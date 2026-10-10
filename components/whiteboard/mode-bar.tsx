@@ -16,6 +16,9 @@ const CLUSTER_HINTS: Record<ClusterView, string> = {
 
 const IKIGAI_HINT = "Pick a step or a circle, then drop cards on it to add its hashtag. Cards stay where they are."
 
+const MARKERS_HINT =
+  "Pick a marker, then drop cards on it to add its hashtag. Cards stay where they are. Ten markers do not write the sentence by themselves."
+
 export function ModeBar({
   mode,
   notes,
@@ -36,6 +39,7 @@ export function ModeBar({
   if (mode.id === "clusters") hint = CLUSTER_HINTS[clusterView]
   if (isMission) {
     if (missionView === "ikigai") hint = IKIGAI_HINT
+    else if (missionView === "markers") hint = MARKERS_HINT
     else if (saved) hint = "Mark each card Keep or Release against this sentence. To change it, choose Sentence."
     else hint = "No mission sentence yet. Choose Sentence to write one in the window."
   }

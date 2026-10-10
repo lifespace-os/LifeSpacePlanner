@@ -2,16 +2,18 @@ import clsx from "clsx"
 import { Plus, X } from "lucide-react"
 import { getCardColor, getIkigaiItem, hasHashtag, type IkigaiItem, type Note } from "@/lib/board-data"
 
-function CardList({
+export function CardList({
   notes,
   empty,
   label,
   onRemove,
+  suffix,
 }: {
   notes: Note[]
   empty: string
   label?: string
   onRemove?: (id: string) => void
+  suffix?: (note: Note) => React.ReactNode
 }) {
   if (notes.length === 0) return <p className="px-3 py-2 text-sm text-ink-soft">{empty}</p>
   return (
@@ -26,6 +28,7 @@ function CardList({
           <span className="min-w-0 flex-1 text-sm leading-snug text-ink">
             <span className="line-clamp-2 break-words">{note.text.trim() || "Blank card"}</span>
           </span>
+          {suffix ? suffix(note) : null}
           {onRemove ? (
             <button
               type="button"

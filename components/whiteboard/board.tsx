@@ -61,6 +61,7 @@ export function Board({
   selectionRef,
   editingId,
   ikigai,
+  tagOnly,
   onZoneMove,
   onZoneResize,
   onGroupMove,
@@ -94,6 +95,8 @@ export function Board({
   selectionRef: RefObject<string[]>
   editingId: string | null
   ikigai: IkigaiBoardState | null
+  /** Cards stay put and dragging only tags them, as in the Ikigai and Markers views. */
+  tagOnly: boolean
   onZoneMove: (id: ZoneId, dx: number, dy: number) => void
   onZoneResize: (id: ZoneId, zone: Zone) => void
   onGroupMove: (id: string, dx: number, dy: number) => void
@@ -290,7 +293,7 @@ export function Board({
           notes={notes}
           ids={selectedIds}
           viewRef={viewRef}
-          fixed={ikigai !== null}
+          fixed={ikigai !== null || tagOnly}
           onMoveMany={onMoveMany}
           onTagDrag={onTagDrag}
         />
@@ -307,7 +310,7 @@ export function Board({
               editing={note.id === editingId}
               viewRef={viewRef}
               selectionRef={selectionRef}
-              fixed={ikigai !== null}
+              fixed={ikigai !== null || tagOnly}
               multiCount={inSelection ? selectedIds.length : 0}
               onSelect={onSelect}
               onTagDrag={onTagDrag}

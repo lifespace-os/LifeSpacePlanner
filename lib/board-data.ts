@@ -2,7 +2,7 @@ export type Mode = "unload" | "clusters" | "mission" | "labels" | "task"
 
 export type ClusterView = "wantmust" | "groups"
 
-export type MissionView = "sentence" | "ikigai"
+export type MissionView = "sentence" | "ikigai" | "markers"
 
 export type ZoneId = "want" | "must"
 
@@ -383,6 +383,37 @@ export function getIkigaiItem(id: string | null | undefined) {
 
 export function countTag(notes: Note[], tag: string) {
   return notes.reduce((total, note) => total + (hasHashtag(note, tag) ? 1 : 0), 0)
+}
+
+/** A sign that something belongs in the mission. Its id is its hashtag. */
+export type Marker = { id: string; name: string; tag: string; description: string }
+
+function marker(tag: string, name: string, description: string): Marker {
+  return { id: tag, name, tag, description }
+}
+
+export const MARKERS: Marker[] = [
+  marker("love-this", "You love it", "You enjoy it for its own sake."),
+  marker("comes-easily", "It comes out well", "The result turns out well without strain."),
+  marker("ease-despite-difficulty", "Easy even when it is hard", "It stays easy for you even when the task is hard."),
+  marker("luck", "Luck shows up", "Good things happen around it, as if luck follows you there."),
+  marker("energy", "It gives energy", "You finish with more energy than you started with."),
+  marker("rather-do-it", "Easier to do than to skip", "Doing it costs you less than avoiding it."),
+  marker("joy", "Joy", "It brings you joy while you do it."),
+  marker("process", "The process matters", "You care about the doing as much as the result."),
+  marker("mastery", "You want mastery", "You want to keep getting better at it."),
+  marker("flow", "Time disappears", "Hours pass and you do not notice."),
+]
+
+const MARKER_INDEX = new Map(MARKERS.map((item) => [item.id, item]))
+
+export function getMarker(id: string | null | undefined) {
+  return id ? MARKER_INDEX.get(id) ?? null : null
+}
+
+/** How many of the ten markers a card carries. */
+export function countMarkers(note: Note) {
+  return MARKERS.reduce((total, item) => total + (hasHashtag(note, item.tag) ? 1 : 0), 0)
 }
 
 export const GROUP_MIN_SIZE = { width: 260, height: 220 }

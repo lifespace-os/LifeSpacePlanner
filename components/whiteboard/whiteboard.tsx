@@ -18,6 +18,7 @@ import {
   ZONE_TAGS,
   areaTagAt,
   getIkigaiItem,
+  getMarker,
   groupAreas,
   groupTag,
   hasHashtag,
@@ -50,6 +51,7 @@ import { Inspector } from "./inspector"
 import { ClustersPanel } from "./clusters-panel"
 import { MissionWindow } from "./mission-window"
 import { IkigaiPanel } from "./ikigai-panel"
+import { MarkersPanel, MarkersWindow } from "./markers-panel"
 import { IkigaiStepsWindow } from "./ikigai-guide"
 import { CardDock } from "./card-dock"
 import { ZoomControls } from "./zoom-controls"
@@ -78,6 +80,9 @@ export function Whiteboard() {
   const [ikigaiCenter, setIkigaiCenter] = useState<IkigaiCenter>({ x: 0, y: 0 })
   const [stepsOpen, setStepsOpen] = useState(true)
   const [detailsOpen, setDetailsOpen] = useState(true)
+  const [markerActive, setMarkerActive] = useState<string | null>(null)
+  const [markersListOpen, setMarkersListOpen] = useState(true)
+  const [markersPanelOpen, setMarkersPanelOpen] = useState(true)
   const [dropHover, setDropHover] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>(NO_IDS)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -93,6 +98,7 @@ export function Whiteboard() {
   const ikigaiPlaced = useRef(false)
 
   const ikigaiOn = mode === "mission" && missionView === "ikigai"
+  const markersOn = mode === "mission" && missionView === "markers"
   const ikigaiOnRef = useRef(ikigaiOn)
   const ikigaiActiveRef = useRef(ikigaiActive)
   const selectionRef = useRef(selectedIds)
@@ -455,6 +461,10 @@ export function Whiteboard() {
     (clientX: number, clientY: number): string | null => {
       const top = document.elementsFromPoint(clientX, clientY).find((el) => !el.closest("[data-note-card], [data-selection-box]"))
       if (!top) return null
+      if (markersOn) {
+        if (top.closest("[data-marker-drop]")) return "panel"
+        return top.closest<HTMLElement>("[data-marker-item]")?.dataset.markerItem ?? null
+      }
       if (top.closest("[data-ikigai-drop]")) return "panel"
       const item = top.closest<HTMLElement>("[data-ikigai-item]")?.dataset.ikigaiItem
       if (item) return item
@@ -462,7 +472,7 @@ export function Whiteboard() {
       const point = screenToWorld(clientX, clientY)
       return ikigaiRegionAt(point.x, point.y, ikigaiCenter)
     },
-    [ikigaiCenter, screenToWorld],
+    [ikigaiCenter, markersOn, screenToWorld],
   )
 
   const handleTagDrag = useCallback(
@@ -477,13 +487,21 @@ export function Whiteboard() {
         return
       }
       setDropHover(null)
+      const ids = selectionRef.current.includes(id) ? selectionRef.current : [id]
+      if (markersOn) {
+        const marker = getMarker(target === "panel" ? markerActive : target)
+        if (!marker) return
+        tagCards(ids, marker.tag)
+        if (target !== "panel") setMarkerActive(marker.id)
+        setSelectedIds(NO_IDS)
+        return
+      }
       const item = getIkigaiItem(target === "panel" ? ikigaiActiveRef.current : target)
       if (!item) return
-      const ids = selectionRef.current.includes(id) ? selectionRef.current : [id]
       tagCards(ids, item.tag)
       if (target !== "panel") setIkigaiActive(item.id)
     },
-    [ikigaiTargetAt, tagCards],
+    [ikigaiTargetAt, markerActive, markersOn, tagCards],
   )
 
   const deleteNote = useCallback((id: string) => {
@@ -621,6 +639,7 @@ export function Whiteboard() {
               }
             : null
         }
+        tagOnly={markersOn}
         onZoneMove={moveZone}
         onZoneResize={resizeZone}
         onGroupMove={moveGroup}
@@ -757,6 +776,64 @@ export function Whiteboard() {
             <button
               type="button"
               onClick={() => setDetailsOpen(true)}
+              aria-label="Show details window"
+              title="Show details window"
+              className="pointer-events-auto absolute top-[11.5rem] right-0 flex h-24 w-9 items-center justify-center rounded-l-xl border border-r-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <ChevronLeft className="size-5" aria-hidden="true" />
+            </button>
+          )}
+        </>
+      ) : null}
+
+      {markersOn ? (
+        <>
+          <div
+            inert={!markersListOpen}
+            aria-hidden={!markersListOpen}
+            className={`pointer-events-none absolute top-[11.5rem] bottom-24 left-4 flex transition-transform duration-300 ease-out motion-reduce:transition-none ${
+              markersListOpen ? "translate-x-0" : "-translate-x-[calc(100%+1.5rem)]"
+            }`}
+          >
+            <MarkersWindow
+              notes={notes}
+              activeId={markerActive}
+              hoverId={dropHover && dropHover !== "panel" ? dropHover : null}
+              onPick={setMarkerActive}
+              onClose={() => setMarkersListOpen(false)}
+            />
+          </div>
+          {markersListOpen ? null : (
+            <button
+              type="button"
+              onClick={() => setMarkersListOpen(true)}
+              aria-label="Show markers window"
+              title="Show markers window"
+              className="pointer-events-auto absolute top-[11.5rem] left-0 flex h-24 w-9 items-center justify-center rounded-r-xl border border-l-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <ChevronRight className="size-5" aria-hidden="true" />
+            </button>
+          )}
+
+          <div
+            inert={!markersPanelOpen}
+            aria-hidden={!markersPanelOpen}
+            className={`pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex transition-transform duration-300 ease-out motion-reduce:transition-none ${
+              markersPanelOpen ? "translate-x-0" : "translate-x-[calc(100%+1.5rem)]"
+            }`}
+          >
+            <MarkersPanel
+              marker={getMarker(markerActive)}
+              notes={notes}
+              dropOver={dropHover === "panel"}
+              onClose={() => setMarkersPanelOpen(false)}
+              onRemoveTag={untagCard}
+            />
+          </div>
+          {markersPanelOpen ? null : (
+            <button
+              type="button"
+              onClick={() => setMarkersPanelOpen(true)}
               aria-label="Show details window"
               title="Show details window"
               className="pointer-events-auto absolute top-[11.5rem] right-0 flex h-24 w-9 items-center justify-center rounded-l-xl border border-r-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"

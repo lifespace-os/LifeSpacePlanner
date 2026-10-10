@@ -9,6 +9,7 @@ const CLUSTER_CONTROLS: { id: ClusterView; name: string }[] = [
 const MISSION_CONTROLS: { id: MissionView; name: string }[] = [
   { id: "sentence", name: "Sentence" },
   { id: "ikigai", name: "Ikigai" },
+  { id: "markers", name: "Markers" },
 ]
 
 export function ModeSwitcher({
