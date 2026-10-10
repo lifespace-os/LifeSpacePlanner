@@ -2,7 +2,9 @@
 
 import { useRef, useState } from "react"
 import clsx from "clsx"
-import { CARD_COLORS, getCardColor, type CardColorId } from "@/lib/board-data"
+import { CARD_COLORS, getCardColor, isCustomColor, type CardColorId } from "@/lib/board-data"
+
+const DEFAULT_CUSTOM_COLOR = "#8fb8c9"
 
 type DragState = { pointerId: number; startX: number; startY: number; moved: boolean }
 
@@ -21,6 +23,8 @@ export function CardDock({
   const drag = useRef<DragState | null>(null)
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null)
   const swatch = getCardColor(color)
+  const customActive = isCustomColor(color)
+  const [customColor, setCustomColor] = useState<string>(customActive ? color : DEFAULT_CUSTOM_COLOR)
 
   function handlePointerDown(event: React.PointerEvent<HTMLButtonElement>) {
     if (event.button !== 0) return
@@ -111,6 +115,45 @@ export function CardDock({
               />
             )
           })}
+
+          <span aria-hidden="true" className="mx-1 h-6 w-px bg-line" />
+
+          <label
+            title="Custom color"
+            className={clsx(
+              "relative flex h-7 cursor-pointer items-center gap-2 rounded-full border border-line bg-board py-0 pr-3 pl-0.5 text-xs font-medium text-ink transition-colors hover:bg-desk focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent",
+              customActive ? "ring-2 ring-ink ring-offset-2 ring-offset-board" : "",
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className="block size-6 rounded-full border-2"
+              style={
+                customActive
+                  ? { backgroundColor: swatch.fill, borderColor: swatch.edge }
+                  : {
+                      backgroundImage:
+                        "conic-gradient(from 0deg, #e8a0a0, #e8c88a, #b9d69a, #8fcbc4, #9db4e6, #c9a3e0, #e8a0a0)",
+                      borderColor: "rgba(35,39,43,0.25)",
+                    }
+              }
+            />
+            Custom
+            <span className="sr-only">card color. Opens a color picker. The next card you drag uses it.</span>
+            <input
+              type="color"
+              value={customActive ? color : customColor}
+              onChange={(event) => {
+                setCustomColor(event.target.value)
+                onColorChange(event.target.value as CardColorId)
+              }}
+              onClick={() => {
+                if (!customActive) onColorChange(customColor as CardColorId)
+              }}
+              aria-label="Custom card color"
+              className="absolute inset-0 size-full cursor-pointer opacity-0"
+            />
+          </label>
         </div>
       </div>
 

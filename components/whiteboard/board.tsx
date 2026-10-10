@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react"
 import clsx from "clsx"
-import type { Bucket, MissionChoice, Mode, Note, View } from "@/lib/board-data"
+import type { MissionChoice, Mode, Note, View, Zone, ZoneId, Zones } from "@/lib/board-data"
 import { NoteCard } from "./note-card"
 import { SortZones } from "./sort-zones"
 
@@ -12,12 +12,15 @@ const GRID = 22
 
 export function Board({
   notes,
+  zones,
   mode,
   view,
   viewRef,
   viewportRef,
   selectedId,
   editingId,
+  onZoneMove,
+  onZoneResize,
   onPan,
   onZoomAt,
   onCanvasMenu,
@@ -32,18 +35,21 @@ export function Board({
   onDelete,
 }: {
   notes: Note[]
+  zones: Zones
   mode: Mode
   view: View
   viewRef: RefObject<View>
   viewportRef: RefObject<HTMLDivElement | null>
   selectedId: string | null
   editingId: string | null
+  onZoneMove: (id: ZoneId, dx: number, dy: number) => void
+  onZoneResize: (id: ZoneId, zone: Zone) => void
   onPan: (dx: number, dy: number) => void
   onZoomAt: (factor: number, clientX: number, clientY: number) => void
   onCanvasMenu: (clientX: number, clientY: number) => void
   onClearSelection: () => void
   onSelect: (id: string) => void
-  onMove: (id: string, x: number, y: number, bucket: Bucket) => void
+  onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
   onFront: (id: string) => void
   onMission: (id: string, choice: Exclude<MissionChoice, null>) => void
   onEditStart: (id: string) => void
@@ -72,7 +78,7 @@ export function Board({
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 && event.button !== 1) return
-    if ((event.target as HTMLElement).closest("[data-note-card]")) return
+    if ((event.target as HTMLElement).closest("[data-note-card], [data-zone-handle]")) return
     if (event.button === 0) onClearSelection()
     if (document.activeElement instanceof HTMLTextAreaElement) document.activeElement.blur()
     pan.current = { pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY }
@@ -128,7 +134,9 @@ export function Board({
         className="absolute top-0 left-0 origin-top-left will-change-transform"
         style={{ transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.zoom})` }}
       >
-        {mode === "sort" ? <SortZones notes={notes} /> : null}
+        {mode === "sort" ? (
+          <SortZones notes={notes} zones={zones} zoom={view.zoom} onMove={onZoneMove} onResize={onZoneResize} />
+        ) : null}
 
         {notes.map((note) => (
           <NoteCard

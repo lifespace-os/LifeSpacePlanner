@@ -6,11 +6,14 @@ import { Maximize2, Minimize2 } from "lucide-react"
 import {
   CARD_MIN_HEIGHT,
   CARD_WIDTH,
+  DEFAULT_ZONES,
   MAX_ZOOM,
   MIN_ZOOM,
   MODES,
   SAMPLE_NOTES,
-  type Bucket,
+  ZONE_MIN_SIZE,
+  applyBucket,
+  bucketAt,
   type CardColorId,
   type LabelGroupId,
   type MissionChoice,
@@ -18,6 +21,9 @@ import {
   type Note,
   type TaskDetails,
   type View,
+  type Zone,
+  type ZoneId,
+  type Zones,
 } from "@/lib/board-data"
 import { ModeSwitcher } from "./mode-switcher"
 import { ModeBar } from "./mode-bar"
@@ -36,6 +42,7 @@ function clampZoom(zoom: number) {
 
 export function Whiteboard() {
   const [notes, setNotes] = useState<Note[]>(SAMPLE_NOTES)
+  const [zones, setZones] = useState<Zones>(DEFAULT_ZONES)
   const [mode, setMode] = useState<Mode>("unload")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -131,32 +138,39 @@ export function Whiteboard() {
     setNotes((prev) => prev.map((note) => (note.id === id ? change(note) : note)))
   }, [])
 
-  const createCardAt = useCallback((worldX: number, worldY: number, color: CardColorId) => {
-    idCounter.current += 1
-    const id = `card-${idCounter.current}`
-    setNotes((prev) => {
-      const maxZ = prev.reduce((max, note) => Math.max(max, note.z), 0)
-      return [
-        ...prev,
-        {
-          id,
-          text: "",
-          color,
-          hashtags: [],
-          x: Math.round(worldX - CARD_WIDTH / 2),
-          y: Math.round(worldY - CARD_MIN_HEIGHT / 2),
-          rotation: Math.round((Math.random() * 4 - 2) * 10) / 10,
-          z: maxZ + 1,
-          bucket: null,
-          mission: null,
-          labels: {},
-          task: null,
-        },
-      ]
-    })
-    setEditingId(id)
-    setMenu(null)
-  }, [])
+  const createCardAt = useCallback(
+    (worldX: number, worldY: number, color: CardColorId) => {
+      idCounter.current += 1
+      const id = `card-${idCounter.current}`
+      const bucket = mode === "sort" ? bucketAt(zones, worldX, worldY) : null
+      setNotes((prev) => {
+        const maxZ = prev.reduce((max, note) => Math.max(max, note.z), 0)
+        return [
+          ...prev,
+          applyBucket(
+            {
+              id,
+              text: "",
+              color,
+              hashtags: [],
+              x: Math.round(worldX - CARD_WIDTH / 2),
+              y: Math.round(worldY - CARD_MIN_HEIGHT / 2),
+              rotation: Math.round((Math.random() * 4 - 2) * 10) / 10,
+              z: maxZ + 1,
+              bucket: null,
+              mission: null,
+              labels: {},
+              task: null,
+            },
+            bucket,
+          ),
+        ]
+      })
+      setEditingId(id)
+      setMenu(null)
+    },
+    [mode, zones],
+  )
 
   const dropFromDock = useCallback(
     (clientX: number, clientY: number) => {
@@ -176,8 +190,61 @@ export function Whiteboard() {
   }, [createCardAt, dockColor, screenToWorld])
 
   const moveNote = useCallback(
-    (id: string, x: number, y: number, bucket: Bucket) => updateNote(id, (note) => ({ ...note, x, y, bucket })),
-    [updateNote],
+    (id: string, x: number, y: number, centerX: number, centerY: number) =>
+      updateNote(id, (note) => {
+        const moved = { ...note, x, y }
+        return mode === "sort" ? applyBucket(moved, bucketAt(zones, centerX, centerY)) : moved
+      }),
+    [mode, updateNote, zones],
+  )
+
+  const cardCenters = useCallback(() => {
+    const centers = new Map<string, { x: number; y: number }>()
+    viewportRef.current?.querySelectorAll<HTMLElement>("[data-note-id]").forEach((el) => {
+      centers.set(el.dataset.noteId ?? "", { x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2 })
+    })
+    return centers
+  }, [])
+
+  const moveZone = useCallback(
+    (id: ZoneId, dx: number, dy: number) => {
+      const next: Zones = { ...zones, [id]: { ...zones[id], left: zones[id].left + dx, top: zones[id].top + dy } }
+      const centers = cardCenters()
+      setZones(next)
+      setNotes((prev) =>
+        prev.map((note) => {
+          const carried = note.bucket === id ? { ...note, x: note.x + dx, y: note.y + dy } : note
+          const center = centers.get(note.id)
+          if (!center) return carried
+          const cx = center.x + (note.bucket === id ? dx : 0)
+          const cy = center.y + (note.bucket === id ? dy : 0)
+          return applyBucket(carried, bucketAt(next, cx, cy))
+        }),
+      )
+    },
+    [cardCenters, zones],
+  )
+
+  const resizeZone = useCallback(
+    (id: ZoneId, zone: Zone) => {
+      const next: Zones = {
+        ...zones,
+        [id]: {
+          ...zone,
+          width: Math.max(ZONE_MIN_SIZE.width, zone.width),
+          height: Math.max(ZONE_MIN_SIZE.height, zone.height),
+        },
+      }
+      const centers = cardCenters()
+      setZones(next)
+      setNotes((prev) =>
+        prev.map((note) => {
+          const center = centers.get(note.id)
+          return center ? applyBucket(note, bucketAt(next, center.x, center.y)) : note
+        }),
+      )
+    },
+    [cardCenters, zones],
   )
 
   const bringToFront = useCallback((id: string) => {
@@ -276,12 +343,15 @@ export function Whiteboard() {
     >
       <Board
         notes={notes}
+        zones={zones}
         mode={mode}
         view={view}
         viewRef={viewRef}
         viewportRef={viewportRef}
         selectedId={showInspector ? selectedId : null}
         editingId={editingId}
+        onZoneMove={moveZone}
+        onZoneResize={resizeZone}
         onPan={pan}
         onZoomAt={zoomAt}
         onCanvasMenu={openCanvasMenu}

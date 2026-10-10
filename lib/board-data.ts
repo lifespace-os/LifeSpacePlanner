@@ -1,6 +1,12 @@
 export type Mode = "unload" | "sort" | "mission" | "labels" | "task"
 
-export type Bucket = "want" | "must" | null
+export type ZoneId = "want" | "must"
+
+export type Bucket = ZoneId | null
+
+export type Zone = { left: number; top: number; width: number; height: number }
+
+export type Zones = Record<ZoneId, Zone>
 
 export type MissionChoice = "keep" | "release" | null
 
@@ -13,7 +19,12 @@ export type TaskDetails = {
   owner: string
 }
 
-export type CardColorId = "butter" | "peach" | "rose" | "sage" | "sky" | "lilac" | "paper"
+export type PresetColorId = "butter" | "peach" | "rose" | "sage" | "sky" | "lilac" | "paper"
+
+/** A preset name, or a custom color as a 6-digit hex such as "#a8d5c9". */
+export type CardColorId = PresetColorId | `#${string}`
+
+export type CardColor = { id: CardColorId; name: string; fill: string; edge: string; dark: boolean }
 
 export type Note = {
   id: string
@@ -52,7 +63,7 @@ export const MODES: { id: Mode; name: string; hint: string }[] = [
 
 export const MISSION = "I build clear systems that help people live more calmly."
 
-export const CARD_COLORS: { id: CardColorId; name: string; fill: string; edge: string }[] = [
+export const CARD_COLORS: { id: PresetColorId; name: string; fill: string; edge: string }[] = [
   { id: "butter", name: "Butter", fill: "#f7e8a4", edge: "#e6d27c" },
   { id: "peach", name: "Peach", fill: "#f6d4bd", edge: "#e8b896" },
   { id: "rose", name: "Rose", fill: "#f3cdd1", edge: "#e2aab1" },
@@ -62,10 +73,23 @@ export const CARD_COLORS: { id: CardColorId; name: string; fill: string; edge: s
   { id: "paper", name: "Paper", fill: "#fffdf8", edge: "#ddd3c2" },
 ]
 
-const COLOR_INDEX = new Map(CARD_COLORS.map((color) => [color.id, color]))
+const COLOR_INDEX = new Map<string, CardColor>(CARD_COLORS.map((color) => [color.id, { ...color, dark: false }]))
 
-export function getCardColor(id: CardColorId) {
-  return COLOR_INDEX.get(id) ?? CARD_COLORS[0]
+const HEX_COLOR = /^#[0-9a-f]{6}$/i
+
+export function isCustomColor(id: string): id is `#${string}` {
+  return HEX_COLOR.test(id)
+}
+
+function customCardColor(hex: `#${string}`): CardColor {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  const edge = [r, g, b].map((channel) => Math.round(channel * 0.82).toString(16).padStart(2, "0")).join("")
+  return { id: hex, name: "Custom", fill: hex, edge: `#${edge}`, dark: luminance < 0.5 }
+}
+
+export function getCardColor(id: CardColorId): CardColor {
+  return COLOR_INDEX.get(id) ?? (isCustomColor(id) ? customCardColor(id) : COLOR_INDEX.get("butter")!)
 }
 
 export function normalizeHashtag(value: string) {
@@ -134,27 +158,38 @@ export function getLabel(id: string | null | undefined) {
   return id ? LABEL_INDEX.get(id) ?? null : null
 }
 
-/** Want and Must zones, in canvas pixels. */
-export const ZONES: Record<Exclude<Bucket, null>, { left: number; top: number; width: number; height: number }> = {
+/** Starting positions for the Want and Must zones, in canvas pixels. */
+export const DEFAULT_ZONES: Zones = {
   want: { left: 0, top: 0, width: 760, height: 640 },
   must: { left: 900, top: 0, width: 760, height: 640 },
 }
 
-export function bucketAt(cx: number, cy: number): Bucket {
+export const ZONE_MIN_SIZE = { width: 300, height: 240 }
+
+export function bucketAt(zones: Zones, cx: number, cy: number): Bucket {
   for (const id of ["want", "must"] as const) {
-    const z = ZONES[id]
+    const z = zones[id]
     if (cx >= z.left && cx <= z.left + z.width && cy >= z.top && cy <= z.top + z.height) return id
   }
   return null
 }
 
+/** Moves a card to a new bucket. Leaving a zone drops its hashtag; entering one adds it. */
+export function applyBucket(note: Note, next: Bucket): Note {
+  if (note.bucket === next) return note
+  let hashtags = note.hashtags
+  if (note.bucket) hashtags = hashtags.filter((tag) => tag.toLowerCase() !== note.bucket)
+  if (next && !hashtags.some((tag) => tag.toLowerCase() === next)) hashtags = [...hashtags, next]
+  return { ...note, bucket: next, hashtags }
+}
+
 type Seed = Pick<Note, "id" | "text" | "color" | "x" | "y" | "rotation"> & Partial<Note>
 
 const SEEDS: Seed[] = [
-  { id: "n1", text: "Run a half marathon next spring", color: "sage", x: 60, y: 70, rotation: -2, bucket: "want", mission: "keep", labels: { area: "body", happiness: "health", budget: "investment" }, hashtags: ["health"] },
-  { id: "n2", text: "Renew passport before June", color: "butter", x: 960, y: 80, rotation: 1.5, bucket: "must", labels: { area: "home", happiness: "safety" } },
+  { id: "n1", text: "Run a half marathon next spring", color: "sage", x: 60, y: 70, rotation: -2, bucket: "want", mission: "keep", labels: { area: "body", happiness: "health", budget: "investment" }, hashtags: ["health", "want"] },
+  { id: "n2", text: "Renew passport before June", color: "butter", x: 960, y: 80, rotation: 1.5, bucket: "must", labels: { area: "home", happiness: "safety" }, hashtags: ["must"] },
   { id: "n3", text: "Am I saving enough for later?", color: "sky", x: 720, y: 820, rotation: -1 },
-  { id: "n4", text: "Call Mom on Sunday", color: "rose", x: 380, y: 300, rotation: 2.5, bucket: "want", mission: "keep", labels: { area: "relationships", happiness: "love" }, hashtags: ["family"] },
+  { id: "n4", text: "Call Mom on Sunday", color: "rose", x: 380, y: 300, rotation: 2.5, bucket: "want", mission: "keep", labels: { area: "relationships", happiness: "love" }, hashtags: ["family", "want"] },
   { id: "n5", text: "Learn to bake sourdough", color: "peach", x: 120, y: 860, rotation: 1 },
   {
     id: "n6",
@@ -164,6 +199,7 @@ const SEEDS: Seed[] = [
     y: 340,
     rotation: -1.5,
     bucket: "must",
+    hashtags: ["must"],
     mission: "keep",
     labels: { area: "home", budget: "expense" },
     task: { title: "Replace kitchen tap washer", labelId: "home", due: "2026-10-18", owner: "Me" },

@@ -7,10 +7,8 @@ import {
   CARD_MIN_HEIGHT,
   CARD_WIDTH,
   LABEL_GROUPS,
-  bucketAt,
   getCardColor,
   getLabel,
-  type Bucket,
   type MissionChoice,
   type Mode,
   type Note,
@@ -25,7 +23,7 @@ type Props = {
   editing: boolean
   viewRef: RefObject<View>
   onSelect: (id: string) => void
-  onMove: (id: string, x: number, y: number, bucket: Bucket) => void
+  onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
   onFront: (id: string) => void
   onMission: (id: string, choice: Exclude<MissionChoice, null>) => void
   onEditStart: (id: string) => void
@@ -78,7 +76,7 @@ export const NoteCard = memo(function NoteCard({
     const y = Math.round(top)
     card.style.left = `${x}px`
     card.style.top = `${y}px`
-    onMove(note.id, x, y, bucketAt(x + card.offsetWidth / 2, y + card.offsetHeight / 2))
+    onMove(note.id, x, y, x + card.offsetWidth / 2, y + card.offsetHeight / 2)
   }
 
   function handlePointerDown(event: React.PointerEvent<HTMLElement>) {
@@ -174,6 +172,7 @@ export const NoteCard = memo(function NoteCard({
     <article
       ref={cardRef}
       data-note-card=""
+      data-note-id={note.id}
       tabIndex={0}
       aria-label={summary}
       aria-describedby="board-help"
@@ -207,6 +206,7 @@ export const NoteCard = memo(function NoteCard({
         "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-board",
         editing ? "cursor-text" : dragging ? "cursor-grabbing" : "cursor-grab",
         isTask ? "task-ruled rounded-md border border-line bg-card" : "rounded-sm border-b-2",
+        !isTask && (color.dark ? "text-board" : "text-ink"),
         dragging || editing
           ? "shadow-[0_18px_30px_-12px_rgba(35,39,43,0.45)]"
           : "shadow-[0_1px_1px_rgba(35,39,43,0.08),0_6px_14px_-8px_rgba(35,39,43,0.35)]",
@@ -221,7 +221,7 @@ export const NoteCard = memo(function NoteCard({
       ) : (
         <p
           className={clsx(
-            "flex-1 px-4 pt-3.5 pb-3 font-serif text-lg leading-snug text-ink text-pretty break-words whitespace-pre-wrap",
+            "flex-1 px-4 pt-3.5 pb-3 font-serif text-lg leading-snug text-current text-pretty break-words whitespace-pre-wrap",
             released && "line-through decoration-release/60",
           )}
         >
@@ -230,7 +230,7 @@ export const NoteCard = memo(function NoteCard({
       )}
 
       {note.hashtags.length > 0 ? (
-        <ul aria-label="Hashtags" className="flex flex-wrap gap-x-2 gap-y-0.5 px-4 pb-2.5 text-xs font-medium text-ink-soft">
+        <ul aria-label="Hashtags" className="flex flex-wrap gap-x-2 gap-y-0.5 px-4 pb-2.5 text-xs font-medium text-current/70">
           {note.hashtags.map((tag) => (
             <li key={tag}>#{tag}</li>
           ))}
@@ -278,7 +278,7 @@ function CardEditor({ note, onDone }: { note: Note; onDone: (text: string) => vo
       onPointerDown={(e) => e.stopPropagation()}
       placeholder="Write anything…"
       maxLength={280}
-      className="field-sizing-content min-h-[116px] w-full flex-1 resize-none bg-transparent px-4 pt-3.5 pb-3 font-serif text-lg leading-snug text-ink outline-none placeholder:text-ink/35"
+      className="field-sizing-content min-h-[116px] w-full flex-1 resize-none bg-transparent px-4 pt-3.5 pb-3 font-serif text-lg leading-snug text-current outline-none placeholder:text-current/40"
     />
   )
 }
@@ -349,7 +349,7 @@ function MissionControls({
         onClick={() => onMission(note.id, "keep")}
         className={clsx(
           "flex flex-1 items-center justify-center gap-1 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
-          note.mission === "keep" ? "bg-accent text-board" : "text-ink-soft hover:bg-accent-soft hover:text-accent",
+          note.mission === "keep" ? "bg-accent text-board" : "text-current/70 hover:bg-accent-soft hover:text-accent",
         )}
       >
         <Check className="size-3.5" aria-hidden="true" />
@@ -361,7 +361,7 @@ function MissionControls({
         onClick={() => onMission(note.id, "release")}
         className={clsx(
           "flex flex-1 items-center justify-center gap-1 border-l border-ink/10 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
-          note.mission === "release" ? "bg-release text-board" : "text-ink-soft hover:bg-release/10 hover:text-release",
+          note.mission === "release" ? "bg-release text-board" : "text-current/70 hover:bg-release/10 hover:text-release",
         )}
       >
         <X className="size-3.5" aria-hidden="true" />
