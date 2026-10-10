@@ -90,6 +90,7 @@ export function Whiteboard() {
   const viewportRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<View>(view)
   const idCounter = useRef(0)
+  const ikigaiPlaced = useRef(false)
 
   const ikigaiOn = mode === "mission" && missionView === "ikigai"
   const ikigaiOnRef = useRef(ikigaiOn)
@@ -179,9 +180,10 @@ export function Whiteboard() {
   }, [fitAll])
 
   useLayoutEffect(() => {
-    if (!ikigaiOn) return
+    if (!ikigaiOn || ikigaiPlaced.current) return
     const viewport = viewportRef.current
     if (!viewport) return
+    ikigaiPlaced.current = true
     let right = -Infinity
     let top = Infinity
     let bottom = -Infinity
