@@ -1,24 +1,34 @@
 "use client"
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import clsx from "clsx"
 import { Maximize2, Minimize2 } from "lucide-react"
 import {
   CARD_MIN_HEIGHT,
   CARD_WIDTH,
+  DEFAULT_GROUPS,
   DEFAULT_ZONES,
   MAX_ZOOM,
   MIN_ZOOM,
   MODES,
   SAMPLE_NOTES,
   ZONE_MIN_SIZE,
-  applyBucket,
-  bucketAt,
+  ZONE_TAGS,
+  areaTagAt,
+  groupAreas,
+  groupTag,
+  nextGroupRect,
+  reconcile,
+  retag,
+  zoneAreas,
   type CardColorId,
+  type ClusterView,
+  type Group,
   type LabelGroupId,
   type MissionChoice,
   type Mode,
   type Note,
+  type TaggedArea,
   type TaskDetails,
   type View,
   type Zone,
@@ -29,6 +39,7 @@ import { ModeSwitcher } from "./mode-switcher"
 import { ModeBar } from "./mode-bar"
 import { Board } from "./board"
 import { Inspector } from "./inspector"
+import { ClustersPanel } from "./clusters-panel"
 import { CardDock } from "./card-dock"
 import { ZoomControls } from "./zoom-controls"
 import { CanvasMenu, CardMenu, type MenuState } from "./context-menu"
@@ -43,6 +54,8 @@ function clampZoom(zoom: number) {
 export function Whiteboard() {
   const [notes, setNotes] = useState<Note[]>(SAMPLE_NOTES)
   const [zones, setZones] = useState<Zones>(DEFAULT_ZONES)
+  const [groups, setGroups] = useState<Group[]>(DEFAULT_GROUPS)
+  const [clusterView, setClusterView] = useState<ClusterView>("wantmust")
   const [mode, setMode] = useState<Mode>("unload")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -104,7 +117,7 @@ export function Whiteboard() {
   const fitAll = useCallback(() => {
     const viewport = viewportRef.current
     if (!viewport) return
-    const cards = viewport.querySelectorAll<HTMLElement>("[data-note-card]")
+    const cards = viewport.querySelectorAll<HTMLElement>("[data-note-card], [data-zone]")
     if (cards.length === 0) {
       updateView(() => ({ x: viewport.clientWidth / 2, y: viewport.clientHeight / 2, zoom: 1 }))
       return
@@ -134,6 +147,19 @@ export function Whiteboard() {
     return () => cancelAnimationFrame(frame)
   }, [fitAll])
 
+  const visibleLayer = mode === "clusters" ? clusterView : null
+  useEffect(() => {
+    if (!visibleLayer) return
+    const frame = requestAnimationFrame(fitAll)
+    return () => cancelAnimationFrame(frame)
+  }, [visibleLayer, fitAll])
+
+  const layer = useMemo<{ areas: TaggedArea[]; tags: string[] } | null>(() => {
+    if (mode !== "clusters") return null
+    if (clusterView === "wantmust") return { areas: zoneAreas(zones), tags: ZONE_TAGS }
+    return { areas: groupAreas(groups), tags: groups.map((g) => g.tag) }
+  }, [mode, clusterView, zones, groups])
+
   const updateNote = useCallback((id: string, change: (note: Note) => Note) => {
     setNotes((prev) => prev.map((note) => (note.id === id ? change(note) : note)))
   }, [])
@@ -142,34 +168,28 @@ export function Whiteboard() {
     (worldX: number, worldY: number, color: CardColorId) => {
       idCounter.current += 1
       const id = `card-${idCounter.current}`
-      const bucket = mode === "sort" ? bucketAt(zones, worldX, worldY) : null
+      const area = layer ? areaTagAt(layer.areas, worldX, worldY) : null
       setNotes((prev) => {
         const maxZ = prev.reduce((max, note) => Math.max(max, note.z), 0)
-        return [
-          ...prev,
-          applyBucket(
-            {
-              id,
-              text: "",
-              color,
-              hashtags: [],
-              x: Math.round(worldX - CARD_WIDTH / 2),
-              y: Math.round(worldY - CARD_MIN_HEIGHT / 2),
-              rotation: Math.round((Math.random() * 4 - 2) * 10) / 10,
-              z: maxZ + 1,
-              bucket: null,
-              mission: null,
-              labels: {},
-              task: null,
-            },
-            bucket,
-          ),
-        ]
+        const card: Note = {
+          id,
+          text: "",
+          color,
+          hashtags: [],
+          x: Math.round(worldX - CARD_WIDTH / 2),
+          y: Math.round(worldY - CARD_MIN_HEIGHT / 2),
+          rotation: Math.round((Math.random() * 4 - 2) * 10) / 10,
+          z: maxZ + 1,
+          mission: null,
+          labels: {},
+          task: null,
+        }
+        return [...prev, layer ? retag(card, layer.tags, area) : card]
       })
       setEditingId(id)
       setMenu(null)
     },
-    [mode, zones],
+    [layer],
   )
 
   const dropFromDock = useCallback(
@@ -193,9 +213,12 @@ export function Whiteboard() {
     (id: string, x: number, y: number, centerX: number, centerY: number) =>
       updateNote(id, (note) => {
         const moved = { ...note, x, y }
-        return mode === "sort" ? applyBucket(moved, bucketAt(zones, centerX, centerY)) : moved
+        if (!layer) return moved
+        const from = areaTagAt(layer.areas, centerX - (x - note.x), centerY - (y - note.y))
+        const to = areaTagAt(layer.areas, centerX, centerY)
+        return reconcile(moved, layer.tags, from, to)
       }),
-    [mode, updateNote, zones],
+    [layer, updateNote],
   )
 
   const cardCenters = useCallback(() => {
@@ -206,23 +229,32 @@ export function Whiteboard() {
     return centers
   }, [])
 
-  const moveZone = useCallback(
-    (id: ZoneId, dx: number, dy: number) => {
-      const next: Zones = { ...zones, [id]: { ...zones[id], left: zones[id].left + dx, top: zones[id].top + dy } }
+  /** Re-tags cards after an area moves or resizes. Cards sitting in `carryTag` travel with the area (dx, dy). */
+  const reshapeAreas = useCallback(
+    (tags: string[], prevAreas: TaggedArea[], nextAreas: TaggedArea[], carryTag: string | null, dx: number, dy: number) => {
       const centers = cardCenters()
-      setZones(next)
       setNotes((prev) =>
         prev.map((note) => {
-          const carried = note.bucket === id ? { ...note, x: note.x + dx, y: note.y + dy } : note
           const center = centers.get(note.id)
-          if (!center) return carried
-          const cx = center.x + (note.bucket === id ? dx : 0)
-          const cy = center.y + (note.bucket === id ? dy : 0)
-          return applyBucket(carried, bucketAt(next, cx, cy))
+          if (!center) return note
+          const from = areaTagAt(prevAreas, center.x, center.y)
+          const carried = carryTag !== null && from === carryTag
+          const shifted = carried ? { ...note, x: note.x + dx, y: note.y + dy } : note
+          const to = areaTagAt(nextAreas, center.x + (carried ? dx : 0), center.y + (carried ? dy : 0))
+          return reconcile(shifted, tags, from, to)
         }),
       )
     },
-    [cardCenters, zones],
+    [cardCenters],
+  )
+
+  const moveZone = useCallback(
+    (id: ZoneId, dx: number, dy: number) => {
+      const next: Zones = { ...zones, [id]: { ...zones[id], left: zones[id].left + dx, top: zones[id].top + dy } }
+      setZones(next)
+      reshapeAreas(ZONE_TAGS, zoneAreas(zones), zoneAreas(next), id, dx, dy)
+    },
+    [reshapeAreas, zones],
   )
 
   const resizeZone = useCallback(
@@ -235,17 +267,51 @@ export function Whiteboard() {
           height: Math.max(ZONE_MIN_SIZE.height, zone.height),
         },
       }
-      const centers = cardCenters()
       setZones(next)
-      setNotes((prev) =>
-        prev.map((note) => {
-          const center = centers.get(note.id)
-          return center ? applyBucket(note, bucketAt(next, center.x, center.y)) : note
-        }),
-      )
+      reshapeAreas(ZONE_TAGS, zoneAreas(zones), zoneAreas(next), null, 0, 0)
     },
-    [cardCenters, zones],
+    [reshapeAreas, zones],
   )
+
+  const moveGroup = useCallback(
+    (id: string, dx: number, dy: number) => {
+      const next = groups.map((g) => (g.id === id ? { ...g, left: g.left + dx, top: g.top + dy } : g))
+      const tag = groups.find((g) => g.id === id)?.tag ?? null
+      setGroups(next)
+      reshapeAreas(next.map((g) => g.tag), groupAreas(groups), groupAreas(next), tag, dx, dy)
+    },
+    [groups, reshapeAreas],
+  )
+
+  const resizeGroup = useCallback(
+    (id: string, zone: Zone) => {
+      const next = groups.map((g) => (g.id === id ? { ...g, ...zone } : g))
+      setGroups(next)
+      reshapeAreas(next.map((g) => g.tag), groupAreas(groups), groupAreas(next), null, 0, 0)
+    },
+    [groups, reshapeAreas],
+  )
+
+  const addGroup = useCallback(
+    (name: string) => {
+      const tag = groupTag(name)
+      if (!tag || groups.some((g) => g.tag === tag)) return
+      const group: Group = { id: tag, name, tag, ...nextGroupRect(groups) }
+      setGroups([...groups, group])
+      updateView((v) => {
+        const rect = viewportRef.current
+        if (!rect) return v
+        return {
+          ...v,
+          x: rect.clientWidth / 2 - (group.left + group.width / 2) * v.zoom,
+          y: rect.clientHeight / 2 - (group.top + group.height / 2) * v.zoom,
+        }
+      })
+    },
+    [groups, updateView],
+  )
+
+  const removeGroup = useCallback((id: string) => setGroups((prev) => prev.filter((g) => g.id !== id)), [])
 
   const bringToFront = useCallback((id: string) => {
     setNotes((prev) => {
@@ -344,6 +410,8 @@ export function Whiteboard() {
       <Board
         notes={notes}
         zones={zones}
+        groups={groups}
+        clusterView={clusterView}
         mode={mode}
         view={view}
         viewRef={viewRef}
@@ -352,6 +420,8 @@ export function Whiteboard() {
         editingId={editingId}
         onZoneMove={moveZone}
         onZoneResize={resizeZone}
+        onGroupMove={moveGroup}
+        onGroupResize={resizeGroup}
         onPan={pan}
         onZoomAt={zoomAt}
         onCanvasMenu={openCanvasMenu}
@@ -367,7 +437,7 @@ export function Whiteboard() {
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4">
-        <ModeBar mode={activeMode} notes={notes} />
+        <ModeBar mode={activeMode} notes={notes} clusterView={clusterView} onClusterViewChange={setClusterView} />
         <div className="pointer-events-auto flex items-center gap-2">
           <ModeSwitcher mode={mode} onChange={setMode} />
           <button
@@ -386,6 +456,18 @@ export function Whiteboard() {
           </button>
         </div>
       </div>
+
+      {mode === "clusters" ? (
+        <div className="pointer-events-none absolute top-[7.5rem] right-4 bottom-24 flex">
+          <ClustersPanel
+            groups={groups}
+            notes={notes}
+            onAddGroup={addGroup}
+            onRemoveGroup={removeGroup}
+            onNewCard={placeAtCenter}
+          />
+        </div>
+      ) : null}
 
       {showInspector ? (
         <div className="pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex">

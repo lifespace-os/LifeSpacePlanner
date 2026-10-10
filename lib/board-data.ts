@@ -1,12 +1,19 @@
-export type Mode = "unload" | "sort" | "mission" | "labels" | "task"
+export type Mode = "unload" | "clusters" | "mission" | "labels" | "task"
+
+export type ClusterView = "wantmust" | "groups"
 
 export type ZoneId = "want" | "must"
 
-export type Bucket = ZoneId | null
-
+/** A rectangle on the canvas, in world pixels. */
 export type Zone = { left: number; top: number; width: number; height: number }
 
 export type Zones = Record<ZoneId, Zone>
+
+/** A named area in the Groups view. Its hashtag is the group's membership. */
+export type Group = Zone & { id: string; name: string; tag: string }
+
+/** An area that owns a hashtag. Both Want / Must zones and groups are areas. */
+export type TaggedArea = Zone & { tag: string }
 
 export type MissionChoice = "keep" | "release" | null
 
@@ -36,7 +43,6 @@ export type Note = {
   y: number
   rotation: number
   z: number
-  bucket: Bucket
   mission: MissionChoice
   labels: Partial<Record<LabelGroupId, string>>
   task: TaskDetails | null
@@ -55,7 +61,11 @@ export const MODES: { id: Mode; name: string; hint: string }[] = [
     name: "Unload",
     hint: "Drag a blank card from the dock and write whatever is on your mind.",
   },
-  { id: "sort", name: "Want / Must", hint: "Drag cards into Want or Must. A card can stay outside both." },
+  {
+    id: "clusters",
+    name: "Clusters",
+    hint: "Sort the same cards two ways. Open either view first. Neither is required.",
+  },
   { id: "mission", name: "Mission", hint: "Read the mission, then mark each card Keep or Release." },
   { id: "labels", name: "Labels", hint: "Select a card, then answer the three questions in the panel." },
   { id: "task", name: "Make a task", hint: "Select a card and turn it into a task. One card, one task." },
@@ -166,30 +176,109 @@ export const DEFAULT_ZONES: Zones = {
 
 export const ZONE_MIN_SIZE = { width: 300, height: 240 }
 
-export function bucketAt(zones: Zones, cx: number, cy: number): Bucket {
-  for (const id of ["want", "must"] as const) {
-    const z = zones[id]
-    if (cx >= z.left && cx <= z.left + z.width && cy >= z.top && cy <= z.top + z.height) return id
+export const ZONE_IDS: ZoneId[] = ["want", "must"]
+
+export const ZONE_TAGS: string[] = ZONE_IDS
+
+export function zoneAreas(zones: Zones): TaggedArea[] {
+  return ZONE_IDS.map((id) => ({ ...zones[id], tag: id }))
+}
+
+export function groupAreas(groups: Group[]): TaggedArea[] {
+  return groups.map(({ left, top, width, height, tag }) => ({ left, top, width, height, tag }))
+}
+
+/** The tag of the topmost area that contains a point, or null when the point is outside every area. */
+export function areaTagAt(areas: TaggedArea[], cx: number, cy: number): string | null {
+  for (let i = areas.length - 1; i >= 0; i--) {
+    const a = areas[i]
+    if (cx >= a.left && cx <= a.left + a.width && cy >= a.top && cy <= a.top + a.height) return a.tag
   }
   return null
 }
 
-/** Moves a card to a new bucket. Leaving a zone drops its hashtag; entering one adds it. */
-export function applyBucket(note: Note, next: Bucket): Note {
-  if (note.bucket === next) return note
-  let hashtags = note.hashtags
-  if (note.bucket) hashtags = hashtags.filter((tag) => tag.toLowerCase() !== note.bucket)
-  if (next && !hashtags.some((tag) => tag.toLowerCase() === next)) hashtags = [...hashtags, next]
-  return { ...note, bucket: next, hashtags }
+export function hasHashtag(note: Note, tag: string) {
+  return note.hashtags.some((t) => t.toLowerCase() === tag.toLowerCase())
 }
+
+/**
+ * Moves a card between the areas of one view. Only that view's hashtags change: entering an area
+ * adds its tag, leaving removes it. Hashtags from the other view are never touched.
+ */
+export function retag(note: Note, viewTags: string[], next: string | null): Note {
+  const owned = new Set(viewTags.map((t) => t.toLowerCase()))
+  let hashtags = note.hashtags.filter((t) => !owned.has(t.toLowerCase()) || t.toLowerCase() === next?.toLowerCase())
+  if (next && !hashtags.some((t) => t.toLowerCase() === next.toLowerCase())) hashtags = [...hashtags, next]
+  const unchanged = hashtags.length === note.hashtags.length && hashtags.every((t, i) => t === note.hashtags[i])
+  return unchanged ? note : { ...note, hashtags }
+}
+
+/** Retags a card only when it crossed from one area to another, so tags added by hand survive a nudge. */
+export function reconcile(note: Note, viewTags: string[], from: string | null, to: string | null): Note {
+  return from === to ? note : retag(note, viewTags, to)
+}
+
+export const GROUP_MIN_SIZE = { width: 260, height: 220 }
+
+const GROUP_SLOT = { width: 380, height: 470, gap: 30, columns: 4 }
+
+export function groupTag(name: string) {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^\p{L}\p{N}_-]/gu, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 32)
+}
+
+/** First grid slot that does not overlap an existing group area. */
+export function nextGroupRect(groups: Zone[]): Zone {
+  for (let i = 0; i < 200; i++) {
+    const col = i % GROUP_SLOT.columns
+    const row = Math.floor(i / GROUP_SLOT.columns)
+    const rect = {
+      left: col * (GROUP_SLOT.width + GROUP_SLOT.gap),
+      top: row * (GROUP_SLOT.height + GROUP_SLOT.gap),
+      width: GROUP_SLOT.width,
+      height: GROUP_SLOT.height,
+    }
+    const taken = groups.some(
+      (g) =>
+        rect.left < g.left + g.width &&
+        rect.left + rect.width > g.left &&
+        rect.top < g.top + g.height &&
+        rect.top + rect.height > g.top,
+    )
+    if (!taken) return rect
+  }
+  return { left: 0, top: 0, ...GROUP_SLOT }
+}
+
+const GROUP_NAMES = [
+  "Fears and anxieties",
+  "Dreams and goals",
+  "Unfinished business",
+  "Problems",
+  "Obligations",
+  "Ideas",
+  "Questions",
+  "People",
+]
+
+export const DEFAULT_GROUPS: Group[] = GROUP_NAMES.reduce<Group[]>((groups, name) => {
+  const tag = groupTag(name)
+  return [...groups, { id: tag, name, tag, ...nextGroupRect(groups) }]
+}, [])
 
 type Seed = Pick<Note, "id" | "text" | "color" | "x" | "y" | "rotation"> & Partial<Note>
 
 const SEEDS: Seed[] = [
-  { id: "n1", text: "Run a half marathon next spring", color: "sage", x: 60, y: 70, rotation: -2, bucket: "want", mission: "keep", labels: { area: "body", happiness: "health", budget: "investment" }, hashtags: ["health", "want"] },
-  { id: "n2", text: "Renew passport before June", color: "butter", x: 960, y: 80, rotation: 1.5, bucket: "must", labels: { area: "home", happiness: "safety" }, hashtags: ["must"] },
+  { id: "n1", text: "Run a half marathon next spring", color: "sage", x: 60, y: 70, rotation: -2, mission: "keep", labels: { area: "body", happiness: "health", budget: "investment" }, hashtags: ["health", "want"] },
+  { id: "n2", text: "Renew passport before June", color: "butter", x: 960, y: 80, rotation: 1.5, labels: { area: "home", happiness: "safety" }, hashtags: ["must"] },
   { id: "n3", text: "Am I saving enough for later?", color: "sky", x: 720, y: 820, rotation: -1 },
-  { id: "n4", text: "Call Mom on Sunday", color: "rose", x: 380, y: 300, rotation: 2.5, bucket: "want", mission: "keep", labels: { area: "relationships", happiness: "love" }, hashtags: ["family", "want"] },
+  { id: "n4", text: "Call Mom on Sunday", color: "rose", x: 380, y: 300, rotation: 2.5, mission: "keep", labels: { area: "relationships", happiness: "love" }, hashtags: ["family", "want"] },
   { id: "n5", text: "Learn to bake sourdough", color: "peach", x: 120, y: 860, rotation: 1 },
   {
     id: "n6",
@@ -198,7 +287,6 @@ const SEEDS: Seed[] = [
     x: 1280,
     y: 340,
     rotation: -1.5,
-    bucket: "must",
     hashtags: ["must"],
     mission: "keep",
     labels: { area: "home", budget: "expense" },
@@ -211,12 +299,19 @@ const SEEDS: Seed[] = [
   { id: "n11", text: "Reply to every unread group chat", color: "peach", x: 740, y: 470, rotation: 1.5, mission: "release" },
 ]
 
-export const SAMPLE_NOTES: Note[] = SEEDS.map((seed, index) => ({
-  hashtags: [],
-  bucket: null,
-  mission: null,
-  labels: {},
-  task: null,
-  z: index + 1,
-  ...seed,
-}))
+const SAMPLE_GROUP_AREAS = groupAreas(DEFAULT_GROUPS)
+const SAMPLE_GROUP_TAGS = DEFAULT_GROUPS.map((g) => g.tag)
+
+/** Sample cards that sit inside a starting group area carry that group's hashtag, so counts match what is on screen. */
+export const SAMPLE_NOTES: Note[] = SEEDS.map((seed, index) => {
+  const note: Note = {
+    hashtags: [],
+    mission: null,
+    labels: {},
+    task: null,
+    z: index + 1,
+    ...seed,
+  }
+  const group = areaTagAt(SAMPLE_GROUP_AREAS, note.x + CARD_WIDTH / 2, note.y + CARD_MIN_HEIGHT / 2)
+  return retag(note, SAMPLE_GROUP_TAGS, group)
+})

@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react"
 import clsx from "clsx"
-import type { MissionChoice, Mode, Note, View, Zone, ZoneId, Zones } from "@/lib/board-data"
+import type { ClusterView, Group, MissionChoice, Mode, Note, View, Zone, ZoneId, Zones } from "@/lib/board-data"
 import { NoteCard } from "./note-card"
 import { SortZones } from "./sort-zones"
+import { GroupAreas } from "./group-areas"
 
 type PanState = { pointerId: number; lastX: number; lastY: number }
 
@@ -13,6 +14,8 @@ const GRID = 22
 export function Board({
   notes,
   zones,
+  groups,
+  clusterView,
   mode,
   view,
   viewRef,
@@ -21,6 +24,8 @@ export function Board({
   editingId,
   onZoneMove,
   onZoneResize,
+  onGroupMove,
+  onGroupResize,
   onPan,
   onZoomAt,
   onCanvasMenu,
@@ -36,6 +41,8 @@ export function Board({
 }: {
   notes: Note[]
   zones: Zones
+  groups: Group[]
+  clusterView: ClusterView
   mode: Mode
   view: View
   viewRef: RefObject<View>
@@ -44,6 +51,8 @@ export function Board({
   editingId: string | null
   onZoneMove: (id: ZoneId, dx: number, dy: number) => void
   onZoneResize: (id: ZoneId, zone: Zone) => void
+  onGroupMove: (id: string, dx: number, dy: number) => void
+  onGroupResize: (id: string, zone: Zone) => void
   onPan: (dx: number, dy: number) => void
   onZoomAt: (factor: number, clientX: number, clientY: number) => void
   onCanvasMenu: (clientX: number, clientY: number) => void
@@ -134,8 +143,11 @@ export function Board({
         className="absolute top-0 left-0 origin-top-left will-change-transform"
         style={{ transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.zoom})` }}
       >
-        {mode === "sort" ? (
+        {mode === "clusters" && clusterView === "wantmust" ? (
           <SortZones notes={notes} zones={zones} zoom={view.zoom} onMove={onZoneMove} onResize={onZoneResize} />
+        ) : null}
+        {mode === "clusters" && clusterView === "groups" ? (
+          <GroupAreas notes={notes} groups={groups} zoom={view.zoom} onMove={onGroupMove} onResize={onGroupResize} />
         ) : null}
 
         {notes.map((note) => (
