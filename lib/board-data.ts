@@ -73,7 +73,7 @@ export const MODES: { id: Mode; name: string; hint: string }[] = [
   { id: "task", name: "Make a task", hint: "Select a card and turn it into a task. One card, one task." },
 ]
 
-export const MISSION_MAX_LENGTH = 200
+export const MISSION_MAX_LENGTH = 1000
 
 export const CARD_COLORS: { id: PresetColorId; name: string; fill: string; edge: string }[] = [
   { id: "butter", name: "Butter", fill: "#f7e8a4", edge: "#e6d27c" },
