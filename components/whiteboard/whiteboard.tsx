@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
 import {
   CARD_MIN_HEIGHT,
   CARD_WIDTH,
+  DEFAULT_GOAL_PLAN,
   DEFAULT_GROUPS,
   DEFAULT_ZONES,
   GOAL_LEVELS,
@@ -32,6 +33,7 @@ import {
   hasHashtag,
   ikigaiRegionAt,
   nextGroupRect,
+  opensGoalPanel,
   reconcile,
   retag,
   setGoalLevel,
@@ -64,6 +66,7 @@ import { IkigaiPanel } from "./ikigai-panel"
 import { MarkersPanel, MarkersWindow } from "./markers-panel"
 import { GoalsPanel, MissionStrip } from "./goals-panel"
 import { GoalMapControls, type GoalMapCommit } from "./goal-map"
+import { GoalCardPanel, type GoalDraft } from "./goal-card-panel"
 import { IkigaiStepsWindow } from "./ikigai-guide"
 import { CardDock } from "./card-dock"
 import { ZoomControls } from "./zoom-controls"
@@ -103,6 +106,7 @@ export function Whiteboard() {
   const [mapFocus, setMapFocus] = useState<number | null>(null)
   const [mapScale, setMapScale] = useState(GOAL_RING_SCALE.initial)
   const [mapAllThreads, setMapAllThreads] = useState(false)
+  const [goalCard, setGoalCard] = useState<{ id: string; fresh: boolean } | null>(null)
   const [dropHover, setDropHover] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>(NO_IDS)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -122,6 +126,9 @@ export function Whiteboard() {
   const goalsOn = mode === "goals"
   const goalsDropOn = goalsOn
   const mapOn = goalsOn && goalView === "map"
+  const goalFormOn = goalsOn && (goalView === "life" || goalView === "project")
+  const notesRef = useRef(notes)
+  notesRef.current = notes
   const ikigaiOnRef = useRef(ikigaiOn)
   const ikigaiActiveRef = useRef(ikigaiActive)
   const selectionRef = useRef(selectedIds)
@@ -315,6 +322,7 @@ export function Whiteboard() {
       idCounter.current += 1
       const id = `card-${idCounter.current}`
       const area = layer ? areaTagAt(layer.areas, worldX, worldY) : null
+      const levelTag = goalFormOn ? (goalView === "life" ? "life-goal" : "project-goal") : null
       setNotes((prev) => {
         const maxZ = prev.reduce((max, note) => Math.max(max, note.z), 0)
         const card: Note = {
@@ -330,12 +338,68 @@ export function Whiteboard() {
           labels: {},
           task: null,
         }
+        if (levelTag) return [...prev, setGoalLevel(card, levelTag)]
         return [...prev, layer ? retag(card, layer.tags, area) : card]
       })
-      setEditingId(id)
+      if (levelTag) {
+        setGoalCard({ id, fresh: true })
+        setGoalsPanelOpen(true)
+      } else {
+        setEditingId(id)
+      }
       setMenu(null)
     },
-    [layer],
+    [layer, goalFormOn, goalView],
+  )
+
+  useEffect(() => {
+    if (!goalFormOn) {
+      setGoalCard(null)
+      return
+    }
+    if (selectedIds.length !== 1) return
+    const note = notesRef.current.find((n) => n.id === selectedIds[0])
+    if (!note || !opensGoalPanel(note)) return
+    setGoalCard((prev) => (prev?.id === note.id ? prev : { id: note.id, fresh: false }))
+  }, [goalFormOn, selectedIds])
+
+  const saveGoalCard = useCallback(
+    (id: string, draft: GoalDraft) => {
+      updateNote(id, (note) => ({ ...note, text: draft.text, parentId: draft.parentId, goalPlan: draft.plan }))
+      setGoalCard((prev) => (prev?.id === id ? { id, fresh: false } : prev))
+    },
+    [updateNote],
+  )
+
+  const splitGoalCard = useCallback(
+    (id: string, draft: GoalDraft, secondText: string) => {
+      idCounter.current += 1
+      const siblingId = `card-${idCounter.current}`
+      setNotes((prev) => {
+        const source = prev.find((note) => note.id === id)
+        if (!source) return prev
+        const maxZ = prev.reduce((max, note) => Math.max(max, note.z), 0)
+        const sibling: Note = {
+          ...source,
+          id: siblingId,
+          text: secondText,
+          x: source.x + CARD_WIDTH + 24,
+          z: maxZ + 1,
+          rotation: Math.round((Math.random() * 4 - 2) * 10) / 10,
+          labels: {},
+          task: null,
+          mapAngle: null,
+          parentId: draft.parentId,
+          goalPlan: { ...DEFAULT_GOAL_PLAN, ground: draft.plan.ground, ownChoice: draft.plan.ownChoice, oneResult: true, split: true },
+        }
+        const updated = prev.map((note) =>
+          note.id === id ? { ...note, text: draft.text, parentId: draft.parentId, goalPlan: draft.plan } : note,
+        )
+        return [...updated, sibling]
+      })
+      setGoalCard((prev) => (prev?.id === id ? { id, fresh: false } : prev))
+    },
+    [],
   )
 
   const dropFromDock = useCallback(
@@ -729,6 +793,8 @@ export function Whiteboard() {
   const showInspector = mode === "labels" || mode === "task"
   const selectedNote = selectedIds.length === 1 ? (notes.find((note) => note.id === selectedIds[0]) ?? null) : null
   const menuNote = menu?.kind === "card" ? notes.find((note) => note.id === menu.noteId) ?? null : null
+  const goalFormCandidate = goalFormOn && goalCard ? (notes.find((note) => note.id === goalCard.id) ?? null) : null
+  const goalFormNote = goalFormCandidate && opensGoalPanel(goalFormCandidate) ? goalFormCandidate : null
 
   return (
     <main
@@ -988,7 +1054,7 @@ export function Whiteboard() {
 
       {goalsOn ? (
         <>
-          <div className="pointer-events-none absolute top-[11.5rem] left-4 flex flex-col items-start gap-3">
+          <div className="pointer-events-none absolute top-[11.5rem] bottom-24 left-4 flex min-h-0 flex-col items-start gap-3">
             <MissionStrip missionText={missionText} />
             {mapOn ? (
               <GoalMapControls
@@ -996,6 +1062,18 @@ export function Whiteboard() {
                 onScale={setMapScale}
                 showAll={mapAllThreads}
                 onShowAll={setMapAllThreads}
+              />
+            ) : null}
+            {goalFormNote && goalCard ? (
+              <GoalCardPanel
+                key={`${goalFormNote.id}:${goalFormNote.text}:${goalFormNote.parentId ?? ""}:${goalCard.fresh}`}
+                note={goalFormNote}
+                notes={notes}
+                missionText={missionText}
+                fresh={goalCard.fresh}
+                onSave={saveGoalCard}
+                onSplit={splitGoalCard}
+                onClose={() => setGoalCard(null)}
               />
             ) : null}
           </div>

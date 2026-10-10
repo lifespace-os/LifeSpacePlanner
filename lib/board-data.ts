@@ -54,6 +54,34 @@ export type Note = {
   parentId?: string | null
   /** Where the point sits on its Map ring, in radians. Empty means the Map places it. */
   mapAngle?: number | null
+  /** The answers saved in the side panel of a Life goals or Project goals card. */
+  goalPlan?: GoalPlan | null
+}
+
+/** Why a goal exists. "unlinked" is a valid answer. */
+export type GoalGround = "mission" | "living" | "want" | "unlinked"
+
+export type GoalAim = "cause" | "symptom"
+
+export type GoalReach = "now" | "smaller"
+
+/** What the person wrote about one goal. It has no owner, start date, deadline, review, or public commitment. */
+export type GoalPlan = {
+  ground: GoalGround | null
+  /** One line: how reaching the goal helps the mission. Used only when the ground is the mission. */
+  missionHelp: string
+  /** One line: why the goal matters to the person. */
+  why: string
+  aim: GoalAim | null
+  /** The person confirmed the sentence holds one result. */
+  oneResult: boolean
+  /** The observable sign, number, or ready state that shows the result is reached. */
+  sign: string
+  reach: GoalReach | null
+  /** The goal was split into two. */
+  split: boolean
+  /** For a card with #must: whether the person chose it themselves. */
+  ownChoice: boolean | null
 }
 
 export type View = { x: number; y: number; zoom: number }
@@ -602,6 +630,51 @@ export function goalChainFor(notes: Note[], id: string): GoalChain | null {
     current = byId.get(link)
   }
   return { steps, reachesMission: false, broken: true }
+}
+
+export const DEFAULT_GOAL_PLAN: GoalPlan = {
+  ground: null,
+  missionHelp: "",
+  why: "",
+  aim: null,
+  oneResult: false,
+  sign: "",
+  reach: null,
+  split: false,
+  ownChoice: null,
+}
+
+/** The two levels that open the goal side panel. */
+export const GOAL_PANEL_TAGS = ["life-goal", "project-goal"]
+
+export function opensGoalPanel(note: Note) {
+  return GOAL_PANEL_TAGS.includes(goalLevelOf(note) ?? "")
+}
+
+const TWO_RESULTS = /\s*;\s*|\s+[&+]\s+|\s+(?:and|plus|as well as)\s+/i
+
+/** Splits a sentence where it joins two results. One part comes back when it holds a single result. */
+export function splitGoalSentence(text: string): string[] {
+  return text
+    .split(TWO_RESULTS)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+export function looksLikeTwoResults(text: string) {
+  return splitGoalSentence(text).length > 1
+}
+
+export type GoalCheck = { id: "written" | "one" | "checkable" | "scale"; label: string; passed: boolean }
+
+export function goalChecks(text: string, plan: GoalPlan): GoalCheck[] {
+  const written = text.trim().length > 0
+  return [
+    { id: "written", label: "Written", passed: written },
+    { id: "one", label: "One result", passed: written && (!looksLikeTwoResults(text) || plan.oneResult) },
+    { id: "checkable", label: "Result can be checked", passed: plan.sign.trim().length > 0 },
+    { id: "scale", label: "Scale is realistic or it was split", passed: plan.reach === "now" || plan.split },
+  ]
 }
 
 export type GoalMapPoint = { id: string; ring: number; angle: number; x: number; y: number }

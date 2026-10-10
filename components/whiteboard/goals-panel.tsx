@@ -38,7 +38,7 @@ export function MissionStrip({ missionText }: { missionText: string }) {
   return (
     <section
       aria-label="Mission sentence"
-      className="pointer-events-auto w-fit max-w-xl rounded-xl border border-accent/30 bg-accent-soft/95 px-4 py-2.5 shadow-sm backdrop-blur"
+      className="pointer-events-auto w-fit max-w-xl shrink-0 rounded-xl border border-accent/30 bg-accent-soft/95 px-4 py-2.5 shadow-sm backdrop-blur"
     >
       {saved ? (
         <p className="line-clamp-2 font-serif text-base leading-snug italic text-ink text-pretty break-words">
