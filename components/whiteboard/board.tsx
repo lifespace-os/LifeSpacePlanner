@@ -17,6 +17,7 @@ export function Board({
   groups,
   clusterView,
   mode,
+  missionSaved,
   view,
   viewRef,
   viewportRef,
@@ -44,6 +45,7 @@ export function Board({
   groups: Group[]
   clusterView: ClusterView
   mode: Mode
+  missionSaved: boolean
   view: View
   viewRef: RefObject<View>
   viewportRef: RefObject<HTMLDivElement | null>
@@ -155,6 +157,7 @@ export function Board({
             key={note.id}
             note={note}
             mode={mode}
+            missionSaved={missionSaved}
             selected={note.id === selectedId}
             editing={note.id === editingId}
             viewRef={viewRef}

@@ -19,6 +19,7 @@ import { LabelChip } from "./label-chip"
 type Props = {
   note: Note
   mode: Mode
+  missionSaved: boolean
   selected: boolean
   editing: boolean
   viewRef: RefObject<View>
@@ -53,6 +54,7 @@ function formatDue(value: string) {
 export const NoteCard = memo(function NoteCard({
   note,
   mode,
+  missionSaved,
   selected,
   editing,
   viewRef,
@@ -245,7 +247,7 @@ export const NoteCard = memo(function NoteCard({
         </div>
       ) : null}
 
-      {mode === "mission" ? <MissionControls note={note} onMission={onMission} /> : null}
+      {mode === "mission" && missionSaved ? <MissionControls note={note} onMission={onMission} /> : null}
     </article>
   )
 })

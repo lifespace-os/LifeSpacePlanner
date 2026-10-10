@@ -40,6 +40,7 @@ import { ModeBar } from "./mode-bar"
 import { Board } from "./board"
 import { Inspector } from "./inspector"
 import { ClustersPanel } from "./clusters-panel"
+import { MissionWindow } from "./mission-window"
 import { CardDock } from "./card-dock"
 import { ZoomControls } from "./zoom-controls"
 import { CanvasMenu, CardMenu, type MenuState } from "./context-menu"
@@ -57,6 +58,8 @@ export function Whiteboard() {
   const [groups, setGroups] = useState<Group[]>(DEFAULT_GROUPS)
   const [clusterView, setClusterView] = useState<ClusterView>("wantmust")
   const [mode, setMode] = useState<Mode>("unload")
+  const [missionText, setMissionText] = useState("")
+  const [missionOpen, setMissionOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [dockColor, setDockColor] = useState<CardColorId>("butter")
@@ -372,6 +375,27 @@ export function Whiteboard() {
     setMenu({ kind: "canvas", clientX, clientY })
   }, [])
 
+  const changeMode = useCallback(
+    (next: Mode) => {
+      setMode(next)
+      setMenu(null)
+      setMissionOpen(next === "mission" && missionText.length === 0)
+    },
+    [missionText],
+  )
+
+  const saveMission = useCallback((text: string) => {
+    setMissionText(text)
+    setMissionOpen(false)
+  }, [])
+
+  const openMission = useCallback(() => {
+    setMenu(null)
+    setMissionOpen(true)
+  }, [])
+
+  const closeMission = useCallback(() => setMissionOpen(false), [])
+
   const closeMenu = useCallback(() => setMenu(null), [])
   const clearSelection = useCallback(() => setSelectedId(null), [])
 
@@ -413,6 +437,7 @@ export function Whiteboard() {
         groups={groups}
         clusterView={clusterView}
         mode={mode}
+        missionSaved={missionText.length > 0}
         view={view}
         viewRef={viewRef}
         viewportRef={viewportRef}
@@ -437,9 +462,16 @@ export function Whiteboard() {
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4">
-        <ModeBar mode={activeMode} notes={notes} clusterView={clusterView} onClusterViewChange={setClusterView} />
+        <ModeBar
+          mode={activeMode}
+          notes={notes}
+          clusterView={clusterView}
+          missionText={missionText}
+          onClusterViewChange={setClusterView}
+          onEditMission={openMission}
+        />
         <div className="pointer-events-auto flex items-center gap-2">
-          <ModeSwitcher mode={mode} onChange={setMode} />
+          <ModeSwitcher mode={mode} onChange={changeMode} />
           <button
             type="button"
             onClick={toggleFocusMode}
@@ -490,6 +522,10 @@ export function Whiteboard() {
         </div>
         <span aria-hidden="true" />
       </div>
+
+      {missionOpen && mode === "mission" ? (
+        <MissionWindow initialText={missionText} onSave={saveMission} onCancel={closeMission} />
+      ) : null}
 
       {menu?.kind === "canvas" ? (
         <CanvasMenu

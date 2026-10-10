@@ -66,12 +66,12 @@ export const MODES: { id: Mode; name: string; hint: string }[] = [
     name: "Clusters",
     hint: "Sort the same cards two ways. Open either view first. Neither is required.",
   },
-  { id: "mission", name: "Mission", hint: "Read the mission, then mark each card Keep or Release." },
+  { id: "mission", name: "Mission", hint: "Write your mission sentence, then mark each card Keep or Release." },
   { id: "labels", name: "Labels", hint: "Select a card, then answer the three questions in the panel." },
   { id: "task", name: "Make a task", hint: "Select a card and turn it into a task. One card, one task." },
 ]
 
-export const MISSION = "I build clear systems that help people live more calmly."
+export const MISSION_MAX_LENGTH = 200
 
 export const CARD_COLORS: { id: PresetColorId; name: string; fill: string; edge: string }[] = [
   { id: "butter", name: "Butter", fill: "#f7e8a4", edge: "#e6d27c" },
@@ -275,10 +275,10 @@ export const DEFAULT_GROUPS: Group[] = GROUP_NAMES.reduce<Group[]>((groups, name
 type Seed = Pick<Note, "id" | "text" | "color" | "x" | "y" | "rotation"> & Partial<Note>
 
 const SEEDS: Seed[] = [
-  { id: "n1", text: "Run a half marathon next spring", color: "sage", x: 60, y: 70, rotation: -2, mission: "keep", labels: { area: "body", happiness: "health", budget: "investment" }, hashtags: ["health", "want"] },
+  { id: "n1", text: "Run a half marathon next spring", color: "sage", x: 60, y: 70, rotation: -2, labels: { area: "body", happiness: "health", budget: "investment" }, hashtags: ["health", "want"] },
   { id: "n2", text: "Renew passport before June", color: "butter", x: 960, y: 80, rotation: 1.5, labels: { area: "home", happiness: "safety" }, hashtags: ["must"] },
   { id: "n3", text: "Am I saving enough for later?", color: "sky", x: 720, y: 820, rotation: -1 },
-  { id: "n4", text: "Call Mom on Sunday", color: "rose", x: 380, y: 300, rotation: 2.5, mission: "keep", labels: { area: "relationships", happiness: "love" }, hashtags: ["family", "want"] },
+  { id: "n4", text: "Call Mom on Sunday", color: "rose", x: 380, y: 300, rotation: 2.5, labels: { area: "relationships", happiness: "love" }, hashtags: ["family", "want"] },
   { id: "n5", text: "Learn to bake sourdough", color: "peach", x: 120, y: 860, rotation: 1 },
   {
     id: "n6",
@@ -288,7 +288,6 @@ const SEEDS: Seed[] = [
     y: 340,
     rotation: -1.5,
     hashtags: ["must"],
-    mission: "keep",
     labels: { area: "home", budget: "expense" },
     task: { title: "Replace kitchen tap washer", labelId: "home", due: "2026-10-18", owner: "Me" },
   },
@@ -296,7 +295,7 @@ const SEEDS: Seed[] = [
   { id: "n8", text: "Tired most afternoons", color: "lilac", x: 420, y: 860, rotation: -2.5 },
   { id: "n9", text: "Write an onboarding guide for the new tool", color: "sky", x: 1020, y: 830, rotation: 1, labels: { area: "work" }, hashtags: ["work"] },
   { id: "n10", text: "A slow week by the sea", color: "sage", x: 720, y: 140, rotation: -1 },
-  { id: "n11", text: "Reply to every unread group chat", color: "peach", x: 740, y: 470, rotation: 1.5, mission: "release" },
+  { id: "n11", text: "Reply to every unread group chat", color: "peach", x: 740, y: 470, rotation: 1.5 },
 ]
 
 const SAMPLE_GROUP_AREAS = groupAreas(DEFAULT_GROUPS)
