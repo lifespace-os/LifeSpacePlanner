@@ -1009,6 +1009,7 @@ export function Whiteboard() {
             <GoalsPanel
               view={goalView}
               notes={notes}
+              missionText={missionText}
               hoverId={dropHover}
               focusRing={mapFocus}
               selectedId={mapSelected}
@@ -1048,9 +1049,11 @@ export function Whiteboard() {
           onReset={() => zoomAtCenter(1 / view.zoom)}
           onFit={() => (mapOn && goalMapCenter ? fitMap(mapFocus) : fitAll())}
         />
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-          <CardDock color={dockColor} onColorChange={setDockColor} onDrop={dropFromDock} onPlaceCenter={placeAtCenter} />
-        </div>
+        {mapOn ? null : (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+            <CardDock color={dockColor} onColorChange={setDockColor} onDrop={dropFromDock} onPlaceCenter={placeAtCenter} />
+          </div>
+        )}
         <span aria-hidden="true" />
       </div>
 

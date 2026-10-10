@@ -6,7 +6,9 @@ import {
   GOAL_VIEW_LEVELS,
   getCardColor,
   getGoalLevel,
+  goalChainFor,
   goalRingOf,
+  type GoalChain,
   hasHashtag,
   type GoalView,
   type Note,
@@ -49,10 +51,67 @@ export function MissionStrip({ missionText }: { missionText: string }) {
   )
 }
 
+/** The selected point, each goal above it, then the mission. It stops, and says so, where a link is missing. */
+function GoalChainList({ chain, missionText }: { chain: GoalChain; missionText: string }) {
+  const saved = missionText.length > 0
+  return (
+    <section aria-label="Chain to the mission" className="mb-2 border-b border-line px-3 pt-1 pb-3">
+      <h3 className="text-xs font-medium tracking-[0.16em] text-ink-soft uppercase">Chain to the mission</h3>
+      <ol className="mt-2 flex flex-col">
+        {chain.steps.map((note, index) => (
+          <li key={note.id} className="flex gap-3">
+            <div className="flex w-3 shrink-0 flex-col items-center">
+              <span
+                aria-hidden="true"
+                className="mt-1.5 size-3 shrink-0 rounded-full border border-ink/60"
+                style={{ backgroundColor: getCardColor(note.color).fill }}
+              />
+              {index < chain.steps.length - 1 || chain.reachesMission ? (
+                <span aria-hidden="true" className="w-px flex-1 bg-line" />
+              ) : null}
+            </div>
+            <div className="min-w-0 flex-1 pb-3">
+              <p className="text-[11px] tracking-wide text-ink-soft uppercase">
+                {index === 0 ? "Selected" : "Goal above"} · {GOAL_RING_NAMES[goalRingOf(note)]}
+              </p>
+              <p className="text-sm text-ink break-words">{note.text.trim() || "Empty card"}</p>
+            </div>
+          </li>
+        ))}
+        {chain.reachesMission ? (
+          <li className="flex gap-3">
+            <div className="flex w-3 shrink-0 flex-col items-center">
+              <span aria-hidden="true" className="mt-1.5 size-3 shrink-0 rounded-full bg-accent" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] tracking-wide text-ink-soft uppercase">Mission</p>
+              {saved ? (
+                <p className="font-serif text-sm leading-snug italic text-ink break-words">{`\u201C${missionText}\u201D`}</p>
+              ) : (
+                <p className="text-sm text-ink-soft">The mission is not written yet.</p>
+              )}
+            </div>
+          </li>
+        ) : (
+          <li className="flex gap-3">
+            <div className="flex w-3 shrink-0 flex-col items-center">
+              <span aria-hidden="true" className="mt-1.5 size-3 shrink-0 rounded-full border border-dashed border-ink-soft" />
+            </div>
+            <p className="min-w-0 flex-1 text-sm text-ink-soft">
+              The goal above is not chosen. Right-click the point to choose it.
+            </p>
+          </li>
+        )}
+      </ol>
+    </section>
+  )
+}
+
 /** The right window of Goals. Each drop area sets one level on the cards dropped on it. */
 export function GoalsPanel({
   view,
   notes,
+  missionText,
   hoverId,
   focusRing,
   selectedId,
@@ -63,6 +122,7 @@ export function GoalsPanel({
 }: {
   view: GoalView
   notes: Note[]
+  missionText: string
   hoverId: string | null
   /** Map only: the ring the view is zoomed to, or null for the whole map. */
   focusRing: number | null
@@ -73,6 +133,7 @@ export function GoalsPanel({
   onRemoveLevel: (id: string, tag: string) => void
 }) {
   const levelTags = view === "map" ? [] : GOAL_VIEW_LEVELS[view]
+  const chain = view === "map" && selectedId ? goalChainFor(notes, selectedId) : null
 
   return (
     <aside aria-label={`${VIEW_TITLES[view]} panel`} className={WINDOW_CLASS}>
@@ -88,6 +149,7 @@ export function GoalsPanel({
 
       {view === "map" ? (
         <div className="mt-3 min-h-0 flex-1 overflow-y-auto border-t border-line px-2 py-2">
+          {chain ? <GoalChainList chain={chain} missionText={missionText} /> : null}
           <p className="px-3 pt-1 pb-2 text-xs text-ink-soft text-pretty">
             Pick a ring to zoom to it and show only its points. Right-click a point to edit it.
           </p>

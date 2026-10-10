@@ -580,6 +580,30 @@ export function goalThreadsFor(notes: Note[], id: string): Set<string> {
   return found
 }
 
+/** The chain from a point inward: the card, each goal above it, then the mission. It stops where a link is missing. */
+export type GoalChain = {
+  steps: Note[]
+  /** True when the last step links to the mission. */
+  reachesMission: boolean
+  /** True when the last step has no goal above chosen. */
+  broken: boolean
+}
+
+export function goalChainFor(notes: Note[], id: string): GoalChain | null {
+  const byId = new Map(notes.map((note) => [note.id, note]))
+  let current = byId.get(id)
+  if (!current || goalRingOf(current) < 0) return null
+  const steps: Note[] = []
+  while (current) {
+    steps.push(current)
+    const link: string | null = goalLink(current, byId)
+    if (!link) return { steps, reachesMission: false, broken: true }
+    if (link === "mission") return { steps, reachesMission: true, broken: false }
+    current = byId.get(link)
+  }
+  return { steps, reachesMission: false, broken: true }
+}
+
 export type GoalMapPoint = { id: string; ring: number; angle: number; x: number; y: number }
 
 /** A thread runs from a card to the goal above it. `to` is that card's id, or "mission". */
