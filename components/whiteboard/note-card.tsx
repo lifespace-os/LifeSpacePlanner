@@ -23,7 +23,12 @@ type Props = {
   selected: boolean
   editing: boolean
   viewRef: RefObject<View>
-  onSelect: (id: string) => void
+  /** In the Ikigai view cards stay put: dragging one is a tagging gesture and the card returns. */
+  fixed: boolean
+  /** Number of cards in the current multi-selection that includes this card, otherwise 0. */
+  multiCount: number
+  onSelect: (id: string, additive: boolean) => void
+  onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => void
   onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
   onFront: (id: string) => void
   onMission: (id: string, choice: Exclude<MissionChoice, null>) => void
@@ -58,7 +63,10 @@ export const NoteCard = memo(function NoteCard({
   selected,
   editing,
   viewRef,
+  fixed,
+  multiCount,
   onSelect,
+  onTagDrag,
   onMove,
   onFront,
   onMission,
@@ -114,6 +122,7 @@ export const NoteCard = memo(function NoteCard({
     const zoom = viewRef.current.zoom
     card.style.left = `${state.left + dx / zoom}px`
     card.style.top = `${state.top + dy / zoom}px`
+    if (fixed) onTagDrag(note.id, event.clientX, event.clientY, "move")
   }
 
   function handlePointerEnd(event: React.PointerEvent<HTMLElement>) {
@@ -121,10 +130,19 @@ export const NoteCard = memo(function NoteCard({
     if (!state || state.pointerId !== event.pointerId) return
     drag.current = null
     if (!state.moved) {
-      if (event.type === "pointerup") onSelect(note.id)
+      if (event.type === "pointerup") onSelect(note.id, event.shiftKey)
       return
     }
     setDragging(false)
+    if (fixed) {
+      const card = cardRef.current
+      if (card) {
+        card.style.left = `${note.x}px`
+        card.style.top = `${note.y}px`
+      }
+      onTagDrag(note.id, event.clientX, event.clientY, event.type === "pointerup" ? "drop" : "cancel")
+      return
+    }
     const zoom = viewRef.current.zoom
     commit(state.left + (event.clientX - state.startX) / zoom, state.top + (event.clientY - state.startY) / zoom)
   }
@@ -138,7 +156,7 @@ export const NoteCard = memo(function NoteCard({
     }
     if (event.key === " ") {
       event.preventDefault()
-      onSelect(note.id)
+      onSelect(note.id, event.shiftKey)
       return
     }
     if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
@@ -153,7 +171,7 @@ export const NoteCard = memo(function NoteCard({
       return
     }
     const arrow = ARROWS[event.key]
-    if (!arrow) return
+    if (!arrow || fixed) return
     event.preventDefault()
     const step = event.shiftKey ? KEY_STEP * 4 : KEY_STEP
     onFront(note.id)
@@ -247,7 +265,13 @@ export const NoteCard = memo(function NoteCard({
         </div>
       ) : null}
 
-      {mode === "mission" && missionSaved ? <MissionControls note={note} onMission={onMission} /> : null}
+      {mode === "mission" && missionSaved && !fixed ? <MissionControls note={note} onMission={onMission} /> : null}
+
+      {dragging && multiCount > 1 ? (
+        <span className="absolute -top-3 -right-3 flex h-7 min-w-7 items-center justify-center rounded-full bg-accent px-2 text-sm font-medium text-board tabular-nums shadow-md">
+          {multiCount}
+        </span>
+      ) : null}
     </article>
   )
 })

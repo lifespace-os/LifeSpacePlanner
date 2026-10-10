@@ -15,8 +15,11 @@ import {
   ZONE_MIN_SIZE,
   ZONE_TAGS,
   areaTagAt,
+  getIkigaiItem,
   groupAreas,
   groupTag,
+  hasHashtag,
+  ikigaiRegionAt,
   nextGroupRect,
   reconcile,
   retag,
@@ -26,6 +29,7 @@ import {
   type Group,
   type LabelGroupId,
   type MissionChoice,
+  type MissionView,
   type Mode,
   type Note,
   type TaggedArea,
@@ -41,12 +45,15 @@ import { Board } from "./board"
 import { Inspector } from "./inspector"
 import { ClustersPanel } from "./clusters-panel"
 import { MissionWindow } from "./mission-window"
+import { IkigaiPanel } from "./ikigai-panel"
 import { CardDock } from "./card-dock"
 import { ZoomControls } from "./zoom-controls"
 import { CanvasMenu, CardMenu, type MenuState } from "./context-menu"
 
 const ZOOM_STEP = 1.25
+const NO_IDS: string[] = []
 const FIT_PADDING = { top: 150, right: 60, bottom: 130, left: 60 }
+const IKIGAI_FIT_PADDING = { top: 270, right: 400, bottom: 130, left: 60 }
 
 function clampZoom(zoom: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
@@ -60,6 +67,10 @@ export function Whiteboard() {
   const [mode, setMode] = useState<Mode>("unload")
   const [missionText, setMissionText] = useState("")
   const [missionOpen, setMissionOpen] = useState(false)
+  const [missionView, setMissionView] = useState<MissionView>("sentence")
+  const [ikigaiActive, setIkigaiActive] = useState<string | null>(null)
+  const [dropHover, setDropHover] = useState<string | null>(null)
+  const [multiIds, setMultiIds] = useState<string[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [dockColor, setDockColor] = useState<CardColorId>("butter")
@@ -71,6 +82,14 @@ export function Whiteboard() {
   const viewportRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<View>(view)
   const idCounter = useRef(0)
+
+  const ikigaiOn = mode === "mission" && missionView === "ikigai"
+  const ikigaiOnRef = useRef(ikigaiOn)
+  const ikigaiActiveRef = useRef(ikigaiActive)
+  const multiRef = useRef(multiIds)
+  ikigaiOnRef.current = ikigaiOn
+  ikigaiActiveRef.current = ikigaiActive
+  multiRef.current = multiIds
 
   const updateView = useCallback((change: (prev: View) => View) => {
     const next = change(viewRef.current)
@@ -135,13 +154,14 @@ export function Whiteboard() {
       maxX = Math.max(maxX, card.offsetLeft + card.offsetWidth)
       maxY = Math.max(maxY, card.offsetTop + card.offsetHeight)
     }
-    const availW = Math.max(200, viewport.clientWidth - FIT_PADDING.left - FIT_PADDING.right)
-    const availH = Math.max(200, viewport.clientHeight - FIT_PADDING.top - FIT_PADDING.bottom)
+    const padding = viewport.querySelector("[data-ikigai]") ? IKIGAI_FIT_PADDING : FIT_PADDING
+    const availW = Math.max(200, viewport.clientWidth - padding.left - padding.right)
+    const availH = Math.max(200, viewport.clientHeight - padding.top - padding.bottom)
     const zoom = clampZoom(Math.min(availW / (maxX - minX), availH / (maxY - minY), 1.2))
     updateView(() => ({
       zoom,
-      x: FIT_PADDING.left + (availW - (maxX - minX) * zoom) / 2 - minX * zoom,
-      y: FIT_PADDING.top + (availH - (maxY - minY) * zoom) / 2 - minY * zoom,
+      x: padding.left + (availW - (maxX - minX) * zoom) / 2 - minX * zoom,
+      y: padding.top + (availH - (maxY - minY) * zoom) / 2 - minY * zoom,
     }))
   }, [updateView])
 
@@ -150,7 +170,7 @@ export function Whiteboard() {
     return () => cancelAnimationFrame(frame)
   }, [fitAll])
 
-  const visibleLayer = mode === "clusters" ? clusterView : null
+  const visibleLayer = mode === "clusters" ? clusterView : ikigaiOn ? "ikigai" : null
   useEffect(() => {
     if (!visibleLayer) return
     const frame = requestAnimationFrame(fitAll)
@@ -347,8 +367,72 @@ export function Whiteboard() {
     [updateNote],
   )
 
+  const selectCard = useCallback((id: string, additive: boolean) => {
+    if (ikigaiOnRef.current) {
+      setMultiIds((prev) => (additive ? (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]) : [id]))
+      return
+    }
+    setSelectedId(id)
+  }, [])
+
+  const tagCards = useCallback((ids: string[], tag: string) => {
+    setNotes((prev) =>
+      prev.map((note) =>
+        ids.includes(note.id) && !hasHashtag(note, tag) ? { ...note, hashtags: [...note.hashtags, tag] } : note,
+      ),
+    )
+  }, [])
+
+  const untagCard = useCallback((id: string, tag: string) => {
+    setNotes((prev) =>
+      prev.map((note) =>
+        note.id === id
+          ? { ...note, hashtags: note.hashtags.filter((t) => t.toLowerCase() !== tag.toLowerCase()) }
+          : note,
+      ),
+    )
+  }, [])
+
+  /** What sits under the pointer while a card is dragged: the side panel, a step or move, or a diagram region. */
+  const ikigaiTargetAt = useCallback(
+    (clientX: number, clientY: number): string | null => {
+      const top = document.elementsFromPoint(clientX, clientY).find((el) => !el.closest("[data-note-card]"))
+      if (!top) return null
+      if (top.closest("[data-ikigai-drop]")) return "panel"
+      const item = top.closest<HTMLElement>("[data-ikigai-item]")?.dataset.ikigaiItem
+      if (item) return item
+      if (!viewportRef.current?.contains(top)) return null
+      const point = screenToWorld(clientX, clientY)
+      return ikigaiRegionAt(point.x, point.y)
+    },
+    [screenToWorld],
+  )
+
+  const handleTagDrag = useCallback(
+    (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => {
+      if (phase === "cancel") {
+        setDropHover(null)
+        return
+      }
+      const target = ikigaiTargetAt(clientX, clientY)
+      if (phase === "move") {
+        setDropHover((prev) => (prev === target ? prev : target))
+        return
+      }
+      setDropHover(null)
+      const item = getIkigaiItem(target === "panel" ? ikigaiActiveRef.current : target)
+      if (!item) return
+      const ids = multiRef.current.includes(id) ? multiRef.current : [id]
+      tagCards(ids, item.tag)
+      if (ids.length > 1) setMultiIds([])
+      if (target !== "panel") setIkigaiActive(item.id)
+    },
+    [ikigaiTargetAt, tagCards],
+  )
+
   const deleteNote = useCallback((id: string) => {
     setNotes((prev) => prev.filter((note) => note.id !== id))
+    setMultiIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : prev))
     setSelectedId((current) => (current === id ? null : current))
     setEditingId((current) => (current === id ? null : current))
     setMenu(null)
@@ -379,10 +463,25 @@ export function Whiteboard() {
     (next: Mode) => {
       setMode(next)
       setMenu(null)
-      setMissionOpen(next === "mission" && missionText.length === 0)
+      setMultiIds([])
+      setDropHover(null)
+      setMissionOpen(next === "mission" && missionView === "sentence" && missionText.length === 0)
+    },
+    [missionText, missionView],
+  )
+
+  const changeMissionView = useCallback(
+    (next: MissionView) => {
+      setMissionView(next)
+      setMenu(null)
+      setMultiIds([])
+      setDropHover(null)
+      setMissionOpen(next === "sentence" && missionText.length === 0)
     },
     [missionText],
   )
+
+  const closeIkigaiPanel = useCallback(() => setIkigaiActive(null), [])
 
   const saveMission = useCallback((text: string) => {
     setMissionText(text)
@@ -397,7 +496,10 @@ export function Whiteboard() {
   const closeMission = useCallback(() => setMissionOpen(false), [])
 
   const closeMenu = useCallback(() => setMenu(null), [])
-  const clearSelection = useCallback(() => setSelectedId(null), [])
+  const clearSelection = useCallback(() => {
+    setSelectedId(null)
+    setMultiIds((prev) => (prev.length > 0 ? [] : prev))
+  }, [])
 
   const toggleFocusMode = useCallback(() => {
     const root = rootRef.current
@@ -419,6 +521,7 @@ export function Whiteboard() {
   }, [])
 
   const activeMode = MODES.find((m) => m.id === mode) ?? MODES[0]
+  const ikigaiItem = getIkigaiItem(ikigaiActive)
   const showInspector = mode === "labels" || mode === "task"
   const selectedNote = notes.find((note) => note.id === selectedId) ?? null
   const menuNote = menu?.kind === "card" ? notes.find((note) => note.id === menu.noteId) ?? null : null
@@ -442,7 +545,13 @@ export function Whiteboard() {
         viewRef={viewRef}
         viewportRef={viewportRef}
         selectedId={showInspector ? selectedId : null}
+        multiIds={ikigaiOn ? multiIds : NO_IDS}
         editingId={editingId}
+        ikigai={
+          ikigaiOn
+            ? { activeId: ikigaiActive, hoverId: dropHover && dropHover !== "panel" ? dropHover : null, onPick: setIkigaiActive }
+            : null
+        }
         onZoneMove={moveZone}
         onZoneResize={resizeZone}
         onGroupMove={moveGroup}
@@ -451,7 +560,8 @@ export function Whiteboard() {
         onZoomAt={zoomAt}
         onCanvasMenu={openCanvasMenu}
         onClearSelection={clearSelection}
-        onSelect={setSelectedId}
+        onSelect={selectCard}
+        onTagDrag={handleTagDrag}
         onMove={moveNote}
         onFront={bringToFront}
         onMission={setMission}
@@ -466,8 +576,10 @@ export function Whiteboard() {
           mode={activeMode}
           notes={notes}
           clusterView={clusterView}
+          missionView={missionView}
           missionText={missionText}
           onClusterViewChange={setClusterView}
+          onMissionViewChange={changeMissionView}
           onEditMission={openMission}
         />
         <div className="pointer-events-auto flex items-center gap-2">
@@ -497,6 +609,18 @@ export function Whiteboard() {
             onAddGroup={addGroup}
             onRemoveGroup={removeGroup}
             onNewCard={placeAtCenter}
+          />
+        </div>
+      ) : null}
+
+      {ikigaiOn && ikigaiItem ? (
+        <div className="pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex">
+          <IkigaiPanel
+            item={ikigaiItem}
+            notes={notes}
+            dropOver={dropHover === "panel"}
+            onClose={closeIkigaiPanel}
+            onRemoveTag={untagCard}
           />
         </div>
       ) : null}

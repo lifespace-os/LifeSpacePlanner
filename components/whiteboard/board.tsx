@@ -2,12 +2,40 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react"
 import clsx from "clsx"
-import type { ClusterView, Group, MissionChoice, Mode, Note, View, Zone, ZoneId, Zones } from "@/lib/board-data"
+import {
+  getIkigaiItem,
+  ikigaiRegionAt,
+  type ClusterView,
+  type Group,
+  type MissionChoice,
+  type Mode,
+  type Note,
+  type View,
+  type Zone,
+  type ZoneId,
+  type Zones,
+} from "@/lib/board-data"
 import { NoteCard } from "./note-card"
 import { SortZones } from "./sort-zones"
 import { GroupAreas } from "./group-areas"
+import { IkigaiCircles, IkigaiLabels } from "./ikigai-diagram"
+import { IkigaiMoves, IkigaiSteps } from "./ikigai-guide"
 
-type PanState = { pointerId: number; lastX: number; lastY: number }
+type PanState = {
+  pointerId: number
+  button: number
+  startX: number
+  startY: number
+  lastX: number
+  lastY: number
+  moved: boolean
+}
+
+export type IkigaiBoardState = {
+  activeId: string | null
+  hoverId: string | null
+  onPick: (id: string) => void
+}
 
 const GRID = 22
 
@@ -22,7 +50,9 @@ export function Board({
   viewRef,
   viewportRef,
   selectedId,
+  multiIds,
   editingId,
+  ikigai,
   onZoneMove,
   onZoneResize,
   onGroupMove,
@@ -32,6 +62,7 @@ export function Board({
   onCanvasMenu,
   onClearSelection,
   onSelect,
+  onTagDrag,
   onMove,
   onFront,
   onMission,
@@ -50,7 +81,9 @@ export function Board({
   viewRef: RefObject<View>
   viewportRef: RefObject<HTMLDivElement | null>
   selectedId: string | null
+  multiIds: string[]
   editingId: string | null
+  ikigai: IkigaiBoardState | null
   onZoneMove: (id: ZoneId, dx: number, dy: number) => void
   onZoneResize: (id: ZoneId, zone: Zone) => void
   onGroupMove: (id: string, dx: number, dy: number) => void
@@ -59,7 +92,8 @@ export function Board({
   onZoomAt: (factor: number, clientX: number, clientY: number) => void
   onCanvasMenu: (clientX: number, clientY: number) => void
   onClearSelection: () => void
-  onSelect: (id: string) => void
+  onSelect: (id: string, additive: boolean) => void
+  onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => void
   onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
   onFront: (id: string) => void
   onMission: (id: string, choice: Exclude<MissionChoice, null>) => void
@@ -89,10 +123,18 @@ export function Board({
 
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (event.button !== 0 && event.button !== 1) return
-    if ((event.target as HTMLElement).closest("[data-note-card], [data-zone-handle]")) return
+    if ((event.target as HTMLElement).closest("[data-note-card], [data-zone-handle], [data-board-control]")) return
     if (event.button === 0) onClearSelection()
     if (document.activeElement instanceof HTMLTextAreaElement) document.activeElement.blur()
-    pan.current = { pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY }
+    pan.current = {
+      pointerId: event.pointerId,
+      button: event.button,
+      startX: event.clientX,
+      startY: event.clientY,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      moved: false,
+    }
     event.currentTarget.setPointerCapture(event.pointerId)
     setPanning(true)
   }
@@ -100,16 +142,27 @@ export function Board({
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
     const state = pan.current
     if (!state || state.pointerId !== event.pointerId) return
+    if (!state.moved && Math.hypot(event.clientX - state.startX, event.clientY - state.startY) >= 4) state.moved = true
     onPan(event.clientX - state.lastX, event.clientY - state.lastY)
     state.lastX = event.clientX
     state.lastY = event.clientY
   }
 
   function handlePointerEnd(event: React.PointerEvent<HTMLDivElement>) {
-    if (pan.current?.pointerId !== event.pointerId) return
+    const state = pan.current
+    if (!state || state.pointerId !== event.pointerId) return
     pan.current = null
     setPanning(false)
+    if (!ikigai || state.moved || state.button !== 0 || event.type !== "pointerup") return
+    const rect = viewportRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const v = viewRef.current
+    const region = ikigaiRegionAt((event.clientX - rect.left - v.x) / v.zoom, (event.clientY - rect.top - v.y) / v.zoom)
+    if (region) ikigai.onPick(region)
   }
+
+  const activeRegion = getIkigaiItem(ikigai?.activeId)?.region ?? null
+  const hoverRegion = getIkigaiItem(ikigai?.hoverId)?.region ?? null
 
   const gridSize = GRID * view.zoom
 
@@ -152,25 +205,41 @@ export function Board({
           <GroupAreas notes={notes} groups={groups} zoom={view.zoom} onMove={onGroupMove} onResize={onGroupResize} />
         ) : null}
 
-        {notes.map((note) => (
-          <NoteCard
-            key={note.id}
-            note={note}
-            mode={mode}
-            missionSaved={missionSaved}
-            selected={note.id === selectedId}
-            editing={note.id === editingId}
-            viewRef={viewRef}
-            onSelect={onSelect}
-            onMove={onMove}
-            onFront={onFront}
-            onMission={onMission}
-            onEditStart={onEditStart}
-            onEditEnd={onEditEnd}
-            onMenu={onCardMenu}
-            onDelete={onDelete}
-          />
-        ))}
+        {ikigai ? <IkigaiCircles activeRegion={activeRegion} hoverRegion={hoverRegion} /> : null}
+
+        {notes.map((note) => {
+          const inMulti = multiIds.includes(note.id)
+          return (
+            <NoteCard
+              key={note.id}
+              note={note}
+              mode={mode}
+              missionSaved={missionSaved}
+              selected={note.id === selectedId || inMulti}
+              editing={note.id === editingId}
+              viewRef={viewRef}
+              fixed={ikigai !== null}
+              multiCount={inMulti ? multiIds.length : 0}
+              onSelect={onSelect}
+              onTagDrag={onTagDrag}
+              onMove={onMove}
+              onFront={onFront}
+              onMission={onMission}
+              onEditStart={onEditStart}
+              onEditEnd={onEditEnd}
+              onMenu={onCardMenu}
+              onDelete={onDelete}
+            />
+          )
+        })}
+
+        {ikigai ? (
+          <>
+            <IkigaiLabels notes={notes} activeRegion={activeRegion} />
+            <IkigaiSteps notes={notes} activeId={ikigai.activeId} hoverId={ikigai.hoverId} onPick={ikigai.onPick} />
+            <IkigaiMoves notes={notes} activeId={ikigai.activeId} hoverId={ikigai.hoverId} onPick={ikigai.onPick} />
+          </>
+        ) : null}
       </div>
     </div>
   )

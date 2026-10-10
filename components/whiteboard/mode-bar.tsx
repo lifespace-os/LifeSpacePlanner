@@ -1,5 +1,5 @@
 import clsx from "clsx"
-import type { ClusterView, MODES, Note } from "@/lib/board-data"
+import type { ClusterView, MODES, MissionView, Note } from "@/lib/board-data"
 
 type ModeInfo = (typeof MODES)[number]
 
@@ -23,18 +23,32 @@ export function ModeBar({
   mode,
   notes,
   clusterView,
+  missionView,
   missionText,
   onClusterViewChange,
+  onMissionViewChange,
   onEditMission,
 }: {
   mode: ModeInfo
   notes: Note[]
   clusterView: ClusterView
+  missionView: MissionView
   missionText: string
   onClusterViewChange: (view: ClusterView) => void
+  onMissionViewChange: (view: MissionView) => void
   onEditMission: () => void
 }) {
-  if (mode.id === "mission") return <MissionStrip notes={notes} missionText={missionText} onEditMission={onEditMission} />
+  if (mode.id === "mission") {
+    return (
+      <MissionStrip
+        notes={notes}
+        view={missionView}
+        missionText={missionText}
+        onViewChange={onMissionViewChange}
+        onEditMission={onEditMission}
+      />
+    )
+  }
 
   const activeView = CLUSTER_VIEWS.find((v) => v.id === clusterView) ?? CLUSTER_VIEWS[0]
 
@@ -78,13 +92,22 @@ export function ModeBar({
   )
 }
 
+const MISSION_VIEWS: { id: MissionView; name: string }[] = [
+  { id: "sentence", name: "Sentence" },
+  { id: "ikigai", name: "Ikigai" },
+]
+
 function MissionStrip({
   notes,
+  view,
   missionText,
+  onViewChange,
   onEditMission,
 }: {
   notes: Note[]
+  view: MissionView
   missionText: string
+  onViewChange: (view: MissionView) => void
   onEditMission: () => void
 }) {
   const kept = notes.filter((n) => n.mission === "keep").length
@@ -96,9 +119,48 @@ function MissionStrip({
     <figure className={`${panelClass} max-w-xl border-accent/30 bg-accent-soft/95`}>
       <figcaption className="flex items-center justify-between gap-4 text-[11px] font-medium uppercase tracking-[0.18em] text-accent">
         <h1>Mission</h1>
-        <span className="text-ink-soft">{saved ? "Step 2 of 2" : "Step 1 of 2"}</span>
+        <span className="text-ink-soft">{view === "ikigai" ? "Ikigai" : saved ? "Step 2 of 2" : "Step 1 of 2"}</span>
       </figcaption>
-      {saved ? (
+      <div
+        role="group"
+        aria-label="Mission view"
+        className="mt-2 inline-flex items-center gap-1 rounded-lg border border-line bg-desk p-0.5"
+      >
+        {MISSION_VIEWS.map((v) => {
+          const active = v.id === view
+          return (
+            <button
+              key={v.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onViewChange(v.id)}
+              className={clsx(
+                "rounded-md px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+                active ? "bg-ink text-board shadow-sm" : "text-ink-soft hover:text-ink",
+              )}
+            >
+              {v.name}
+            </button>
+          )
+        })}
+      </div>
+      {view === "ikigai" ? (
+        <>
+          {saved ? (
+            <blockquote className="mt-2 line-clamp-2 font-serif text-lg leading-snug italic text-ink text-pretty break-words">{`\u201C${missionText}\u201D`}</blockquote>
+          ) : null}
+          <p className="mt-1.5 text-sm text-ink-soft text-pretty">
+            Pick a step or a circle, then drop cards on it to add its hashtag. Cards stay where they are.
+          </p>
+          <button
+            type="button"
+            onClick={onEditMission}
+            className="mt-2 rounded-md border border-line bg-board px-2.5 py-1 text-sm text-ink transition-colors hover:bg-desk focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            {saved ? "Change sentence" : "Write mission"}
+          </button>
+        </>
+      ) : saved ? (
         <>
           <blockquote className="mt-1 font-serif text-xl leading-snug italic text-ink text-pretty break-words">{`\u201C${missionText}\u201D`}</blockquote>
           <p className="mt-1.5 text-sm text-ink-soft text-pretty">Mark each card Keep or Release against this sentence.</p>

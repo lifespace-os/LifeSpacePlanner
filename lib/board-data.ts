@@ -2,6 +2,8 @@ export type Mode = "unload" | "clusters" | "mission" | "labels" | "task"
 
 export type ClusterView = "wantmust" | "groups"
 
+export type MissionView = "sentence" | "ikigai"
+
 export type ZoneId = "want" | "must"
 
 /** A rectangle on the canvas, in world pixels. */
@@ -218,6 +220,135 @@ export function reconcile(note: Note, viewTags: string[], from: string | null, t
   return from === to ? note : retag(note, viewTags, to)
 }
 
+export type IkigaiCircleId = "love" | "good-at" | "income" | "needed"
+
+export type IkigaiOverlapId = "passion" | "profession" | "work" | "vocation"
+
+export type IkigaiRegionId = IkigaiCircleId | IkigaiOverlapId | "ikigai"
+
+export type IkigaiMoveId = "could-help" | "beloved-from-list" | "skill-to-grow" | "could-earn"
+
+/** Circles sit on the four compass points around the center of the diagram, in canvas pixels. */
+export const IKIGAI = { cx: 780, cy: 520, r: 260, d: 165 }
+
+export const IKIGAI_SIZE = 2 * (IKIGAI.r + IKIGAI.d)
+
+/** Distance from the center to the middle of a region that belongs to a single circle. */
+export const IKIGAI_LABEL_REACH = 313
+
+export const IKIGAI_RECT = { left: IKIGAI.cx - IKIGAI_SIZE / 2, top: IKIGAI.cy - IKIGAI_SIZE / 2, size: IKIGAI_SIZE }
+
+export const IKIGAI_CIRCLES: IkigaiCircleId[] = ["love", "needed", "income", "good-at"]
+
+const CIRCLE_DIRECTION: Record<IkigaiCircleId, [number, number]> = {
+  love: [0, -1],
+  needed: [1, 0],
+  income: [0, 1],
+  "good-at": [-1, 0],
+}
+
+/** Each overlap is where two neighbouring circles meet. */
+export const OVERLAP_PARENTS: Record<IkigaiOverlapId, [IkigaiCircleId, IkigaiCircleId]> = {
+  passion: ["love", "good-at"],
+  profession: ["good-at", "income"],
+  work: ["income", "needed"],
+  vocation: ["love", "needed"],
+}
+
+/** Offset of a circle's center from the center of the diagram. */
+export function ikigaiCircleOffset(id: IkigaiCircleId) {
+  const [dx, dy] = CIRCLE_DIRECTION[id]
+  return { x: dx * IKIGAI.d, y: dy * IKIGAI.d }
+}
+
+/** Which region of the diagram a canvas point falls in, or null when it is outside every circle. */
+export function ikigaiRegionAt(x: number, y: number): IkigaiRegionId | null {
+  const inside = IKIGAI_CIRCLES.filter((id) => {
+    const o = ikigaiCircleOffset(id)
+    return Math.hypot(x - (IKIGAI.cx + o.x), y - (IKIGAI.cy + o.y)) <= IKIGAI.r
+  })
+  if (inside.length === 0) return null
+  if (inside.length === 1) return inside[0]
+  if (inside.length === 4) return "ikigai"
+
+  const overlaps = (Object.keys(OVERLAP_PARENTS) as IkigaiOverlapId[]).filter((id) =>
+    OVERLAP_PARENTS[id].every((parent) => inside.includes(parent)),
+  )
+  if (overlaps.length === 0) return "ikigai"
+  if (overlaps.length === 1) return overlaps[0]
+
+  // Three circles meet here. Pick the overlap whose parents' midpoint is nearest.
+  let best = overlaps[0]
+  let bestDistance = Infinity
+  for (const id of overlaps) {
+    const [a, b] = OVERLAP_PARENTS[id].map(ikigaiCircleOffset)
+    const distance = Math.hypot(x - (IKIGAI.cx + (a.x + b.x) / 2), y - (IKIGAI.cy + (a.y + b.y) / 2))
+    if (distance < bestDistance) {
+      best = id
+      bestDistance = distance
+    }
+  }
+  return best
+}
+
+/** A step, circle, overlap, or move that owns a hashtag. Its id is its hashtag. */
+export type IkigaiItem = {
+  id: string
+  kind: "region" | "move"
+  step: number | null
+  name: string
+  tag: string
+  /** The area highlighted on the diagram when this item is chosen. */
+  region: IkigaiRegionId
+  /** Hashtags of the two circles an overlap joins. */
+  parents: [string, string] | null
+  description: string
+}
+
+function regionItem(
+  step: number | null,
+  id: IkigaiRegionId,
+  name: string,
+  description: string,
+): IkigaiItem {
+  const parents = id in OVERLAP_PARENTS ? OVERLAP_PARENTS[id as IkigaiOverlapId] : null
+  return { id, kind: "region", step, name, tag: id, region: id, parents, description }
+}
+
+function moveItem(id: IkigaiMoveId, name: string, region: IkigaiCircleId, description: string): IkigaiItem {
+  return { id, kind: "move", step: null, name, tag: id, region, parents: null, description }
+}
+
+export const IKIGAI_ITEMS: IkigaiItem[] = [
+  regionItem(1, "love", "What you love", "Things you enjoy so much that time passes without notice."),
+  regionItem(2, "good-at", "What you are good at", "Skills and strengths you already have."),
+  regionItem(3, "passion", "Passion", "Where what you love meets what you are good at."),
+  regionItem(4, "income", "What brings you income", "Things people would pay you for."),
+  regionItem(5, "profession", "Profession", "Where what you are good at meets what can earn you income."),
+  regionItem(6, "needed", "What people need", "Needs and wishes of other people that you could answer."),
+  regionItem(7, "work", "Work", "Where what brings income meets what people need."),
+  regionItem(8, "vocation", "Vocation", "Where what you love meets what people need."),
+  regionItem(null, "ikigai", "Ikigai", "The center, where all four circles meet."),
+  moveItem("could-help", "How this could help people", "needed", "Cards where you can see a way to help someone."),
+  moveItem("beloved-from-list", "Find a loved activity from the love list", "love", "Cards from the love list you would like to do more of."),
+  moveItem("skill-to-grow", "Develop a skill from the list", "good-at", "Cards from the good-at list that are worth growing."),
+  moveItem("could-earn", "Find a way to earn from it", "income", "Cards that could turn into income."),
+]
+
+export const IKIGAI_STEPS = IKIGAI_ITEMS.filter((item) => item.step !== null)
+
+export const IKIGAI_MOVES = IKIGAI_ITEMS.filter((item) => item.kind === "move")
+
+const IKIGAI_INDEX = new Map(IKIGAI_ITEMS.map((item) => [item.id, item]))
+
+export function getIkigaiItem(id: string | null | undefined) {
+  return id ? IKIGAI_INDEX.get(id) ?? null : null
+}
+
+export function countTag(notes: Note[], tag: string) {
+  return notes.reduce((total, note) => total + (hasHashtag(note, tag) ? 1 : 0), 0)
+}
+
 export const GROUP_MIN_SIZE = { width: 260, height: 220 }
 
 const GROUP_SLOT = { width: 380, height: 470, gap: 30, columns: 4 }
@@ -279,7 +410,7 @@ const SEEDS: Seed[] = [
   { id: "n2", text: "Renew passport before June", color: "butter", x: 960, y: 80, rotation: 1.5, labels: { area: "home", happiness: "safety" }, hashtags: ["must"] },
   { id: "n3", text: "Am I saving enough for later?", color: "sky", x: 720, y: 820, rotation: -1 },
   { id: "n4", text: "Call Mom on Sunday", color: "rose", x: 380, y: 300, rotation: 2.5, labels: { area: "relationships", happiness: "love" }, hashtags: ["family", "want"] },
-  { id: "n5", text: "Learn to bake sourdough", color: "peach", x: 120, y: 860, rotation: 1 },
+  { id: "n5", text: "Learn to bake sourdough", color: "peach", x: 120, y: 860, rotation: 1, hashtags: ["love", "good-at"] },
   {
     id: "n6",
     text: "Fix the leaking kitchen tap",
@@ -291,10 +422,10 @@ const SEEDS: Seed[] = [
     labels: { area: "home", budget: "expense" },
     task: { title: "Replace kitchen tap washer", labelId: "home", due: "2026-10-18", owner: "Me" },
   },
-  { id: "n7", text: "Quarterly tax filing", color: "paper", x: 1320, y: 840, rotation: 2 },
+  { id: "n7", text: "Quarterly tax filing", color: "paper", x: 1320, y: 840, rotation: 2, hashtags: ["income"] },
   { id: "n8", text: "Tired most afternoons", color: "lilac", x: 420, y: 860, rotation: -2.5 },
-  { id: "n9", text: "Write an onboarding guide for the new tool", color: "sky", x: 1020, y: 830, rotation: 1, labels: { area: "work" }, hashtags: ["work"] },
-  { id: "n10", text: "A slow week by the sea", color: "sage", x: 720, y: 140, rotation: -1 },
+  { id: "n9", text: "Write an onboarding guide for the new tool", color: "sky", x: 1020, y: 830, rotation: 1, labels: { area: "work" }, hashtags: ["work", "income", "needed"] },
+  { id: "n10", text: "A slow week by the sea", color: "sage", x: 720, y: 140, rotation: -1, hashtags: ["love"] },
   { id: "n11", text: "Reply to every unread group chat", color: "peach", x: 740, y: 470, rotation: 1.5 },
 ]
 
