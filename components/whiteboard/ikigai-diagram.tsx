@@ -5,6 +5,7 @@ import {
   IKIGAI_LABEL_REACH,
   IKIGAI_SIZE,
   OVERLAP_PARENTS,
+  countAllTags,
   countTag,
   ikigaiCircleOffset,
   type IkigaiCenter,
@@ -15,6 +16,9 @@ import {
 } from "@/lib/board-data"
 
 const HALF = IKIGAI_SIZE / 2
+
+/** Distance from the center to the count on a three-circle overlap, on the side away from the missing circle. */
+const LENS_LABEL_REACH = 135
 
 const TONES: Record<IkigaiCircleId, { fill: string; edge: string }> = {
   love: { fill: "#f3cdd1", edge: "#d9a0a8" },
@@ -67,8 +71,7 @@ function Clipped({ ids, children }: { ids: IkigaiCircleId[]; children: ReactNode
   return ids.reduceRight<ReactNode>((inner, id) => <g clipPath={`url(#ikigai-clip-${id})`}>{inner}</g>, children)
 }
 
-function Highlight({ region, kind }: { region: IkigaiRegionId; kind: "active" | "hover" }) {
-  const ids = circleIds(region)
+function Highlight({ ids, kind }: { ids: IkigaiCircleId[]; kind: "active" | "hover" }) {
   const [first, ...rest] = ids
   const stroke: CSSProperties = {
     stroke: "var(--color-accent)",
@@ -98,11 +101,18 @@ export function IkigaiCircles({
   center,
   activeRegion,
   hoverRegion,
+  activeLens,
+  hoverLens,
 }: {
   center: IkigaiCenter
   activeRegion: IkigaiRegionId | null
   hoverRegion: IkigaiRegionId | null
+  activeLens: IkigaiCircleId[] | null
+  hoverLens: IkigaiCircleId[] | null
 }) {
+  const activeIds = activeLens ?? (activeRegion ? circleIds(activeRegion) : null)
+  const hoverIds = hoverLens ?? (hoverRegion ? circleIds(hoverRegion) : null)
+  const showHover = hoverIds !== null && hoverIds.join() !== activeIds?.join()
   return (
     <div data-zone="" data-ikigai="" aria-hidden="true" className="pointer-events-none absolute" style={frameAt(center)}>
       <svg viewBox={`0 0 ${IKIGAI_SIZE} ${IKIGAI_SIZE}`} width={IKIGAI_SIZE} height={IKIGAI_SIZE} className="absolute inset-0">
@@ -125,8 +135,8 @@ export function IkigaiCircles({
             style={{ mixBlendMode: "multiply" }}
           />
         ))}
-        {hoverRegion && hoverRegion !== activeRegion ? <Highlight region={hoverRegion} kind="hover" /> : null}
-        {activeRegion ? <Highlight region={activeRegion} kind="active" /> : null}
+        {showHover ? <Highlight ids={hoverIds} kind="hover" /> : null}
+        {activeIds ? <Highlight ids={activeIds} kind="active" /> : null}
       </svg>
     </div>
   )
@@ -177,13 +187,30 @@ export function IkigaiLabels({
   center,
   notes,
   activeRegion,
+  activeLens,
 }: {
   center: IkigaiCenter
   notes: Note[]
   activeRegion: IkigaiRegionId | null
+  activeLens: IkigaiCircleId[] | null
 }) {
+  const missing = activeLens ? IKIGAI_CIRCLES.find((id) => !activeLens.includes(id)) : undefined
+  const lensSpot = missing ? ikigaiCircleOffset(missing) : null
   return (
     <div aria-hidden="true" className="pointer-events-none absolute z-[5000]" style={frameAt(center)}>
+      {activeLens && lensSpot ? (
+        <div
+          className="absolute -translate-x-1/2 -translate-y-1/2"
+          style={{
+            left: HALF - (lensSpot.x / IKIGAI.d) * LENS_LABEL_REACH,
+            top: HALF - (lensSpot.y / IKIGAI.d) * LENS_LABEL_REACH,
+          }}
+        >
+          <span className="block rounded-full border border-accent bg-accent px-3 py-0.5 text-[20px] leading-snug font-medium whitespace-nowrap text-board tabular-nums">
+            {countText(countAllTags(notes, activeLens))}
+          </span>
+        </div>
+      ) : null}
       {IKIGAI_CIRCLES.map((id) => {
         const o = ikigaiCircleOffset(id)
         const scale = IKIGAI_LABEL_REACH / IKIGAI.d

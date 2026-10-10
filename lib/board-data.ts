@@ -306,6 +306,8 @@ export type IkigaiItem = {
   region: IkigaiRegionId
   /** Hashtags of the two circles an overlap joins. */
   parents: [string, string] | null
+  /** The three circles whose shared overlap a move points to. */
+  lens: [IkigaiCircleId, IkigaiCircleId, IkigaiCircleId] | null
   description: string
 }
 
@@ -316,11 +318,17 @@ function regionItem(
   description: string,
 ): IkigaiItem {
   const parents = id in OVERLAP_PARENTS ? OVERLAP_PARENTS[id as IkigaiOverlapId] : null
-  return { id, kind: "region", step, name, tag: id, region: id, parents, description }
+  return { id, kind: "region", step, name, tag: id, region: id, parents, lens: null, description }
 }
 
-function moveItem(id: IkigaiMoveId, name: string, region: IkigaiCircleId, description: string): IkigaiItem {
-  return { id, kind: "move", step: null, name, tag: id, region, parents: null, description }
+function moveItem(
+  id: IkigaiMoveId,
+  name: string,
+  region: IkigaiCircleId,
+  lens: [IkigaiCircleId, IkigaiCircleId, IkigaiCircleId],
+  description: string,
+): IkigaiItem {
+  return { id, kind: "move", step: null, name, tag: id, region, parents: null, lens, description }
 }
 
 export const IKIGAI_ITEMS: IkigaiItem[] = [
@@ -333,10 +341,34 @@ export const IKIGAI_ITEMS: IkigaiItem[] = [
   regionItem(7, "work", "Work", "Where what brings income meets what people need."),
   regionItem(8, "vocation", "Vocation", "Where what you love meets what people need."),
   regionItem(null, "ikigai", "Ikigai", "The center, where all four circles meet."),
-  moveItem("could-help", "How this could help people", "needed", "Cards where you can see a way to help someone."),
-  moveItem("beloved-from-list", "Find a loved activity from the love list", "love", "Cards from the love list you would like to do more of."),
-  moveItem("skill-to-grow", "Develop a skill from the list", "good-at", "Cards from the good-at list that are worth growing."),
-  moveItem("could-earn", "Find a way to earn from it", "income", "Cards that could turn into income."),
+  moveItem(
+    "could-help",
+    "How this could help people",
+    "needed",
+    ["love", "good-at", "income"],
+    "Cards where you can see a way to help someone.",
+  ),
+  moveItem(
+    "beloved-from-list",
+    "Find a loved activity from the love list",
+    "love",
+    ["good-at", "income", "needed"],
+    "Cards from the love list you would like to do more of.",
+  ),
+  moveItem(
+    "skill-to-grow",
+    "Develop a skill from the list",
+    "good-at",
+    ["love", "income", "needed"],
+    "Cards from the good-at list that are worth growing.",
+  ),
+  moveItem(
+    "could-earn",
+    "Find a way to earn from it",
+    "income",
+    ["love", "good-at", "needed"],
+    "Cards that could turn into income.",
+  ),
 ]
 
 export const IKIGAI_STEPS = IKIGAI_ITEMS.filter((item) => item.step !== null)
@@ -351,6 +383,11 @@ export function getIkigaiItem(id: string | null | undefined) {
 
 export function countTag(notes: Note[], tag: string) {
   return notes.reduce((total, note) => total + (hasHashtag(note, tag) ? 1 : 0), 0)
+}
+
+/** Cards that carry every one of the given hashtags. */
+export function countAllTags(notes: Note[], tags: string[]) {
+  return notes.reduce((total, note) => total + (tags.every((tag) => hasHashtag(note, tag)) ? 1 : 0), 0)
 }
 
 export const GROUP_MIN_SIZE = { width: 260, height: 220 }

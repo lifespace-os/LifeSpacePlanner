@@ -187,8 +187,12 @@ export function Board({
     if (region) ikigai.onPick(region)
   }
 
-  const activeRegion = getIkigaiItem(ikigai?.activeId)?.region ?? null
-  const hoverRegion = getIkigaiItem(ikigai?.hoverId)?.region ?? null
+  const activeItem = getIkigaiItem(ikigai?.activeId)
+  const hoverItem = getIkigaiItem(ikigai?.hoverId)
+  const activeLens = activeItem?.lens ?? null
+  const hoverLens = hoverItem?.lens ?? null
+  const activeRegion = activeItem && !activeLens ? activeItem.region : null
+  const hoverRegion = hoverItem && !hoverLens ? hoverItem.region : null
 
   const gridSize = GRID * view.zoom
 
@@ -231,7 +235,15 @@ export function Board({
           <GroupAreas notes={notes} groups={groups} zoom={view.zoom} onMove={onGroupMove} onResize={onGroupResize} />
         ) : null}
 
-        {ikigai ? <IkigaiCircles center={ikigai.center} activeRegion={activeRegion} hoverRegion={hoverRegion} /> : null}
+        {ikigai ? (
+          <IkigaiCircles
+            center={ikigai.center}
+            activeRegion={activeRegion}
+            hoverRegion={hoverRegion}
+            activeLens={activeLens}
+            hoverLens={hoverLens}
+          />
+        ) : null}
 
         {notes.map((note) => {
           const inMulti = multiIds.includes(note.id)
@@ -259,7 +271,9 @@ export function Board({
           )
         })}
 
-        {ikigai ? <IkigaiLabels center={ikigai.center} notes={notes} activeRegion={activeRegion} /> : null}
+        {ikigai ? (
+          <IkigaiLabels center={ikigai.center} notes={notes} activeRegion={activeRegion} activeLens={activeLens} />
+        ) : null}
       </div>
     </div>
   )
