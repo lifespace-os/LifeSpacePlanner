@@ -14,6 +14,7 @@ import {
   type Note,
   type View,
 } from "@/lib/board-data"
+import { beginGroupDrag, type GroupDrag, type GroupMove } from "@/lib/group-drag"
 import { LabelChip } from "./label-chip"
 
 type Props = {
@@ -23,6 +24,8 @@ type Props = {
   selected: boolean
   editing: boolean
   viewRef: RefObject<View>
+  /** Ids of every selected card, read when a drag starts so the whole selection travels together. */
+  selectionRef: RefObject<string[]>
   /** In the Ikigai view cards stay put: dragging one is a tagging gesture and the card returns. */
   fixed: boolean
   /** Number of cards in the current multi-selection that includes this card, otherwise 0. */
@@ -30,6 +33,7 @@ type Props = {
   onSelect: (id: string, additive: boolean) => void
   onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => void
   onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
+  onMoveMany: (moves: GroupMove[]) => void
   onFront: (id: string) => void
   onMission: (id: string, choice: Exclude<MissionChoice, null>) => void
   onEditStart: (id: string) => void
@@ -38,7 +42,13 @@ type Props = {
   onDelete: (id: string) => void
 }
 
-type DragState = { pointerId: number; startX: number; startY: number; left: number; top: number; moved: boolean }
+type DragState = {
+  pointerId: number
+  startX: number
+  startY: number
+  group: GroupDrag | null
+  moved: boolean
+}
 
 const KEY_STEP = 24
 const ARROWS: Record<string, [number, number]> = {
@@ -63,11 +73,13 @@ export const NoteCard = memo(function NoteCard({
   selected,
   editing,
   viewRef,
+  selectionRef,
   fixed,
   multiCount,
   onSelect,
   onTagDrag,
   onMove,
+  onMoveMany,
   onFront,
   onMission,
   onEditStart,
@@ -99,8 +111,7 @@ export const NoteCard = memo(function NoteCard({
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      left: note.x,
-      top: note.y,
+      group: null,
       moved: false,
     }
     card.setPointerCapture(event.pointerId)
@@ -116,12 +127,15 @@ export const NoteCard = memo(function NoteCard({
       if (Math.hypot(dx, dy) < 4) return
       state.moved = true
       setDragging(true)
+      const root = cardRef.current?.parentElement
+      if (!root) return
+      const selection = selectionRef.current
+      const inSelection = selection.includes(note.id)
+      if (!inSelection) onSelect(note.id, false)
+      state.group = beginGroupDrag(root, inSelection ? selection : [note.id])
     }
-    const card = cardRef.current
-    if (!card) return
     const zoom = viewRef.current.zoom
-    card.style.left = `${state.left + dx / zoom}px`
-    card.style.top = `${state.top + dy / zoom}px`
+    state.group?.apply(dx / zoom, dy / zoom)
     if (fixed) onTagDrag(note.id, event.clientX, event.clientY, "move")
   }
 
@@ -134,17 +148,16 @@ export const NoteCard = memo(function NoteCard({
       return
     }
     setDragging(false)
+    const dropped = event.type === "pointerup"
     if (fixed) {
-      const card = cardRef.current
-      if (card) {
-        card.style.left = `${note.x}px`
-        card.style.top = `${note.y}px`
-      }
-      onTagDrag(note.id, event.clientX, event.clientY, event.type === "pointerup" ? "drop" : "cancel")
+      state.group?.reset()
+      onTagDrag(note.id, event.clientX, event.clientY, dropped ? "drop" : "cancel")
       return
     }
     const zoom = viewRef.current.zoom
-    commit(state.left + (event.clientX - state.startX) / zoom, state.top + (event.clientY - state.startY) / zoom)
+    const dx = dropped ? (event.clientX - state.startX) / zoom : 0
+    const dy = dropped ? (event.clientY - state.startY) / zoom : 0
+    if (state.group) onMoveMany(state.group.commit(dx, dy))
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLElement>) {

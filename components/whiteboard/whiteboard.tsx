@@ -42,6 +42,7 @@ import {
   type ZoneId,
   type Zones,
 } from "@/lib/board-data"
+import type { GroupMove } from "@/lib/group-drag"
 import { ModeSwitcher } from "./mode-switcher"
 import { ModeBar } from "./mode-bar"
 import { Board } from "./board"
@@ -78,8 +79,7 @@ export function Whiteboard() {
   const [stepsOpen, setStepsOpen] = useState(true)
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [dropHover, setDropHover] = useState<string | null>(null)
-  const [multiIds, setMultiIds] = useState<string[]>([])
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>(NO_IDS)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [dockColor, setDockColor] = useState<CardColorId>("butter")
   const [menu, setMenu] = useState<MenuState | null>(null)
@@ -94,10 +94,10 @@ export function Whiteboard() {
   const ikigaiOn = mode === "mission" && missionView === "ikigai"
   const ikigaiOnRef = useRef(ikigaiOn)
   const ikigaiActiveRef = useRef(ikigaiActive)
-  const multiRef = useRef(multiIds)
+  const selectionRef = useRef(selectedIds)
   ikigaiOnRef.current = ikigaiOn
   ikigaiActiveRef.current = ikigaiActive
-  multiRef.current = multiIds
+  selectionRef.current = selectedIds
 
   const updateView = useCallback((change: (prev: View) => View) => {
     const next = change(viewRef.current)
@@ -278,6 +278,24 @@ export function Whiteboard() {
     [layer, updateNote],
   )
 
+  const moveNotes = useCallback(
+    (moves: GroupMove[]) => {
+      const byId = new Map(moves.map((move) => [move.id, move]))
+      setNotes((prev) =>
+        prev.map((note) => {
+          const move = byId.get(note.id)
+          if (!move) return note
+          const moved = { ...note, x: move.x, y: move.y }
+          if (!layer) return moved
+          const from = areaTagAt(layer.areas, move.centerX - (move.x - note.x), move.centerY - (move.y - note.y))
+          const to = areaTagAt(layer.areas, move.centerX, move.centerY)
+          return reconcile(moved, layer.tags, from, to)
+        }),
+      )
+    },
+    [layer],
+  )
+
   const cardCenters = useCallback(() => {
     const centers = new Map<string, { x: number; y: number }>()
     viewportRef.current?.querySelectorAll<HTMLElement>("[data-note-id]").forEach((el) => {
@@ -402,11 +420,14 @@ export function Whiteboard() {
   )
 
   const selectCard = useCallback((id: string, additive: boolean) => {
-    if (ikigaiOnRef.current) {
-      setMultiIds((prev) => (additive ? (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]) : [id]))
-      return
-    }
-    setSelectedId(id)
+    setSelectedIds((prev) => (additive ? (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]) : [id]))
+  }, [])
+
+  const selectInside = useCallback((ids: string[]) => {
+    setSelectedIds((prev) => {
+      const next = [...prev, ...ids.filter((id) => !prev.includes(id))]
+      return next.length === prev.length ? prev : next
+    })
   }, [])
 
   const tagCards = useCallback((ids: string[], tag: string) => {
@@ -430,7 +451,7 @@ export function Whiteboard() {
   /** What sits under the pointer while a card is dragged: the side panel, a step or move, or a diagram region. */
   const ikigaiTargetAt = useCallback(
     (clientX: number, clientY: number): string | null => {
-      const top = document.elementsFromPoint(clientX, clientY).find((el) => !el.closest("[data-note-card]"))
+      const top = document.elementsFromPoint(clientX, clientY).find((el) => !el.closest("[data-note-card], [data-selection-box]"))
       if (!top) return null
       if (top.closest("[data-ikigai-drop]")) return "panel"
       const item = top.closest<HTMLElement>("[data-ikigai-item]")?.dataset.ikigaiItem
@@ -456,9 +477,8 @@ export function Whiteboard() {
       setDropHover(null)
       const item = getIkigaiItem(target === "panel" ? ikigaiActiveRef.current : target)
       if (!item) return
-      const ids = multiRef.current.includes(id) ? multiRef.current : [id]
+      const ids = selectionRef.current.includes(id) ? selectionRef.current : [id]
       tagCards(ids, item.tag)
-      if (ids.length > 1) setMultiIds([])
       if (target !== "panel") setIkigaiActive(item.id)
     },
     [ikigaiTargetAt, tagCards],
@@ -466,8 +486,7 @@ export function Whiteboard() {
 
   const deleteNote = useCallback((id: string) => {
     setNotes((prev) => prev.filter((note) => note.id !== id))
-    setMultiIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : prev))
-    setSelectedId((current) => (current === id ? null : current))
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : prev))
     setEditingId((current) => (current === id ? null : current))
     setMenu(null)
   }, [])
@@ -497,7 +516,6 @@ export function Whiteboard() {
     (next: Mode) => {
       setMode(next)
       setMenu(null)
-      setMultiIds([])
       setDropHover(null)
       setMissionOpen(next === "mission" && missionView === "sentence" && missionText.length === 0)
     },
@@ -508,7 +526,6 @@ export function Whiteboard() {
     (next: MissionView) => {
       setMissionView(next)
       setMenu(null)
-      setMultiIds([])
       setDropHover(null)
       setMissionOpen(next === "sentence" && missionText.length === 0)
     },
@@ -543,10 +560,7 @@ export function Whiteboard() {
   const closeMission = useCallback(() => setMissionOpen(false), [])
 
   const closeMenu = useCallback(() => setMenu(null), [])
-  const clearSelection = useCallback(() => {
-    setSelectedId(null)
-    setMultiIds((prev) => (prev.length > 0 ? [] : prev))
-  }, [])
+  const clearSelection = useCallback(() => setSelectedIds((prev) => (prev.length > 0 ? NO_IDS : prev)), [])
 
   const toggleFocusMode = useCallback(() => {
     const root = rootRef.current
@@ -570,7 +584,7 @@ export function Whiteboard() {
   const activeMode = MODES.find((m) => m.id === mode) ?? MODES[0]
   const ikigaiItem = getIkigaiItem(ikigaiActive)
   const showInspector = mode === "labels" || mode === "task"
-  const selectedNote = notes.find((note) => note.id === selectedId) ?? null
+  const selectedNote = selectedIds.length === 1 ? (notes.find((note) => note.id === selectedIds[0]) ?? null) : null
   const menuNote = menu?.kind === "card" ? notes.find((note) => note.id === menu.noteId) ?? null : null
 
   return (
@@ -591,8 +605,8 @@ export function Whiteboard() {
         view={view}
         viewRef={viewRef}
         viewportRef={viewportRef}
-        selectedId={showInspector ? selectedId : null}
-        multiIds={ikigaiOn ? multiIds : NO_IDS}
+        selectedIds={selectedIds}
+        selectionRef={selectionRef}
         editingId={editingId}
         ikigai={
           ikigaiOn
@@ -614,8 +628,10 @@ export function Whiteboard() {
         onCanvasMenu={openCanvasMenu}
         onClearSelection={clearSelection}
         onSelect={selectCard}
+        onMarquee={selectInside}
         onTagDrag={handleTagDrag}
         onMove={moveNote}
+        onMoveMany={moveNotes}
         onFront={bringToFront}
         onMission={setMission}
         onEditStart={startEdit}
