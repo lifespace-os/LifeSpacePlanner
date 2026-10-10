@@ -50,12 +50,39 @@ export function IkigaiPanel({
   onClose,
   onRemoveTag,
 }: {
-  item: IkigaiItem
+  item: IkigaiItem | null
   notes: Note[]
   dropOver: boolean
   onClose: () => void
   onRemoveTag: (id: string, tag: string) => void
 }) {
+  if (!item) {
+    return (
+      <aside
+        aria-label="Ikigai details"
+        className="pointer-events-auto flex max-h-full w-80 shrink-0 flex-col rounded-2xl border border-line bg-card shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)]"
+      >
+        <div className="flex items-start justify-between gap-3 px-5 pt-5">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase">Ikigai</p>
+            <h2 className="mt-1 font-serif text-2xl leading-tight font-medium text-balance">Details</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Hide details window"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-soft transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        </div>
+        <p className="px-5 pt-2 pb-5 text-sm leading-relaxed text-ink-soft text-pretty">
+          Choose a step in the left window, or click a circle. Its description, drop area, and tagged cards appear here.
+        </p>
+      </aside>
+    )
+  }
+
   const tagged = notes.filter((note) => hasHashtag(note, item.tag))
   const candidates = item.parents
     ? notes.filter(
@@ -80,7 +107,7 @@ export function IkigaiPanel({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close panel"
+          aria-label="Hide details window"
           className="flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-soft transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
         >
           <X className="size-4" aria-hidden="true" />

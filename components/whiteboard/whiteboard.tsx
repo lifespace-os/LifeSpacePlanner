@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import clsx from "clsx"
-import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
 import {
   CARD_MIN_HEIGHT,
   CARD_WIDTH,
   DEFAULT_GROUPS,
   DEFAULT_ZONES,
+  IKIGAI_GAP,
+  IKIGAI_SIZE,
   MAX_ZOOM,
   MIN_ZOOM,
   MODES,
@@ -27,6 +29,7 @@ import {
   type CardColorId,
   type ClusterView,
   type Group,
+  type IkigaiCenter,
   type LabelGroupId,
   type MissionChoice,
   type MissionView,
@@ -46,6 +49,7 @@ import { Inspector } from "./inspector"
 import { ClustersPanel } from "./clusters-panel"
 import { MissionWindow } from "./mission-window"
 import { IkigaiPanel } from "./ikigai-panel"
+import { IkigaiStepsWindow } from "./ikigai-guide"
 import { CardDock } from "./card-dock"
 import { ZoomControls } from "./zoom-controls"
 import { CanvasMenu, CardMenu, type MenuState } from "./context-menu"
@@ -53,7 +57,7 @@ import { CanvasMenu, CardMenu, type MenuState } from "./context-menu"
 const ZOOM_STEP = 1.25
 const NO_IDS: string[] = []
 const FIT_PADDING = { top: 150, right: 60, bottom: 130, left: 60 }
-const IKIGAI_FIT_PADDING = { top: 270, right: 400, bottom: 130, left: 60 }
+const IKIGAI_FIT_PADDING = { top: 270, right: 400, bottom: 130, left: 400 }
 
 function clampZoom(zoom: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
@@ -70,6 +74,9 @@ export function Whiteboard() {
   const [missionOpen, setMissionOpen] = useState(false)
   const [missionView, setMissionView] = useState<MissionView>("sentence")
   const [ikigaiActive, setIkigaiActive] = useState<string | null>(null)
+  const [ikigaiCenter, setIkigaiCenter] = useState<IkigaiCenter>({ x: 0, y: 0 })
+  const [stepsOpen, setStepsOpen] = useState(true)
+  const [detailsOpen, setDetailsOpen] = useState(true)
   const [dropHover, setDropHover] = useState<string | null>(null)
   const [multiIds, setMultiIds] = useState<string[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -170,6 +177,32 @@ export function Whiteboard() {
     const frame = requestAnimationFrame(fitAll)
     return () => cancelAnimationFrame(frame)
   }, [fitAll])
+
+  useLayoutEffect(() => {
+    if (!ikigaiOn) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+    let right = -Infinity
+    let top = Infinity
+    let bottom = -Infinity
+    viewport.querySelectorAll<HTMLElement>("[data-note-card]").forEach((card) => {
+      right = Math.max(right, card.offsetLeft + card.offsetWidth)
+      top = Math.min(top, card.offsetTop)
+      bottom = Math.max(bottom, card.offsetTop + card.offsetHeight)
+    })
+    if (right === -Infinity) {
+      const rect = viewport.getBoundingClientRect()
+      const open = screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2)
+      setIkigaiCenter({ x: Math.round(open.x), y: Math.round(open.y) })
+      return
+    }
+    setIkigaiCenter({ x: Math.round(right + IKIGAI_GAP + IKIGAI_SIZE / 2), y: Math.round((top + bottom) / 2) })
+  }, [ikigaiOn, screenToWorld])
+
+  const moveIkigaiGroup = useCallback(
+    (dx: number, dy: number) => setIkigaiCenter((center) => ({ x: center.x + dx, y: center.y + dy })),
+    [],
+  )
 
   const visibleLayer = mode === "clusters" ? clusterView : ikigaiOn ? "ikigai" : null
   useEffect(() => {
@@ -404,9 +437,9 @@ export function Whiteboard() {
       if (item) return item
       if (!viewportRef.current?.contains(top)) return null
       const point = screenToWorld(clientX, clientY)
-      return ikigaiRegionAt(point.x, point.y)
+      return ikigaiRegionAt(point.x, point.y, ikigaiCenter)
     },
-    [screenToWorld],
+    [ikigaiCenter, screenToWorld],
   )
 
   const handleTagDrag = useCallback(
@@ -499,7 +532,8 @@ export function Whiteboard() {
     [changeMissionView],
   )
 
-  const closeIkigaiPanel = useCallback(() => setIkigaiActive(null), [])
+  const hideSteps = useCallback(() => setStepsOpen(false), [])
+  const hideDetails = useCallback(() => setDetailsOpen(false), [])
 
   const saveMission = useCallback((text: string) => {
     setMissionText(text)
@@ -562,7 +596,13 @@ export function Whiteboard() {
         editingId={editingId}
         ikigai={
           ikigaiOn
-            ? { activeId: ikigaiActive, hoverId: dropHover && dropHover !== "panel" ? dropHover : null, onPick: setIkigaiActive }
+            ? {
+                center: ikigaiCenter,
+                activeId: ikigaiActive,
+                hoverId: dropHover && dropHover !== "panel" ? dropHover : null,
+                onPick: setIkigaiActive,
+                onMoveGroup: moveIkigaiGroup,
+              }
             : null
         }
         onZoneMove={moveZone}
@@ -651,16 +691,62 @@ export function Whiteboard() {
         </>
       ) : null}
 
-      {ikigaiOn && ikigaiItem ? (
-        <div className="pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex">
-          <IkigaiPanel
-            item={ikigaiItem}
-            notes={notes}
-            dropOver={dropHover === "panel"}
-            onClose={closeIkigaiPanel}
-            onRemoveTag={untagCard}
-          />
-        </div>
+      {ikigaiOn ? (
+        <>
+          <div
+            inert={!stepsOpen}
+            aria-hidden={!stepsOpen}
+            className={`pointer-events-none absolute top-[11.5rem] bottom-24 left-4 flex transition-transform duration-300 ease-out motion-reduce:transition-none ${
+              stepsOpen ? "translate-x-0" : "-translate-x-[calc(100%+1.5rem)]"
+            }`}
+          >
+            <IkigaiStepsWindow
+              notes={notes}
+              activeId={ikigaiActive}
+              hoverId={dropHover && dropHover !== "panel" ? dropHover : null}
+              onPick={setIkigaiActive}
+              onClose={hideSteps}
+            />
+          </div>
+          {stepsOpen ? null : (
+            <button
+              type="button"
+              onClick={() => setStepsOpen(true)}
+              aria-label="Show steps window"
+              title="Show steps window"
+              className="pointer-events-auto absolute top-[11.5rem] left-0 flex h-24 w-9 items-center justify-center rounded-r-xl border border-l-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <ChevronRight className="size-5" aria-hidden="true" />
+            </button>
+          )}
+
+          <div
+            inert={!detailsOpen}
+            aria-hidden={!detailsOpen}
+            className={`pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex transition-transform duration-300 ease-out motion-reduce:transition-none ${
+              detailsOpen ? "translate-x-0" : "translate-x-[calc(100%+1.5rem)]"
+            }`}
+          >
+            <IkigaiPanel
+              item={ikigaiItem}
+              notes={notes}
+              dropOver={dropHover === "panel"}
+              onClose={hideDetails}
+              onRemoveTag={untagCard}
+            />
+          </div>
+          {detailsOpen ? null : (
+            <button
+              type="button"
+              onClick={() => setDetailsOpen(true)}
+              aria-label="Show details window"
+              title="Show details window"
+              className="pointer-events-auto absolute top-[11.5rem] right-0 flex h-24 w-9 items-center justify-center rounded-l-xl border border-r-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <ChevronLeft className="size-5" aria-hidden="true" />
+            </button>
+          )}
+        </>
       ) : null}
 
       {showInspector ? (

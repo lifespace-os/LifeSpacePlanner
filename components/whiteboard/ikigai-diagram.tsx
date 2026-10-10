@@ -3,11 +3,11 @@ import {
   IKIGAI,
   IKIGAI_CIRCLES,
   IKIGAI_LABEL_REACH,
-  IKIGAI_RECT,
   IKIGAI_SIZE,
   OVERLAP_PARENTS,
   countTag,
   ikigaiCircleOffset,
+  type IkigaiCenter,
   type IkigaiCircleId,
   type IkigaiOverlapId,
   type IkigaiRegionId,
@@ -44,7 +44,9 @@ const OVERLAP_POSITIONS: Record<IkigaiOverlapId, [number, number]> = {
   profession: [-1, 1],
 }
 
-const frame: CSSProperties = { left: IKIGAI_RECT.left, top: IKIGAI_RECT.top, width: IKIGAI_SIZE, height: IKIGAI_SIZE }
+function frameAt(center: IkigaiCenter): CSSProperties {
+  return { left: center.x - HALF, top: center.y - HALF, width: IKIGAI_SIZE, height: IKIGAI_SIZE }
+}
 
 const halo: CSSProperties = {
   textShadow: "0 0 8px var(--color-board), 0 0 3px var(--color-board), 0 0 3px var(--color-board)",
@@ -93,14 +95,16 @@ function Highlight({ region, kind }: { region: IkigaiRegionId; kind: "active" | 
 }
 
 export function IkigaiCircles({
+  center,
   activeRegion,
   hoverRegion,
 }: {
+  center: IkigaiCenter
   activeRegion: IkigaiRegionId | null
   hoverRegion: IkigaiRegionId | null
 }) {
   return (
-    <div data-zone="" data-ikigai="" aria-hidden="true" className="pointer-events-none absolute" style={frame}>
+    <div data-zone="" data-ikigai="" aria-hidden="true" className="pointer-events-none absolute" style={frameAt(center)}>
       <svg viewBox={`0 0 ${IKIGAI_SIZE} ${IKIGAI_SIZE}`} width={IKIGAI_SIZE} height={IKIGAI_SIZE} className="absolute inset-0">
         <defs>
           {IKIGAI_CIRCLES.map((id) => (
@@ -169,9 +173,17 @@ function Label({
 }
 
 /** Names and card counts. Drawn above the cards, never in the way of the pointer. */
-export function IkigaiLabels({ notes, activeRegion }: { notes: Note[]; activeRegion: IkigaiRegionId | null }) {
+export function IkigaiLabels({
+  center,
+  notes,
+  activeRegion,
+}: {
+  center: IkigaiCenter
+  notes: Note[]
+  activeRegion: IkigaiRegionId | null
+}) {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute z-[5000]" style={frame}>
+    <div aria-hidden="true" className="pointer-events-none absolute z-[5000]" style={frameAt(center)}>
       {IKIGAI_CIRCLES.map((id) => {
         const o = ikigaiCircleOffset(id)
         const scale = IKIGAI_LABEL_REACH / IKIGAI.d

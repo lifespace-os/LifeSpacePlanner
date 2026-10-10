@@ -6,6 +6,7 @@ import {
   getIkigaiItem,
   ikigaiRegionAt,
   type ClusterView,
+  type IkigaiCenter,
   type Group,
   type MissionChoice,
   type Mode,
@@ -19,11 +20,12 @@ import { NoteCard } from "./note-card"
 import { SortZones } from "./sort-zones"
 import { GroupAreas } from "./group-areas"
 import { IkigaiCircles, IkigaiLabels } from "./ikigai-diagram"
-import { IkigaiMoves, IkigaiSteps } from "./ikigai-guide"
 
 type PanState = {
   pointerId: number
   button: number
+  /** True when the drag started on the circles: it moves the circle group instead of the canvas. */
+  group: boolean
   startX: number
   startY: number
   lastX: number
@@ -32,9 +34,11 @@ type PanState = {
 }
 
 export type IkigaiBoardState = {
+  center: IkigaiCenter
   activeId: string | null
   hoverId: string | null
   onPick: (id: string) => void
+  onMoveGroup: (dx: number, dy: number) => void
 }
 
 const GRID = 22
@@ -126,9 +130,21 @@ export function Board({
     if ((event.target as HTMLElement).closest("[data-note-card], [data-zone-handle], [data-board-control]")) return
     if (event.button === 0) onClearSelection()
     if (document.activeElement instanceof HTMLTextAreaElement) document.activeElement.blur()
+    let group = false
+    const rect = viewportRef.current?.getBoundingClientRect()
+    if (ikigai && event.button === 0 && rect) {
+      const v = viewRef.current
+      group =
+        ikigaiRegionAt(
+          (event.clientX - rect.left - v.x) / v.zoom,
+          (event.clientY - rect.top - v.y) / v.zoom,
+          ikigai.center,
+        ) !== null
+    }
     pan.current = {
       pointerId: event.pointerId,
       button: event.button,
+      group,
       startX: event.clientX,
       startY: event.clientY,
       lastX: event.clientX,
@@ -143,7 +159,13 @@ export function Board({
     const state = pan.current
     if (!state || state.pointerId !== event.pointerId) return
     if (!state.moved && Math.hypot(event.clientX - state.startX, event.clientY - state.startY) >= 4) state.moved = true
-    onPan(event.clientX - state.lastX, event.clientY - state.lastY)
+    const dx = event.clientX - state.lastX
+    const dy = event.clientY - state.lastY
+    if (state.group && ikigai) {
+      if (state.moved) ikigai.onMoveGroup(dx / viewRef.current.zoom, dy / viewRef.current.zoom)
+    } else {
+      onPan(dx, dy)
+    }
     state.lastX = event.clientX
     state.lastY = event.clientY
   }
@@ -157,7 +179,11 @@ export function Board({
     const rect = viewportRef.current?.getBoundingClientRect()
     if (!rect) return
     const v = viewRef.current
-    const region = ikigaiRegionAt((event.clientX - rect.left - v.x) / v.zoom, (event.clientY - rect.top - v.y) / v.zoom)
+    const region = ikigaiRegionAt(
+      (event.clientX - rect.left - v.x) / v.zoom,
+      (event.clientY - rect.top - v.y) / v.zoom,
+      ikigai.center,
+    )
     if (region) ikigai.onPick(region)
   }
 
@@ -205,7 +231,7 @@ export function Board({
           <GroupAreas notes={notes} groups={groups} zoom={view.zoom} onMove={onGroupMove} onResize={onGroupResize} />
         ) : null}
 
-        {ikigai ? <IkigaiCircles activeRegion={activeRegion} hoverRegion={hoverRegion} /> : null}
+        {ikigai ? <IkigaiCircles center={ikigai.center} activeRegion={activeRegion} hoverRegion={hoverRegion} /> : null}
 
         {notes.map((note) => {
           const inMulti = multiIds.includes(note.id)
@@ -233,13 +259,7 @@ export function Board({
           )
         })}
 
-        {ikigai ? (
-          <>
-            <IkigaiLabels notes={notes} activeRegion={activeRegion} />
-            <IkigaiSteps notes={notes} activeId={ikigai.activeId} hoverId={ikigai.hoverId} onPick={ikigai.onPick} />
-            <IkigaiMoves notes={notes} activeId={ikigai.activeId} hoverId={ikigai.hoverId} onPick={ikigai.onPick} />
-          </>
-        ) : null}
+        {ikigai ? <IkigaiLabels center={ikigai.center} notes={notes} activeRegion={activeRegion} /> : null}
       </div>
     </div>
   )

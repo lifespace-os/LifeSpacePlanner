@@ -229,14 +229,18 @@ export type IkigaiRegionId = IkigaiCircleId | IkigaiOverlapId | "ikigai"
 export type IkigaiMoveId = "could-help" | "beloved-from-list" | "skill-to-grow" | "could-earn"
 
 /** Circles sit on the four compass points around the center of the diagram, in canvas pixels. */
-export const IKIGAI = { cx: 780, cy: 520, r: 260, d: 165 }
+export const IKIGAI = { r: 260, d: 165 }
 
 export const IKIGAI_SIZE = 2 * (IKIGAI.r + IKIGAI.d)
 
 /** Distance from the center to the middle of a region that belongs to a single circle. */
 export const IKIGAI_LABEL_REACH = 313
 
-export const IKIGAI_RECT = { left: IKIGAI.cx - IKIGAI_SIZE / 2, top: IKIGAI.cy - IKIGAI_SIZE / 2, size: IKIGAI_SIZE }
+/** Center of the four circles on the canvas. The circles move together, so one point places them all. */
+export type IkigaiCenter = { x: number; y: number }
+
+/** Clear space between the rectangle around all cards and the circles, in canvas pixels. */
+export const IKIGAI_GAP = 160
 
 export const IKIGAI_CIRCLES: IkigaiCircleId[] = ["love", "needed", "income", "good-at"]
 
@@ -262,10 +266,10 @@ export function ikigaiCircleOffset(id: IkigaiCircleId) {
 }
 
 /** Which region of the diagram a canvas point falls in, or null when it is outside every circle. */
-export function ikigaiRegionAt(x: number, y: number): IkigaiRegionId | null {
+export function ikigaiRegionAt(x: number, y: number, center: IkigaiCenter): IkigaiRegionId | null {
   const inside = IKIGAI_CIRCLES.filter((id) => {
     const o = ikigaiCircleOffset(id)
-    return Math.hypot(x - (IKIGAI.cx + o.x), y - (IKIGAI.cy + o.y)) <= IKIGAI.r
+    return Math.hypot(x - (center.x + o.x), y - (center.y + o.y)) <= IKIGAI.r
   })
   if (inside.length === 0) return null
   if (inside.length === 1) return inside[0]
@@ -282,7 +286,7 @@ export function ikigaiRegionAt(x: number, y: number): IkigaiRegionId | null {
   let bestDistance = Infinity
   for (const id of overlaps) {
     const [a, b] = OVERLAP_PARENTS[id].map(ikigaiCircleOffset)
-    const distance = Math.hypot(x - (IKIGAI.cx + (a.x + b.x) / 2), y - (IKIGAI.cy + (a.y + b.y) / 2))
+    const distance = Math.hypot(x - (center.x + (a.x + b.x) / 2), y - (center.y + (a.y + b.y) / 2))
     if (distance < bestDistance) {
       best = id
       bestDistance = distance

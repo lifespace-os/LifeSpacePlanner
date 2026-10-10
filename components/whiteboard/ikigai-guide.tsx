@@ -1,114 +1,122 @@
 import clsx from "clsx"
-import { ArrowUp } from "lucide-react"
-import { IKIGAI_MOVES, IKIGAI_RECT, IKIGAI_STEPS, countTag, type IkigaiItem, type Note } from "@/lib/board-data"
-
-const STEPS_WIDTH = 340
-const STEPS_GAP = 40
+import { X } from "lucide-react"
+import { IKIGAI_MOVES, IKIGAI_STEPS, countTag, type IkigaiItem, type Note } from "@/lib/board-data"
 
 type Props = {
   notes: Note[]
   activeId: string | null
   hoverId: string | null
   onPick: (id: string) => void
+  onClose: () => void
 }
 
-function countText(count: number) {
-  return `${count} ${count === 1 ? "card" : "cards"}`
-}
-
-function subline(item: IkigaiItem, notes: Note[]) {
-  return `#${item.tag} · ${countText(countTag(notes, item.tag))}`
-}
-
-/** Steps 1 to 8, beside the circles. They sit on the canvas, so they pan and zoom with it. */
-export function IkigaiSteps({ notes, activeId, hoverId, onPick }: Props) {
+function StepButton({
+  item,
+  number,
+  count,
+  active,
+  hovered,
+  onPick,
+}: {
+  item: IkigaiItem
+  number: number
+  count: number
+  active: boolean
+  hovered: boolean
+  onPick: (id: string) => void
+}) {
   return (
-    <section
-      data-zone=""
-      aria-label="Ikigai steps"
-      className="absolute z-[5001] rounded-3xl border-2 border-line bg-card/95 p-5 shadow-[0_18px_36px_-16px_rgba(35,39,43,0.4)]"
-      style={{ left: IKIGAI_RECT.left - STEPS_GAP - STEPS_WIDTH, top: IKIGAI_RECT.top + 40, width: STEPS_WIDTH }}
-    >
-      <h2 className="px-1 text-[20px] font-medium tracking-[0.16em] text-ink-soft uppercase">Steps</h2>
-      <ol className="mt-3 flex flex-col gap-1.5">
-        {IKIGAI_STEPS.map((item) => {
-          const active = item.id === activeId
-          return (
-            <li key={item.id}>
-              <button
-                type="button"
-                data-board-control=""
-                data-ikigai-item={item.id}
-                aria-pressed={active}
-                onClick={() => onPick(item.id)}
-                className={clsx(
-                  "flex w-full items-center gap-4 rounded-2xl border-2 px-3 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                  active
-                    ? "border-accent bg-accent-soft"
-                    : hoverId === item.id
-                      ? "border-dashed border-accent bg-accent-soft/60"
-                      : "border-transparent hover:bg-desk",
-                )}
-              >
-                <span
-                  className={clsx(
-                    "flex size-10 shrink-0 items-center justify-center rounded-full text-[20px] font-medium tabular-nums",
-                    active ? "bg-accent text-board" : "bg-ink text-board",
-                  )}
-                >
-                  {item.step}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[23px] leading-tight font-medium text-ink">{item.name}</span>
-                  <span className="block text-[18px] leading-snug text-ink-soft tabular-nums">{subline(item, notes)}</span>
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ol>
-    </section>
+    <li>
+      <button
+        type="button"
+        data-ikigai-item={item.id}
+        aria-pressed={active}
+        onClick={() => onPick(item.id)}
+        className={clsx(
+          "flex w-full items-center gap-3 rounded-xl border-2 px-2.5 py-1.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+          active
+            ? "border-accent bg-accent-soft"
+            : hovered
+              ? "border-dashed border-accent bg-accent-soft/60"
+              : "border-transparent hover:bg-desk",
+        )}
+      >
+        <span
+          aria-hidden="true"
+          className={clsx(
+            "flex size-7 shrink-0 items-center justify-center rounded-full text-sm font-medium tabular-nums",
+            active ? "bg-accent text-board" : "bg-ink text-board",
+          )}
+        >
+          {number}
+        </span>
+        <span className="min-w-0 flex-1 text-sm leading-snug font-medium text-pretty text-ink">
+          <span className="sr-only">Step {number}: </span>
+          {item.name}
+        </span>
+        <span className="shrink-0 text-xs text-ink-soft tabular-nums">
+          {count}
+          <span className="sr-only"> {count === 1 ? "card" : "cards"}</span>
+        </span>
+      </button>
+    </li>
   )
 }
 
-/** Four moves toward the center, in a row below the circles. */
-export function IkigaiMoves({ notes, activeId, hoverId, onPick }: Props) {
+/** Steps 1 to 12 in a window on the left edge. Same shape as the details window on the right. */
+export function IkigaiStepsWindow({ notes, activeId, hoverId, onPick, onClose }: Props) {
   return (
-    <section
-      data-zone=""
-      aria-label="Moves toward the center"
-      className="absolute z-[5001]"
-      style={{ left: IKIGAI_RECT.left, top: IKIGAI_RECT.top + IKIGAI_RECT.size + 28, width: IKIGAI_RECT.size }}
+    <aside
+      aria-label="Ikigai steps"
+      className="pointer-events-auto flex max-h-full w-80 shrink-0 flex-col rounded-2xl border border-line bg-card shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)]"
     >
-      <h2 className="px-1 text-[20px] font-medium tracking-[0.16em] text-ink-soft uppercase">Moves toward the center</h2>
-      <ul className="mt-3 grid grid-cols-4 gap-4">
-        {IKIGAI_MOVES.map((item) => {
-          const active = item.id === activeId
-          return (
-            <li key={item.id} className="flex">
-              <button
-                type="button"
-                data-board-control=""
-                data-ikigai-item={item.id}
-                aria-pressed={active}
-                onClick={() => onPick(item.id)}
-                className={clsx(
-                  "flex w-full flex-col items-start gap-2 rounded-2xl border-2 bg-card/95 p-4 text-left shadow-[0_10px_24px_-14px_rgba(35,39,43,0.4)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                  active
-                    ? "border-accent bg-accent-soft"
-                    : hoverId === item.id
-                      ? "border-dashed border-accent bg-accent-soft/60"
-                      : "border-line hover:bg-desk",
-                )}
-              >
-                <ArrowUp className={clsx("size-7", active ? "text-accent" : "text-ink-soft")} aria-hidden="true" />
-                <span className="text-[21px] leading-tight font-medium text-balance text-ink">{item.name}</span>
-                <span className="text-[18px] leading-snug text-ink-soft tabular-nums">{subline(item, notes)}</span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-    </section>
+      <div className="flex items-start justify-between gap-3 px-5 pt-5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium tracking-[0.18em] text-ink-soft uppercase">Ikigai</p>
+          <h2 className="mt-1 font-serif text-2xl leading-tight font-medium text-balance">Steps</h2>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Hide steps window"
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-soft transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          <X className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="mt-3 min-h-0 flex-1 overflow-y-auto border-t border-line px-2 py-2">
+        <ol className="flex flex-col gap-0.5">
+          {IKIGAI_STEPS.map((item) => (
+            <StepButton
+              key={item.id}
+              item={item}
+              number={item.step ?? 0}
+              count={countTag(notes, item.tag)}
+              active={item.id === activeId}
+              hovered={item.id === hoverId}
+              onPick={onPick}
+            />
+          ))}
+        </ol>
+
+        <h3 className="px-3 pt-4 pb-1 text-xs font-medium tracking-[0.16em] text-ink-soft uppercase">
+          Move toward the center
+        </h3>
+        <ol start={IKIGAI_STEPS.length + 1} className="flex flex-col gap-0.5">
+          {IKIGAI_MOVES.map((item, index) => (
+            <StepButton
+              key={item.id}
+              item={item}
+              number={IKIGAI_STEPS.length + 1 + index}
+              count={countTag(notes, item.tag)}
+              active={item.id === activeId}
+              hovered={item.id === hoverId}
+              onPick={onPick}
+            />
+          ))}
+        </ol>
+      </div>
+    </aside>
   )
 }
