@@ -52,6 +52,8 @@ export type Note = {
   task: TaskDetails | null
   /** The goal above this card on the Map: a card id, "mission", or empty. */
   parentId?: string | null
+  /** Where the point sits on its Map ring, in radians. Empty means the Map places it. */
+  mapAngle?: number | null
 }
 
 export type View = { x: number; y: number; zoom: number }
@@ -474,17 +476,39 @@ export function goalRingOf(note: Note): number {
 /** Sets a card's level. A new level replaces the previous one; other hashtags stay. A link survives only on the same ring. */
 export function setGoalLevel(note: Note, tag: string): Note {
   const ring = goalRingOf(note)
+  const level = goalLevelOf(note)
   const next = retag(note, GOAL_TAGS, tag)
   const nextRing = GOAL_RING_TAGS.findIndex((tags) => tags.includes(tag))
-  return ring !== nextRing && next.parentId ? { ...next, parentId: null } : next
+  const kept = level === tag ? next : { ...next, mapAngle: null }
+  return ring !== nextRing && kept.parentId ? { ...kept, parentId: null } : kept
 }
 
-/** Radii of the Map in canvas pixels: the mission disc, then four rings that widen toward the outside. */
-export const GOAL_MAP_EDGES = [170, 290, 440, 640, 900]
+/** Radius of the mission disc in canvas pixels. It does not change with ring thickness. */
+export const GOAL_MAP_MISSION_RADIUS = 170
 
-export const GOAL_MAP_RADIUS = GOAL_MAP_EDGES[GOAL_MAP_EDGES.length - 1]
+const GOAL_RING_WIDTHS = [120, 150, 200, 260]
+
+/** The thickness control: a factor on every ring width. */
+export const GOAL_RING_SCALE = { min: 0.6, max: 1.6, step: 0.1, initial: 1 }
+
+/** Radii of the Map: the mission disc, then four rings that widen toward the outside. */
+export function goalMapEdges(scale = GOAL_RING_SCALE.initial): number[] {
+  const edges = [GOAL_MAP_MISSION_RADIUS]
+  for (const width of GOAL_RING_WIDTHS) edges.push(edges[edges.length - 1] + width * scale)
+  return edges
+}
+
+const MAX_EDGES = goalMapEdges(GOAL_RING_SCALE.max)
+
+/** Half the frame the Map is drawn in. It fits the thickest rings, so the frame never moves. */
+export const GOAL_MAP_RADIUS = MAX_EDGES[MAX_EDGES.length - 1]
 
 export const GOAL_MAP_SIZE = GOAL_MAP_RADIUS * 2
+
+/** Radius the points of a ring sit on. The first ring keeps its points toward the outer edge, clear of its title. */
+export function goalRingRadius(edges: number[], ring: number) {
+  return ring === 0 ? edges[0] + (edges[1] - edges[0]) * 0.7 : (edges[ring] + edges[ring + 1]) / 2
+}
 
 const SECTOR = (2 * Math.PI) / 3
 
@@ -494,15 +518,33 @@ export function goalSectorStart(index: number) {
 }
 
 /** The level a canvas point stands for on the Map, or null over the mission or outside the rings. */
-export function goalMapTagAt(x: number, y: number, center: IkigaiCenter): string | null {
+export function goalMapTagAt(x: number, y: number, center: IkigaiCenter, scale = GOAL_RING_SCALE.initial): string | null {
+  const edges = goalMapEdges(scale)
   const dx = x - center.x
   const dy = y - center.y
   const distance = Math.hypot(dx, dy)
-  if (distance < GOAL_MAP_EDGES[0] || distance > GOAL_MAP_RADIUS) return null
-  const ring = GOAL_MAP_EDGES.findIndex((edge, i) => i > 0 && distance <= edge) - 1
+  if (distance < edges[0] || distance > edges[edges.length - 1]) return null
+  const ring = edges.findIndex((edge, i) => i > 0 && distance <= edge) - 1
   if (ring !== 0) return GOAL_RING_TAGS[ring][0]
   const turn = (((Math.atan2(dy, dx) + Math.PI / 2) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
   return GOAL_RING_TAGS[0][Math.min(2, Math.floor(turn / SECTOR))]
+}
+
+/** Wraps an angle into the range the Map uses: from the top, clockwise. */
+export function goalAngle(angle: number) {
+  const turn = (((angle + Math.PI / 2) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+  return turn - Math.PI / 2
+}
+
+const SECTOR_MARGIN = 0.12
+
+/** Keeps an angle on the ring of a level. The first ring holds each level inside its own sector. */
+export function clampGoalAngle(tag: string, angle: number) {
+  const wrapped = goalAngle(angle)
+  const sector = GOAL_RING_TAGS[0].indexOf(tag)
+  if (sector < 0) return wrapped
+  const start = goalSectorStart(sector)
+  return Math.min(start + SECTOR - SECTOR_MARGIN, Math.max(start + SECTOR_MARGIN, wrapped))
 }
 
 /** What a card is linked to on the Map: a card id, "mission", or null. A link counts only when it is valid now. */
@@ -514,24 +556,62 @@ export function goalLink(note: Note, byId: Map<string, Note>): string | null {
   return parent && ring > 0 && goalRingOf(parent) === ring - 1 ? parent.id : null
 }
 
+/** The threads of a point: inward through the goals above it to the mission, and outward to everything below it. */
+export function goalThreadsFor(notes: Note[], id: string): Set<string> {
+  const byId = new Map(notes.map((note) => [note.id, note]))
+  const found = new Set<string>()
+  let current = byId.get(id)
+  while (current) {
+    const link = goalLink(current, byId)
+    if (!link) break
+    found.add(current.id)
+    current = link === "mission" ? undefined : byId.get(link)
+  }
+  const queue = [id]
+  while (queue.length > 0) {
+    const parent = queue.shift()
+    for (const note of notes) {
+      if (goalLink(note, byId) === parent && !found.has(note.id)) {
+        found.add(note.id)
+        queue.push(note.id)
+      }
+    }
+  }
+  return found
+}
+
 export type GoalMapPoint = { id: string; ring: number; angle: number; x: number; y: number }
 
-export type GoalMapThread = { id: string; x1: number; y1: number; x2: number; y2: number }
+/** A thread runs from a card to the goal above it. `to` is that card's id, or "mission". */
+export type GoalMapThread = { id: string; to: string; x1: number; y1: number; x2: number; y2: number }
 
 const POINT_GAP = 78
 
-/** Places every card that has a level as a point on its ring, with a thread to the goal above it. */
-export function layoutGoalMap(notes: Note[], center: IkigaiCenter): { points: GoalMapPoint[]; threads: GoalMapThread[] } {
+/**
+ * Places every card that has a level as a point on its ring, with a thread to the goal above it.
+ * A card's saved angle wins; `drag` overrides one point while it is being dragged.
+ */
+export function layoutGoalMap(
+  notes: Note[],
+  center: IkigaiCenter,
+  options: { scale?: number; drag?: { id: string; angle: number } | null } = {},
+): { points: GoalMapPoint[]; threads: GoalMapThread[] } {
+  const edges = goalMapEdges(options.scale)
+  const drag = options.drag ?? null
   const byId = new Map(notes.map((note) => [note.id, note]))
   const angles = new Map<string, number>()
 
   for (let ring = 0; ring < GOAL_RING_TAGS.length; ring++) {
     const inRing = notes.filter((note) => goalRingOf(note) === ring)
-    const radius = ring === 0 ? GOAL_MAP_EDGES[1] - 36 : (GOAL_MAP_EDGES[ring] + GOAL_MAP_EDGES[ring + 1]) / 2
+    const radius = goalRingRadius(edges, ring)
     if (ring === 0) {
       GOAL_RING_TAGS[0].forEach((tag, sector) => {
         const cards = inRing.filter((note) => goalLevelOf(note) === tag)
-        cards.forEach((note, k) => angles.set(note.id, goalSectorStart(sector) + ((k + 1) / (cards.length + 1)) * SECTOR))
+        cards.forEach((note, k) => {
+          const slot = goalSectorStart(sector) + ((k + 1) / (cards.length + 1)) * SECTOR
+          const wanted = drag?.id === note.id ? drag.angle : (note.mapAngle ?? slot)
+          angles.set(note.id, clampGoalAngle(tag, wanted))
+        })
       })
       continue
     }
@@ -540,11 +620,16 @@ export function layoutGoalMap(notes: Note[], center: IkigaiCenter): { points: Go
       const link = goalLink(note, byId)
       const above = link && link !== "mission" ? angles.get(link) : undefined
       const slot = loose.indexOf(note)
-      return { note, angle: above ?? -Math.PI / 2 + (2 * Math.PI * (slot + 0.5)) / Math.max(1, loose.length) }
+      const fallback = above ?? -Math.PI / 2 + (2 * Math.PI * (slot + 0.5)) / Math.max(1, loose.length)
+      return { note, angle: drag?.id === note.id ? drag.angle : (note.mapAngle ?? fallback) }
     })
     wanted.sort((a, b) => a.angle - b.angle)
     const gap = Math.min(POINT_GAP / radius, (2 * Math.PI) / Math.max(1, wanted.length))
     wanted.forEach((entry, i) => {
+      if (drag?.id === entry.note.id) {
+        angles.set(entry.note.id, entry.angle)
+        return
+      }
       const previous = i > 0 ? angles.get(wanted[i - 1].note.id)! : -Infinity
       angles.set(entry.note.id, Math.max(entry.angle, previous + gap))
     })
@@ -556,7 +641,7 @@ export function layoutGoalMap(notes: Note[], center: IkigaiCenter): { points: Go
     const ring = goalRingOf(note)
     const angle = angles.get(note.id)
     if (ring < 0 || angle === undefined) continue
-    const radius = ring === 0 ? GOAL_MAP_EDGES[1] - 36 : (GOAL_MAP_EDGES[ring] + GOAL_MAP_EDGES[ring + 1]) / 2
+    const radius = goalRingRadius(edges, ring)
     const point = { id: note.id, ring, angle, x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) }
     points.push(point)
     at.set(note.id, point)
@@ -570,12 +655,12 @@ export function layoutGoalMap(notes: Note[], center: IkigaiCenter): { points: Go
     if (link === "mission") {
       const dx = from.x - center.x
       const dy = from.y - center.y
-      const scale = GOAL_MAP_EDGES[0] / Math.hypot(dx, dy)
-      threads.push({ id: note.id, x1: from.x, y1: from.y, x2: center.x + dx * scale, y2: center.y + dy * scale })
+      const scale = edges[0] / Math.hypot(dx, dy)
+      threads.push({ id: note.id, to: link, x1: from.x, y1: from.y, x2: center.x + dx * scale, y2: center.y + dy * scale })
       continue
     }
     const to = at.get(link)
-    if (to) threads.push({ id: note.id, x1: from.x, y1: from.y, x2: to.x, y2: to.y })
+    if (to) threads.push({ id: note.id, to: link, x1: from.x, y1: from.y, x2: to.x, y2: to.y })
   }
   return { points, threads }
 }

@@ -101,6 +101,7 @@ export function CardMenu({
   onAddHashtag,
   onRemoveHashtag,
   goalAbove,
+  mapEdit,
   onEdit,
   onDelete,
   onClose,
@@ -113,6 +114,14 @@ export function CardMenu({
   onRemoveHashtag: (tag: string) => void
   /** Present only for a card that has a goal level. An empty value means no link. */
   goalAbove?: { value: string; options: { id: string; label: string }[]; onChange: (value: string) => void }
+  /** Present only on the Map, where the card is hidden: its words and level are edited here. */
+  mapEdit?: {
+    text: string
+    onText: (text: string) => void
+    level: string
+    levels: { tag: string; name: string }[]
+    onLevel: (tag: string) => void
+  }
   onEdit: () => void
   onDelete: () => void
   onClose: () => void
@@ -130,6 +139,47 @@ export function CardMenu({
   return (
     <MenuShell clientX={clientX} clientY={clientY} label="Card options" role="dialog" onClose={onClose}>
       <div className="w-64 p-1.5">
+        {mapEdit ? (
+          <>
+            <div className="mb-4">
+              <label
+                htmlFor="card-menu-text"
+                className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft"
+              >
+                Text
+              </label>
+              <textarea
+                id="card-menu-text"
+                data-autofocus=""
+                value={mapEdit.text}
+                onChange={(e) => mapEdit.onText(e.target.value)}
+                maxLength={280}
+                rows={3}
+                className="mt-2 w-full resize-none rounded-md border border-line bg-board px-2 py-1.5 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
+              />
+            </div>
+            <div className="mb-4">
+              <label
+                htmlFor="card-menu-level"
+                className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft"
+              >
+                Level
+              </label>
+              <select
+                id="card-menu-level"
+                value={mapEdit.level}
+                onChange={(e) => mapEdit.onLevel(e.target.value)}
+                className="mt-2 h-8 w-full rounded-md border border-line bg-board px-2 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
+              >
+                {mapEdit.levels.map((level) => (
+                  <option key={level.tag} value={level.tag}>
+                    {level.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        ) : null}
         <p id="card-menu-color" className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft">
           Color
         </p>
@@ -236,10 +286,12 @@ export function CardMenu({
       </div>
 
       <div className="mt-1.5 border-t border-line pt-1.5">
-        <button type="button" onClick={onEdit} className={itemClass}>
-          <PencilLine className="size-4 text-ink-soft" aria-hidden="true" />
-          Edit words
-        </button>
+        {mapEdit ? null : (
+          <button type="button" onClick={onEdit} className={itemClass}>
+            <PencilLine className="size-4 text-ink-soft" aria-hidden="true" />
+            Edit words
+          </button>
+        )}
         <button type="button" onClick={onDelete} className={clsx(itemClass, "text-release hover:bg-release/10")}>
           <Trash2 className="size-4" aria-hidden="true" />
           Remove card

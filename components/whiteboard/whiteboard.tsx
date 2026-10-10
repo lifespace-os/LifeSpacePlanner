@@ -8,10 +8,13 @@ import {
   CARD_WIDTH,
   DEFAULT_GROUPS,
   DEFAULT_ZONES,
+  GOAL_LEVELS,
   GOAL_MAP_RADIUS,
+  GOAL_RING_SCALE,
   IKIGAI_GAP,
+  goalLevelOf,
   goalLink,
-  goalMapTagAt,
+  goalMapEdges,
   goalRingOf,
   IKIGAI_SIZE,
   MAX_ZOOM,
@@ -60,6 +63,7 @@ import { MissionWindow } from "./mission-window"
 import { IkigaiPanel } from "./ikigai-panel"
 import { MarkersPanel, MarkersWindow } from "./markers-panel"
 import { GoalsPanel, MissionStrip } from "./goals-panel"
+import { GoalMapControls, type GoalMapCommit } from "./goal-map"
 import { IkigaiStepsWindow } from "./ikigai-guide"
 import { CardDock } from "./card-dock"
 import { ZoomControls } from "./zoom-controls"
@@ -69,6 +73,7 @@ const ZOOM_STEP = 1.25
 const NO_IDS: string[] = []
 const FIT_PADDING = { top: 150, right: 60, bottom: 130, left: 60 }
 const IKIGAI_FIT_PADDING = { top: 270, right: 400, bottom: 130, left: 400 }
+const MAP_FIT_PADDING = { top: 200, right: 400, bottom: 110, left: 40 }
 
 function clampZoom(zoom: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
@@ -94,6 +99,10 @@ export function Whiteboard() {
   const [markersPanelOpen, setMarkersPanelOpen] = useState(true)
   const [goalView, setGoalView] = useState<GoalView>("needs")
   const [goalsPanelOpen, setGoalsPanelOpen] = useState(true)
+  const [mapSelected, setMapSelected] = useState<string | null>(null)
+  const [mapFocus, setMapFocus] = useState<number | null>(null)
+  const [mapScale, setMapScale] = useState(GOAL_RING_SCALE.initial)
+  const [mapAllThreads, setMapAllThreads] = useState(false)
   const [dropHover, setDropHover] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>(NO_IDS)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -119,6 +128,12 @@ export function Whiteboard() {
   ikigaiOnRef.current = ikigaiOn
   ikigaiActiveRef.current = ikigaiActive
   selectionRef.current = selectedIds
+  const goalMapCenterRef = useRef(goalMapCenter)
+  const mapScaleRef = useRef(mapScale)
+  const mapFocusRef = useRef(mapFocus)
+  goalMapCenterRef.current = goalMapCenter
+  mapScaleRef.current = mapScale
+  mapFocusRef.current = mapFocus
 
   const updateView = useCallback((change: (prev: View) => View) => {
     const next = change(viewRef.current)
@@ -194,6 +209,26 @@ export function Whiteboard() {
     }))
   }, [updateView])
 
+  /** Fits the Map, or one ring of it, into the free space between the header, the list, and the dock. */
+  const fitMap = useCallback(
+    (ring: number | null) => {
+      const viewport = viewportRef.current
+      const center = goalMapCenterRef.current
+      if (!viewport || !center) return
+      const edges = goalMapEdges(mapScaleRef.current)
+      const radius = ring === null ? edges[edges.length - 1] : edges[ring + 1]
+      const availW = Math.max(200, viewport.clientWidth - MAP_FIT_PADDING.left - MAP_FIT_PADDING.right)
+      const availH = Math.max(200, viewport.clientHeight - MAP_FIT_PADDING.top - MAP_FIT_PADDING.bottom)
+      const zoom = clampZoom(Math.min(availW, availH) / (radius * 2))
+      updateView(() => ({
+        zoom,
+        x: MAP_FIT_PADDING.left + availW / 2 - center.x * zoom,
+        y: MAP_FIT_PADDING.top + availH / 2 - center.y * zoom,
+      }))
+    },
+    [updateView],
+  )
+
   useLayoutEffect(() => {
     const frame = requestAnimationFrame(fitAll)
     return () => cancelAnimationFrame(frame)
@@ -255,9 +290,15 @@ export function Whiteboard() {
   const visibleLayer = mode === "clusters" ? clusterView : ikigaiOn ? "ikigai" : mapOn && goalMapCenter ? "map" : null
   useEffect(() => {
     if (!visibleLayer) return
-    const frame = requestAnimationFrame(fitAll)
+    const frame = requestAnimationFrame(() => (visibleLayer === "map" ? fitMap(mapFocusRef.current) : fitAll()))
     return () => cancelAnimationFrame(frame)
-  }, [visibleLayer, fitAll])
+  }, [visibleLayer, fitAll, fitMap])
+
+  useEffect(() => {
+    if (mapOn) return
+    setMapFocus(null)
+    setMapSelected(null)
+  }, [mapOn])
 
   const layer = useMemo<{ areas: TaggedArea[]; tags: string[] } | null>(() => {
     if (mode !== "clusters") return null
@@ -496,16 +537,34 @@ export function Whiteboard() {
     )
   }, [])
 
+  /** A point was dragged along its ring. Dropping it on another ring also changes the level of the card. */
+  const commitMapPoint = useCallback(
+    (id: string, change: GoalMapCommit) =>
+      updateNote(id, (note) => ({
+        ...(change.level ? setGoalLevel(note, change.level) : note),
+        mapAngle: change.angle,
+      })),
+    [updateNote],
+  )
+
+  const focusMapRing = useCallback(
+    (ring: number | null) => {
+      setMapFocus(ring)
+      setMapSelected((current) => {
+        if (ring === null || !current) return current
+        const note = notes.find((n) => n.id === current)
+        return note && goalRingOf(note) === ring ? current : null
+      })
+      fitMap(ring)
+    },
+    [fitMap, notes],
+  )
+
   /** What sits under the pointer while a card is dragged: the side panel, a step or move, or a diagram region. */
   const ikigaiTargetAt = useCallback(
     (clientX: number, clientY: number): string | null => {
       const top = document.elementsFromPoint(clientX, clientY).find((el) => !el.closest("[data-note-card], [data-selection-box]"))
       if (!top) return null
-      if (mapOn) {
-        if (!goalMapCenter || !viewportRef.current?.contains(top)) return null
-        const point = screenToWorld(clientX, clientY)
-        return goalMapTagAt(point.x, point.y, goalMapCenter)
-      }
       if (goalsDropOn) return top.closest<HTMLElement>("[data-goal-area]")?.dataset.goalArea ?? null
       if (markersOn) {
         if (top.closest("[data-marker-drop]")) return "panel"
@@ -518,7 +577,7 @@ export function Whiteboard() {
       const point = screenToWorld(clientX, clientY)
       return ikigaiRegionAt(point.x, point.y, ikigaiCenter)
     },
-    [goalMapCenter, goalsDropOn, ikigaiCenter, mapOn, markersOn, screenToWorld],
+    [goalsDropOn, ikigaiCenter, markersOn, screenToWorld],
   )
 
   const handleTagDrag = useCallback(
@@ -641,7 +700,10 @@ export function Whiteboard() {
   const closeMission = useCallback(() => setMissionOpen(false), [])
 
   const closeMenu = useCallback(() => setMenu(null), [])
-  const clearSelection = useCallback(() => setSelectedIds((prev) => (prev.length > 0 ? NO_IDS : prev)), [])
+  const clearSelection = useCallback(() => {
+    setSelectedIds((prev) => (prev.length > 0 ? NO_IDS : prev))
+    setMapSelected(null)
+  }, [])
 
   const toggleFocusMode = useCallback(() => {
     const root = rootRef.current
@@ -702,7 +764,18 @@ export function Whiteboard() {
         }
         goalMap={
           mapOn && goalMapCenter
-            ? { center: goalMapCenter, missionText, hoverTag: dropHover }
+            ? {
+                center: goalMapCenter,
+                missionText,
+                scale: mapScale,
+                selectedId: mapSelected,
+                showAllThreads: mapAllThreads,
+                focusRing: mapFocus,
+                toWorld: screenToWorld,
+                onSelect: setMapSelected,
+                onMenu: openCardMenu,
+                onCommit: commitMapPoint,
+              }
             : null
         }
         tagOnly={markersOn || goalsDropOn}
@@ -915,8 +988,16 @@ export function Whiteboard() {
 
       {goalsOn ? (
         <>
-          <div className="pointer-events-none absolute top-[11.5rem] left-4">
+          <div className="pointer-events-none absolute top-[11.5rem] left-4 flex flex-col items-start gap-3">
             <MissionStrip missionText={missionText} />
+            {mapOn ? (
+              <GoalMapControls
+                scale={mapScale}
+                onScale={setMapScale}
+                showAll={mapAllThreads}
+                onShowAll={setMapAllThreads}
+              />
+            ) : null}
           </div>
           <div
             inert={!goalsPanelOpen}
@@ -929,6 +1010,10 @@ export function Whiteboard() {
               view={goalView}
               notes={notes}
               hoverId={dropHover}
+              focusRing={mapFocus}
+              selectedId={mapSelected}
+              onFocusRing={focusMapRing}
+              onSelectPoint={setMapSelected}
               onClose={() => setGoalsPanelOpen(false)}
               onRemoveLevel={untagCard}
             />
@@ -961,7 +1046,7 @@ export function Whiteboard() {
           onZoomIn={() => zoomAtCenter(ZOOM_STEP)}
           onZoomOut={() => zoomAtCenter(1 / ZOOM_STEP)}
           onReset={() => zoomAtCenter(1 / view.zoom)}
-          onFit={fitAll}
+          onFit={() => (mapOn && goalMapCenter ? fitMap(mapFocus) : fitAll())}
         />
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
           <CardDock color={dockColor} onColorChange={setDockColor} onDrop={dropFromDock} onPlaceCenter={placeAtCenter} />
@@ -1017,7 +1102,18 @@ export function Whiteboard() {
   onChange: (value) => updateNote(menuNote.id, (note) => ({ ...note, parentId: value || null })),
   }
   }
-  onEdit={() => startEdit(menuNote.id)}
+  mapEdit={
+            mapOn
+              ? {
+                  text: menuNote.text,
+                  onText: (text) => updateNote(menuNote.id, (note) => ({ ...note, text })),
+                  level: goalLevelOf(menuNote) ?? "",
+                  levels: GOAL_LEVELS.map((level) => ({ tag: level.tag, name: level.name })),
+                  onLevel: (tag) => updateNote(menuNote.id, (note) => setGoalLevel(note, tag)),
+                }
+              : undefined
+          }
+          onEdit={() => startEdit(menuNote.id)}
           onDelete={() => deleteNote(menuNote.id)}
         />
       ) : null}

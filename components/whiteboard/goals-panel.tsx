@@ -1,11 +1,13 @@
 import clsx from "clsx"
 import { Plus, X } from "lucide-react"
 import {
-  GOAL_LEVELS,
+  GOAL_RING_NAMES,
+  GOAL_RING_TAGS,
   GOAL_VIEW_LEVELS,
+  getCardColor,
   getGoalLevel,
+  goalRingOf,
   hasHashtag,
-  countTag,
   type GoalView,
   type Note,
 } from "@/lib/board-data"
@@ -16,6 +18,9 @@ const WINDOW_CLASS =
 
 const CLOSE_CLASS =
   "flex size-8 shrink-0 items-center justify-center rounded-lg text-ink-soft transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+
+const ROW_CLASS =
+  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-desk focus-visible:outline-2 focus-visible:outline-accent"
 
 const VIEW_TITLES: Record<GoalView, string> = {
   needs: "Needs, dreams, and wants",
@@ -49,12 +54,21 @@ export function GoalsPanel({
   view,
   notes,
   hoverId,
+  focusRing,
+  selectedId,
+  onFocusRing,
+  onSelectPoint,
   onClose,
   onRemoveLevel,
 }: {
   view: GoalView
   notes: Note[]
   hoverId: string | null
+  /** Map only: the ring the view is zoomed to, or null for the whole map. */
+  focusRing: number | null
+  selectedId: string | null
+  onFocusRing: (ring: number | null) => void
+  onSelectPoint: (id: string) => void
   onClose: () => void
   onRemoveLevel: (id: string, tag: string) => void
 }) {
@@ -74,22 +88,74 @@ export function GoalsPanel({
 
       {view === "map" ? (
         <div className="mt-3 min-h-0 flex-1 overflow-y-auto border-t border-line px-2 py-2">
-          <h3 className="px-3 pt-1 pb-1 text-xs font-medium tracking-[0.16em] text-ink-soft uppercase">
-            Cards by level
-          </h3>
-          <ul className="flex flex-col">
-            {GOAL_LEVELS.map((level) => {
-              const count = countTag(notes, level.tag)
+          <p className="px-3 pt-1 pb-2 text-xs text-ink-soft text-pretty">
+            Pick a ring to zoom to it and show only its points. Right-click a point to edit it.
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            <li>
+              <button
+                type="button"
+                aria-pressed={focusRing === null}
+                onClick={() => onFocusRing(null)}
+                className={clsx(ROW_CLASS, focusRing === null && "bg-accent-soft")}
+              >
+                <span className="min-w-0 flex-1 text-sm font-medium text-ink">Whole map</span>
+                <span className="shrink-0 text-sm text-ink-soft tabular-nums">
+                  {notes.filter((note) => goalRingOf(note) >= 0).length}
+                  <span className="sr-only"> cards</span>
+                </span>
+              </button>
+            </li>
+            {GOAL_RING_NAMES.map((name, ring) => {
+              const onRing = notes.filter((note) => goalRingOf(note) === ring)
+              const focused = focusRing === ring
               return (
-                <li key={level.id} className="flex items-center gap-3 rounded-lg px-3 py-2">
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-ink">{level.name}</span>
-                    <span className="block text-xs text-ink-soft">#{level.tag}</span>
-                  </span>
-                  <span className="shrink-0 text-sm text-ink-soft tabular-nums">
-                    {count}
-                    <span className="sr-only"> {count === 1 ? "card" : "cards"}</span>
-                  </span>
+                <li key={name}>
+                  <button
+                    type="button"
+                    aria-pressed={focused}
+                    onClick={() => onFocusRing(focused ? null : ring)}
+                    className={clsx(ROW_CLASS, focused && "bg-accent-soft")}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium text-ink">{name}</span>
+                      <span className="block text-xs text-ink-soft">
+                        {GOAL_RING_TAGS[ring].map((tag) => `#${tag}`).join(" ")}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-sm text-ink-soft tabular-nums">
+                      {onRing.length}
+                      <span className="sr-only"> {onRing.length === 1 ? "card" : "cards"}</span>
+                    </span>
+                  </button>
+                  {focused ? (
+                    <ul aria-label={`Points on ${name}`} className="mt-0.5 mb-1.5 ml-3 flex flex-col border-l border-line">
+                      {onRing.length === 0 ? (
+                        <li className="px-3 py-2 text-xs text-ink-soft">No cards on this ring yet.</li>
+                      ) : (
+                        onRing.map((note) => (
+                          <li key={note.id}>
+                            <button
+                              type="button"
+                              aria-pressed={selectedId === note.id}
+                              onClick={() => onSelectPoint(note.id)}
+                              className={clsx(
+                                "flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-sm transition-colors hover:bg-desk focus-visible:outline-2 focus-visible:outline-accent",
+                                selectedId === note.id ? "bg-desk text-ink" : "text-ink-soft",
+                              )}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className="size-3 shrink-0 rounded-full border border-ink/60"
+                                style={{ backgroundColor: getCardColor(note.color).fill }}
+                              />
+                              <span className="min-w-0 flex-1 truncate">{note.text.trim() || "Empty card"}</span>
+                            </button>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  ) : null}
                 </li>
               )
             })}

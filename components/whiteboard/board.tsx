@@ -22,7 +22,7 @@ import { SelectionBox } from "./selection-box"
 import { SortZones } from "./sort-zones"
 import { GroupAreas } from "./group-areas"
 import { IkigaiCircles, IkigaiLabels } from "./ikigai-diagram"
-import { GoalMapPoints, GoalMapRings } from "./goal-map"
+import { GoalMapLayer, type GoalMapCommit } from "./goal-map"
 
 type PanState = {
   pointerId: number
@@ -49,7 +49,16 @@ export type IkigaiBoardState = {
 export type GoalMapBoardState = {
   center: IkigaiCenter
   missionText: string
-  hoverTag: string | null
+  /** Factor on the ring widths, set by the thickness control. */
+  scale: number
+  selectedId: string | null
+  showAllThreads: boolean
+  /** The ring the list zoomed to, or null for the whole map. Only that ring's points show. */
+  focusRing: number | null
+  toWorld: (clientX: number, clientY: number) => { x: number; y: number }
+  onSelect: (id: string) => void
+  onMenu: (id: string, clientX: number, clientY: number) => void
+  onCommit: (id: string, change: GoalMapCommit) => void
 }
 
 const GRID = 22
@@ -300,49 +309,62 @@ export function Board({
         ) : null}
 
         {goalMap ? (
-          <GoalMapRings center={goalMap.center} missionText={goalMap.missionText} hoverTag={goalMap.hoverTag} />
-        ) : null}
-
-        <SelectionBox
-          notes={notes}
-          ids={selectedIds}
-          viewRef={viewRef}
-          fixed={ikigai !== null}
-          tagTarget={tagOnly}
-          onMoveMany={onMoveMany}
-          onTagDrag={onTagDrag}
-        />
-
-        {notes.map((note) => {
-          const inSelection = selectedIds.includes(note.id)
-          return (
-            <NoteCard
-              key={note.id}
-              note={note}
-              mode={mode}
-              missionSaved={missionSaved}
-              selected={inSelection}
-              editing={note.id === editingId}
+          <GoalMapLayer
+            center={goalMap.center}
+            missionText={goalMap.missionText}
+            notes={notes}
+            scale={goalMap.scale}
+            zoom={view.zoom}
+            selectedId={goalMap.selectedId}
+            showAllThreads={goalMap.showAllThreads}
+            focusRing={goalMap.focusRing}
+            toWorld={goalMap.toWorld}
+            onSelect={goalMap.onSelect}
+            onMenu={goalMap.onMenu}
+            onCommit={goalMap.onCommit}
+          />
+        ) : (
+          <>
+            <SelectionBox
+              notes={notes}
+              ids={selectedIds}
               viewRef={viewRef}
-              selectionRef={selectionRef}
               fixed={ikigai !== null}
               tagTarget={tagOnly}
-              multiCount={inSelection ? selectedIds.length : 0}
-              onSelect={onSelect}
-              onTagDrag={onTagDrag}
-              onMove={onMove}
               onMoveMany={onMoveMany}
-              onFront={onFront}
-              onMission={onMission}
-              onEditStart={onEditStart}
-              onEditEnd={onEditEnd}
-              onMenu={onCardMenu}
-              onDelete={onDelete}
+              onTagDrag={onTagDrag}
             />
-          )
-        })}
 
-        {goalMap ? <GoalMapPoints center={goalMap.center} notes={notes} /> : null}
+            {notes.map((note) => {
+              const inSelection = selectedIds.includes(note.id)
+              return (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  mode={mode}
+                  missionSaved={missionSaved}
+                  selected={inSelection}
+                  editing={note.id === editingId}
+                  viewRef={viewRef}
+                  selectionRef={selectionRef}
+                  fixed={ikigai !== null}
+                  tagTarget={tagOnly}
+                  multiCount={inSelection ? selectedIds.length : 0}
+                  onSelect={onSelect}
+                  onTagDrag={onTagDrag}
+                  onMove={onMove}
+                  onMoveMany={onMoveMany}
+                  onFront={onFront}
+                  onMission={onMission}
+                  onEditStart={onEditStart}
+                  onEditEnd={onEditEnd}
+                  onMenu={onCardMenu}
+                  onDelete={onDelete}
+                />
+              )
+            })}
+          </>
+        )}
 
         {ikigai ? (
           <IkigaiLabels
