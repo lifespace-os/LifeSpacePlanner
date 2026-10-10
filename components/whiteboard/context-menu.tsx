@@ -100,6 +100,7 @@ export function CardMenu({
   onColor,
   onAddHashtag,
   onRemoveHashtag,
+  goalAbove,
   onEdit,
   onDelete,
   onClose,
@@ -110,6 +111,8 @@ export function CardMenu({
   onColor: (color: CardColorId) => void
   onAddHashtag: (tag: string) => void
   onRemoveHashtag: (tag: string) => void
+  /** Present only for a card that has a goal level. An empty value means no link. */
+  goalAbove?: { value: string; options: { id: string; label: string }[]; onChange: (value: string) => void }
   onEdit: () => void
   onDelete: () => void
   onClose: () => void
@@ -205,6 +208,30 @@ export function CardMenu({
               </li>
             ))}
           </ul>
+        ) : null}
+
+        {goalAbove ? (
+          <div className="mt-4">
+            <label
+              htmlFor="card-menu-goal-above"
+              className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft"
+            >
+              Goal above
+            </label>
+            <select
+              id="card-menu-goal-above"
+              value={goalAbove.value}
+              onChange={(e) => goalAbove.onChange(e.target.value)}
+              className="mt-2 h-8 w-full rounded-md border border-line bg-board px-2 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
+            >
+              <option value="">No goal above</option>
+              {goalAbove.options.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         ) : null}
       </div>
 

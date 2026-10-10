@@ -50,6 +50,8 @@ export type Note = {
   mission: MissionChoice
   labels: Partial<Record<LabelGroupId, string>>
   task: TaskDetails | null
+  /** The goal above this card on the Map: a card id, "mission", or empty. */
+  parentId?: string | null
 }
 
 export type View = { x: number; y: number; zoom: number }
@@ -453,9 +455,129 @@ export function getGoalLevel(tag: string | null | undefined) {
   return GOAL_LEVELS.find((level) => level.tag === tag) ?? null
 }
 
-/** Sets a card's level. A new level replaces the previous one; other hashtags stay. */
+/** The goal level a card carries, or null when it has none. */
+export function goalLevelOf(note: Note): string | null {
+  const found = note.hashtags.find((t) => GOAL_TAGS.includes(t.toLowerCase()))
+  return found ? found.toLowerCase() : null
+}
+
+/** Map ring of a level, counted from the mission outward: 0 needs, dreams, wants; 1 life; 2 project; 3 tasks. */
+export const GOAL_RING_TAGS: string[][] = [["need", "dream", "want"], ["life-goal"], ["project-goal"], ["task"]]
+
+export const GOAL_RING_NAMES = ["Needs, dreams, and wants", "Life goals", "Project goals", "Tasks"]
+
+export function goalRingOf(note: Note): number {
+  const level = goalLevelOf(note)
+  return level ? GOAL_RING_TAGS.findIndex((tags) => tags.includes(level)) : -1
+}
+
+/** Sets a card's level. A new level replaces the previous one; other hashtags stay. A link survives only on the same ring. */
 export function setGoalLevel(note: Note, tag: string): Note {
-  return retag(note, GOAL_TAGS, tag)
+  const ring = goalRingOf(note)
+  const next = retag(note, GOAL_TAGS, tag)
+  const nextRing = GOAL_RING_TAGS.findIndex((tags) => tags.includes(tag))
+  return ring !== nextRing && next.parentId ? { ...next, parentId: null } : next
+}
+
+/** Radii of the Map in canvas pixels: the mission disc, then four rings that widen toward the outside. */
+export const GOAL_MAP_EDGES = [170, 290, 440, 640, 900]
+
+export const GOAL_MAP_RADIUS = GOAL_MAP_EDGES[GOAL_MAP_EDGES.length - 1]
+
+export const GOAL_MAP_SIZE = GOAL_MAP_RADIUS * 2
+
+const SECTOR = (2 * Math.PI) / 3
+
+/** The first ring is cut into three equal sectors, starting at the top and running clockwise. */
+export function goalSectorStart(index: number) {
+  return -Math.PI / 2 + index * SECTOR
+}
+
+/** The level a canvas point stands for on the Map, or null over the mission or outside the rings. */
+export function goalMapTagAt(x: number, y: number, center: IkigaiCenter): string | null {
+  const dx = x - center.x
+  const dy = y - center.y
+  const distance = Math.hypot(dx, dy)
+  if (distance < GOAL_MAP_EDGES[0] || distance > GOAL_MAP_RADIUS) return null
+  const ring = GOAL_MAP_EDGES.findIndex((edge, i) => i > 0 && distance <= edge) - 1
+  if (ring !== 0) return GOAL_RING_TAGS[ring][0]
+  const turn = (((Math.atan2(dy, dx) + Math.PI / 2) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
+  return GOAL_RING_TAGS[0][Math.min(2, Math.floor(turn / SECTOR))]
+}
+
+/** What a card is linked to on the Map: a card id, "mission", or null. A link counts only when it is valid now. */
+export function goalLink(note: Note, byId: Map<string, Note>): string | null {
+  const ring = goalRingOf(note)
+  if (ring < 0 || !note.parentId) return null
+  if (note.parentId === "mission") return "mission"
+  const parent = byId.get(note.parentId)
+  return parent && ring > 0 && goalRingOf(parent) === ring - 1 ? parent.id : null
+}
+
+export type GoalMapPoint = { id: string; ring: number; angle: number; x: number; y: number }
+
+export type GoalMapThread = { id: string; x1: number; y1: number; x2: number; y2: number }
+
+const POINT_GAP = 78
+
+/** Places every card that has a level as a point on its ring, with a thread to the goal above it. */
+export function layoutGoalMap(notes: Note[], center: IkigaiCenter): { points: GoalMapPoint[]; threads: GoalMapThread[] } {
+  const byId = new Map(notes.map((note) => [note.id, note]))
+  const angles = new Map<string, number>()
+
+  for (let ring = 0; ring < GOAL_RING_TAGS.length; ring++) {
+    const inRing = notes.filter((note) => goalRingOf(note) === ring)
+    const radius = ring === 0 ? GOAL_MAP_EDGES[1] - 36 : (GOAL_MAP_EDGES[ring] + GOAL_MAP_EDGES[ring + 1]) / 2
+    if (ring === 0) {
+      GOAL_RING_TAGS[0].forEach((tag, sector) => {
+        const cards = inRing.filter((note) => goalLevelOf(note) === tag)
+        cards.forEach((note, k) => angles.set(note.id, goalSectorStart(sector) + ((k + 1) / (cards.length + 1)) * SECTOR))
+      })
+      continue
+    }
+    const loose = inRing.filter((note) => !angles.has(goalLink(note, byId) ?? ""))
+    const wanted = inRing.map((note) => {
+      const link = goalLink(note, byId)
+      const above = link && link !== "mission" ? angles.get(link) : undefined
+      const slot = loose.indexOf(note)
+      return { note, angle: above ?? -Math.PI / 2 + (2 * Math.PI * (slot + 0.5)) / Math.max(1, loose.length) }
+    })
+    wanted.sort((a, b) => a.angle - b.angle)
+    const gap = Math.min(POINT_GAP / radius, (2 * Math.PI) / Math.max(1, wanted.length))
+    wanted.forEach((entry, i) => {
+      const previous = i > 0 ? angles.get(wanted[i - 1].note.id)! : -Infinity
+      angles.set(entry.note.id, Math.max(entry.angle, previous + gap))
+    })
+  }
+
+  const points: GoalMapPoint[] = []
+  const at = new Map<string, GoalMapPoint>()
+  for (const note of notes) {
+    const ring = goalRingOf(note)
+    const angle = angles.get(note.id)
+    if (ring < 0 || angle === undefined) continue
+    const radius = ring === 0 ? GOAL_MAP_EDGES[1] - 36 : (GOAL_MAP_EDGES[ring] + GOAL_MAP_EDGES[ring + 1]) / 2
+    const point = { id: note.id, ring, angle, x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) }
+    points.push(point)
+    at.set(note.id, point)
+  }
+
+  const threads: GoalMapThread[] = []
+  for (const note of notes) {
+    const from = at.get(note.id)
+    const link = goalLink(note, byId)
+    if (!from || !link) continue
+    if (link === "mission") {
+      const dx = from.x - center.x
+      const dy = from.y - center.y
+      const scale = GOAL_MAP_EDGES[0] / Math.hypot(dx, dy)
+      threads.push({ id: note.id, x1: from.x, y1: from.y, x2: center.x + dx * scale, y2: center.y + dy * scale })
+      continue
+    }
+    const to = at.get(link)
+    if (to) threads.push({ id: note.id, x1: from.x, y1: from.y, x2: to.x, y2: to.y })
+  }
+  return { points, threads }
 }
 
 export const GROUP_MIN_SIZE = { width: 260, height: 220 }

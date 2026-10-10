@@ -8,7 +8,11 @@ import {
   CARD_WIDTH,
   DEFAULT_GROUPS,
   DEFAULT_ZONES,
+  GOAL_MAP_RADIUS,
   IKIGAI_GAP,
+  goalLink,
+  goalMapTagAt,
+  goalRingOf,
   IKIGAI_SIZE,
   MAX_ZOOM,
   MIN_ZOOM,
@@ -82,6 +86,7 @@ export function Whiteboard() {
   const [missionView, setMissionView] = useState<MissionView>("sentence")
   const [ikigaiActive, setIkigaiActive] = useState<string | null>(null)
   const [ikigaiCenter, setIkigaiCenter] = useState<IkigaiCenter>({ x: 0, y: 0 })
+  const [goalMapCenter, setGoalMapCenter] = useState<IkigaiCenter | null>(null)
   const [stepsOpen, setStepsOpen] = useState(true)
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [markerActive, setMarkerActive] = useState<string | null>(null)
@@ -106,7 +111,8 @@ export function Whiteboard() {
   const ikigaiOn = mode === "mission" && missionView === "ikigai"
   const markersOn = mode === "mission" && missionView === "markers"
   const goalsOn = mode === "goals"
-  const goalsDropOn = goalsOn && goalView !== "map"
+  const goalsDropOn = goalsOn
+  const mapOn = goalsOn && goalView === "map"
   const ikigaiOnRef = useRef(ikigaiOn)
   const ikigaiActiveRef = useRef(ikigaiActive)
   const selectionRef = useRef(selectedIds)
@@ -220,7 +226,33 @@ export function Whiteboard() {
     [],
   )
 
-  const visibleLayer = mode === "clusters" ? clusterView : ikigaiOn ? "ikigai" : null
+  useLayoutEffect(() => {
+    if (!mapOn || goalMapCenter) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+    let right = -Infinity
+    let top = Infinity
+    let bottom = -Infinity
+    viewport.querySelectorAll<HTMLElement>("[data-note-card]").forEach((card) => {
+      right = Math.max(right, card.offsetLeft + card.offsetWidth)
+      top = Math.min(top, card.offsetTop)
+      bottom = Math.max(bottom, card.offsetTop + card.offsetHeight)
+    })
+    if (ikigaiPlaced.current) {
+      right = Math.max(right, ikigaiCenter.x + IKIGAI_SIZE / 2)
+      top = Math.min(top, ikigaiCenter.y - IKIGAI_SIZE / 2)
+      bottom = Math.max(bottom, ikigaiCenter.y + IKIGAI_SIZE / 2)
+    }
+    if (right === -Infinity) {
+      const rect = viewport.getBoundingClientRect()
+      const open = screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2)
+      setGoalMapCenter({ x: Math.round(open.x), y: Math.round(open.y) })
+      return
+    }
+    setGoalMapCenter({ x: Math.round(right + IKIGAI_GAP + GOAL_MAP_RADIUS), y: Math.round((top + bottom) / 2) })
+  }, [mapOn, goalMapCenter, ikigaiCenter, screenToWorld])
+
+  const visibleLayer = mode === "clusters" ? clusterView : ikigaiOn ? "ikigai" : mapOn && goalMapCenter ? "map" : null
   useEffect(() => {
     if (!visibleLayer) return
     const frame = requestAnimationFrame(fitAll)
@@ -469,6 +501,11 @@ export function Whiteboard() {
     (clientX: number, clientY: number): string | null => {
       const top = document.elementsFromPoint(clientX, clientY).find((el) => !el.closest("[data-note-card], [data-selection-box]"))
       if (!top) return null
+      if (mapOn) {
+        if (!goalMapCenter || !viewportRef.current?.contains(top)) return null
+        const point = screenToWorld(clientX, clientY)
+        return goalMapTagAt(point.x, point.y, goalMapCenter)
+      }
       if (goalsDropOn) return top.closest<HTMLElement>("[data-goal-area]")?.dataset.goalArea ?? null
       if (markersOn) {
         if (top.closest("[data-marker-drop]")) return "panel"
@@ -481,7 +518,7 @@ export function Whiteboard() {
       const point = screenToWorld(clientX, clientY)
       return ikigaiRegionAt(point.x, point.y, ikigaiCenter)
     },
-    [goalsDropOn, ikigaiCenter, markersOn, screenToWorld],
+    [goalMapCenter, goalsDropOn, ikigaiCenter, mapOn, markersOn, screenToWorld],
   )
 
   const handleTagDrag = useCallback(
@@ -661,6 +698,11 @@ export function Whiteboard() {
                 onPick: setIkigaiActive,
                 onMoveGroup: moveIkigaiGroup,
               }
+            : null
+        }
+        goalMap={
+          mapOn && goalMapCenter
+            ? { center: goalMapCenter, missionText, hoverTag: dropHover }
             : null
         }
         tagOnly={markersOn || goalsDropOn}
@@ -961,7 +1003,21 @@ export function Whiteboard() {
           onRemoveHashtag={(tag) =>
             updateNote(menuNote.id, (note) => ({ ...note, hashtags: note.hashtags.filter((t) => t !== tag) }))
           }
-          onEdit={() => startEdit(menuNote.id)}
+          goalAbove={
+  goalRingOf(menuNote) < 0
+  ? undefined
+  : {
+  value: goalLink(menuNote, new Map(notes.map((n) => [n.id, n]))) ?? "",
+  options: [
+  { id: "mission", label: "The mission" },
+  ...notes
+  .filter((n) => goalRingOf(n) >= 0 && goalRingOf(n) === goalRingOf(menuNote) - 1)
+  .map((n) => ({ id: n.id, label: n.text.trim().slice(0, 48) || "Untitled card" })),
+  ],
+  onChange: (value) => updateNote(menuNote.id, (note) => ({ ...note, parentId: value || null })),
+  }
+  }
+  onEdit={() => startEdit(menuNote.id)}
           onDelete={() => deleteNote(menuNote.id)}
         />
       ) : null}

@@ -22,6 +22,7 @@ import { SelectionBox } from "./selection-box"
 import { SortZones } from "./sort-zones"
 import { GroupAreas } from "./group-areas"
 import { IkigaiCircles, IkigaiLabels } from "./ikigai-diagram"
+import { GoalMapPoints, GoalMapRings } from "./goal-map"
 
 type PanState = {
   pointerId: number
@@ -45,6 +46,12 @@ export type IkigaiBoardState = {
   onMoveGroup: (dx: number, dy: number) => void
 }
 
+export type GoalMapBoardState = {
+  center: IkigaiCenter
+  missionText: string
+  hoverTag: string | null
+}
+
 const GRID = 22
 
 export function Board({
@@ -61,6 +68,7 @@ export function Board({
   selectionRef,
   editingId,
   ikigai,
+  goalMap,
   tagOnly,
   onZoneMove,
   onZoneResize,
@@ -95,6 +103,8 @@ export function Board({
   selectionRef: RefObject<string[]>
   editingId: string | null
   ikigai: IkigaiBoardState | null
+  /** Set only while Goals > Map is open. The rings are not drawn anywhere else. */
+  goalMap: GoalMapBoardState | null
   /** Markers view: cards move freely, and a drop on the marker area tags them and sends them back. */
   tagOnly: boolean
   onZoneMove: (id: ZoneId, dx: number, dy: number) => void
@@ -289,6 +299,10 @@ export function Board({
           />
         ) : null}
 
+        {goalMap ? (
+          <GoalMapRings center={goalMap.center} missionText={goalMap.missionText} hoverTag={goalMap.hoverTag} />
+        ) : null}
+
         <SelectionBox
           notes={notes}
           ids={selectedIds}
@@ -327,6 +341,8 @@ export function Board({
             />
           )
         })}
+
+        {goalMap ? <GoalMapPoints center={goalMap.center} notes={notes} /> : null}
 
         {ikigai ? (
           <IkigaiLabels
