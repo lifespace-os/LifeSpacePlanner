@@ -28,10 +28,13 @@ type Props = {
   selectionRef: RefObject<string[]>
   /** In the Ikigai view cards stay put: dragging one is a tagging gesture and the card returns. */
   fixed: boolean
+  /** In the Markers view cards move freely, and a drop on the marker area tags them and sends them back. */
+  tagTarget: boolean
   /** Number of cards in the current multi-selection that includes this card, otherwise 0. */
   multiCount: number
   onSelect: (id: string, additive: boolean) => void
-  onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => void
+  /** Returns true when a drop was taken as a tagging gesture, so the cards should return. */
+  onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
   onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
   onMoveMany: (moves: GroupMove[]) => void
   onFront: (id: string) => void
@@ -75,6 +78,7 @@ export const NoteCard = memo(function NoteCard({
   viewRef,
   selectionRef,
   fixed,
+  tagTarget,
   multiCount,
   onSelect,
   onTagDrag,
@@ -136,7 +140,7 @@ export const NoteCard = memo(function NoteCard({
     }
     const zoom = viewRef.current.zoom
     state.group?.apply(dx / zoom, dy / zoom)
-    if (fixed) onTagDrag(note.id, event.clientX, event.clientY, "move")
+    if (fixed || tagTarget) onTagDrag(note.id, event.clientX, event.clientY, "move")
   }
 
   function handlePointerEnd(event: React.PointerEvent<HTMLElement>) {
@@ -152,6 +156,10 @@ export const NoteCard = memo(function NoteCard({
     if (fixed) {
       state.group?.reset()
       onTagDrag(note.id, event.clientX, event.clientY, dropped ? "drop" : "cancel")
+      return
+    }
+    if (tagTarget && onTagDrag(note.id, event.clientX, event.clientY, dropped ? "drop" : "cancel")) {
+      state.group?.reset()
       return
     }
     const zoom = viewRef.current.zoom
@@ -278,7 +286,7 @@ export const NoteCard = memo(function NoteCard({
         </div>
       ) : null}
 
-      {mode === "mission" && missionSaved && !fixed ? <MissionControls note={note} onMission={onMission} /> : null}
+      {mode === "mission" && missionSaved && !fixed && !tagTarget ? <MissionControls note={note} onMission={onMission} /> : null}
 
       {dragging && multiCount > 1 ? (
         <span className="absolute -top-3 -right-3 flex h-7 min-w-7 items-center justify-center rounded-full bg-accent px-2 text-sm font-medium text-board tabular-nums shadow-md">

@@ -95,7 +95,7 @@ export function Board({
   selectionRef: RefObject<string[]>
   editingId: string | null
   ikigai: IkigaiBoardState | null
-  /** Cards stay put and dragging only tags them, as in the Ikigai and Markers views. */
+  /** Markers view: cards move freely, and a drop on the marker area tags them and sends them back. */
   tagOnly: boolean
   onZoneMove: (id: ZoneId, dx: number, dy: number) => void
   onZoneResize: (id: ZoneId, zone: Zone) => void
@@ -107,7 +107,7 @@ export function Board({
   onClearSelection: () => void
   onSelect: (id: string, additive: boolean) => void
   onMarquee: (ids: string[]) => void
-  onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => void
+  onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
   onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
   onMoveMany: (moves: GroupMove[]) => void
   onFront: (id: string) => void
@@ -293,7 +293,8 @@ export function Board({
           notes={notes}
           ids={selectedIds}
           viewRef={viewRef}
-          fixed={ikigai !== null || tagOnly}
+          fixed={ikigai !== null}
+          tagTarget={tagOnly}
           onMoveMany={onMoveMany}
           onTagDrag={onTagDrag}
         />
@@ -310,7 +311,8 @@ export function Board({
               editing={note.id === editingId}
               viewRef={viewRef}
               selectionRef={selectionRef}
-              fixed={ikigai !== null || tagOnly}
+              fixed={ikigai !== null}
+              tagTarget={tagOnly}
               multiCount={inSelection ? selectedIds.length : 0}
               onSelect={onSelect}
               onTagDrag={onTagDrag}

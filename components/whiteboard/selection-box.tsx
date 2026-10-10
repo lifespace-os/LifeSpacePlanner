@@ -23,6 +23,7 @@ export function SelectionBox({
   ids,
   viewRef,
   fixed,
+  tagTarget,
   onMoveMany,
   onTagDrag,
 }: {
@@ -31,8 +32,10 @@ export function SelectionBox({
   viewRef: RefObject<View>
   /** In the Ikigai view the cards return after a drop, so the frame returns with them. */
   fixed: boolean
+  /** In the Markers view the frame moves freely, and a drop on the marker area tags the cards and returns them. */
+  tagTarget: boolean
   onMoveMany: (moves: GroupMove[]) => void
-  onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => void
+  onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
 }) {
   const boxRef = useRef<HTMLDivElement>(null)
   const drag = useRef<DragState | null>(null)
@@ -94,7 +97,7 @@ export function SelectionBox({
     }
     const zoom = viewRef.current.zoom
     state.group.apply(dx / zoom, dy / zoom)
-    if (fixed) onTagDrag(ids[0], event.clientX, event.clientY, "move")
+    if (fixed || tagTarget) onTagDrag(ids[0], event.clientX, event.clientY, "move")
   }
 
   function handlePointerEnd(event: React.PointerEvent<HTMLDivElement>) {
@@ -107,6 +110,10 @@ export function SelectionBox({
     if (fixed) {
       state.group.reset()
       onTagDrag(ids[0], event.clientX, event.clientY, dropped ? "drop" : "cancel")
+      return
+    }
+    if (tagTarget && onTagDrag(ids[0], event.clientX, event.clientY, dropped ? "drop" : "cancel")) {
+      state.group.reset()
       return
     }
     const zoom = viewRef.current.zoom

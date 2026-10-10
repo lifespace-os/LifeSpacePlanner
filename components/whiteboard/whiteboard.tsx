@@ -476,30 +476,31 @@ export function Whiteboard() {
   )
 
   const handleTagDrag = useCallback(
-    (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => {
+    (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel"): boolean => {
       if (phase === "cancel") {
         setDropHover(null)
-        return
+        return false
       }
       const target = ikigaiTargetAt(clientX, clientY)
       if (phase === "move") {
         setDropHover((prev) => (prev === target ? prev : target))
-        return
+        return false
       }
       setDropHover(null)
       const ids = selectionRef.current.includes(id) ? selectionRef.current : [id]
       if (markersOn) {
         const marker = getMarker(target === "panel" ? markerActive : target)
-        if (!marker) return
+        if (!marker) return false
         tagCards(ids, marker.tag)
         if (target !== "panel") setMarkerActive(marker.id)
         setSelectedIds(NO_IDS)
-        return
+        return true
       }
       const item = getIkigaiItem(target === "panel" ? ikigaiActiveRef.current : target)
-      if (!item) return
+      if (!item) return false
       tagCards(ids, item.tag)
       if (target !== "panel") setIkigaiActive(item.id)
+      return true
     },
     [ikigaiTargetAt, markerActive, markersOn, tagCards],
   )
