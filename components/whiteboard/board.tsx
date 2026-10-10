@@ -324,7 +324,13 @@ export function Board({
         })}
 
         {ikigai ? (
-          <IkigaiLabels center={ikigai.center} notes={notes} activeRegion={activeRegion} activeLens={activeLens} />
+          <IkigaiLabels
+            center={ikigai.center}
+            notes={notes}
+            activeRegion={activeRegion}
+            activeLens={activeLens}
+            lensTag={activeItem?.tag ?? ""}
+          />
         ) : null}
       </div>
 

@@ -5,7 +5,6 @@ import {
   IKIGAI_LABEL_REACH,
   IKIGAI_SIZE,
   OVERLAP_PARENTS,
-  countAllTags,
   countTag,
   ikigaiCircleOffset,
   type IkigaiCenter,
@@ -188,11 +187,14 @@ export function IkigaiLabels({
   notes,
   activeRegion,
   activeLens,
+  lensTag,
 }: {
   center: IkigaiCenter
   notes: Note[]
   activeRegion: IkigaiRegionId | null
   activeLens: IkigaiCircleId[] | null
+  /** Hashtag of the selected step; the lens counts the cards that carry it. */
+  lensTag: string
 }) {
   const missing = activeLens ? IKIGAI_CIRCLES.find((id) => !activeLens.includes(id)) : undefined
   const lensSpot = missing ? ikigaiCircleOffset(missing) : null
@@ -207,7 +209,7 @@ export function IkigaiLabels({
           }}
         >
           <span className="block rounded-full border border-accent bg-accent px-3 py-0.5 text-[20px] leading-snug font-medium whitespace-nowrap text-board tabular-nums">
-            {countText(countAllTags(notes, activeLens))}
+            {countText(countTag(notes, lensTag))}
           </span>
         </div>
       ) : null}

@@ -385,11 +385,6 @@ export function countTag(notes: Note[], tag: string) {
   return notes.reduce((total, note) => total + (hasHashtag(note, tag) ? 1 : 0), 0)
 }
 
-/** Cards that carry every one of the given hashtags. */
-export function countAllTags(notes: Note[], tags: string[]) {
-  return notes.reduce((total, note) => total + (tags.every((tag) => hasHashtag(note, tag)) ? 1 : 0), 0)
-}
-
 export const GROUP_MIN_SIZE = { width: 260, height: 220 }
 
 const GROUP_SLOT = { width: 380, height: 470, gap: 30, columns: 4 }
