@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import clsx from "clsx"
-import { Maximize2, Minimize2 } from "lucide-react"
+import { ChevronLeft, Maximize2, Minimize2 } from "lucide-react"
 import {
   CARD_MIN_HEIGHT,
   CARD_WIDTH,
@@ -64,6 +64,7 @@ export function Whiteboard() {
   const [zones, setZones] = useState<Zones>(DEFAULT_ZONES)
   const [groups, setGroups] = useState<Group[]>(DEFAULT_GROUPS)
   const [clusterView, setClusterView] = useState<ClusterView>("wantmust")
+  const [groupsOpen, setGroupsOpen] = useState(true)
   const [mode, setMode] = useState<Mode>("unload")
   const [missionText, setMissionText] = useState("")
   const [missionOpen, setMissionOpen] = useState(false)
@@ -618,16 +619,36 @@ export function Whiteboard() {
         </div>
       </div>
 
-      {mode === "clusters" ? (
-        <div className="pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex">
-          <ClustersPanel
-            groups={groups}
-            notes={notes}
-            onAddGroup={addGroup}
-            onRemoveGroup={removeGroup}
-            onNewCard={placeAtCenter}
-          />
-        </div>
+      {mode === "clusters" && clusterView === "groups" ? (
+        <>
+          <div
+            inert={!groupsOpen}
+            aria-hidden={!groupsOpen}
+            className={`pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex transition-transform duration-300 ease-out motion-reduce:transition-none ${
+              groupsOpen ? "translate-x-0" : "translate-x-[calc(100%+1.5rem)]"
+            }`}
+          >
+            <ClustersPanel
+              groups={groups}
+              notes={notes}
+              onAddGroup={addGroup}
+              onRemoveGroup={removeGroup}
+              onNewCard={placeAtCenter}
+              onClose={() => setGroupsOpen(false)}
+            />
+          </div>
+          {groupsOpen ? null : (
+            <button
+              type="button"
+              onClick={() => setGroupsOpen(true)}
+              aria-label="Show Groups panel"
+              title="Show Groups panel"
+              className="pointer-events-auto absolute top-[11.5rem] right-0 flex h-24 w-9 items-center justify-center rounded-l-xl border border-r-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <ChevronLeft className="size-5" aria-hidden="true" />
+            </button>
+          )}
+        </>
       ) : null}
 
       {ikigaiOn && ikigaiItem ? (

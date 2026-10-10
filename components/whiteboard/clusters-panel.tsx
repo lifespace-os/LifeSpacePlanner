@@ -1,7 +1,7 @@
 "use client"
 
 import { useId, useState } from "react"
-import { Plus, StickyNote, X } from "lucide-react"
+import { ChevronRight, Plus, StickyNote, X } from "lucide-react"
 import { ZONE_TAGS, groupTag, hasHashtag, type Group, type Note } from "@/lib/board-data"
 
 export function ClustersPanel({
@@ -10,12 +10,14 @@ export function ClustersPanel({
   onAddGroup,
   onRemoveGroup,
   onNewCard,
+  onClose,
 }: {
   groups: Group[]
   notes: Note[]
   onAddGroup: (name: string) => void
   onRemoveGroup: (id: string) => void
   onNewCard: () => void
+  onClose: () => void
 }) {
   const [name, setName] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -46,14 +48,25 @@ export function ClustersPanel({
     >
       <div className="flex items-center justify-between gap-3 px-5 pt-5">
         <h2 className="font-serif text-2xl leading-none font-medium">Groups</h2>
-        <button
-          type="button"
-          onClick={onNewCard}
-          className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink transition-colors hover:bg-desk focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          <StickyNote className="size-4" aria-hidden="true" />
-          New card
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onNewCard}
+            className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm text-ink transition-colors hover:bg-desk focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <StickyNote className="size-4" aria-hidden="true" />
+            New card
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Hide Groups panel"
+            title="Hide panel. Groups and hashtags are kept."
+            className="flex size-8 items-center justify-center rounded-lg text-ink-soft transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <ChevronRight className="size-4" aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <p className="mt-1.5 px-5 text-sm text-ink-soft text-pretty">
         Drag a card into a group to give it that hashtag. Cards can stay ungrouped.
