@@ -3,7 +3,7 @@
 import { useState } from "react"
 import clsx from "clsx"
 import { MousePointerClick, Undo2 } from "lucide-react"
-import { KIND_LABEL, LABEL_GROUPS, type LabelGroupId, type Mode, type Note, type TaskDetails } from "@/lib/board-data"
+import { LABEL_GROUPS, type LabelGroupId, type Mode, type Note, type TaskDetails } from "@/lib/board-data"
 import { LabelMark } from "./label-chip"
 
 export function Inspector({
@@ -20,14 +20,16 @@ export function Inspector({
   return (
     <aside
       aria-label={mode === "labels" ? "Labels" : "Make a task"}
-      className="flex w-80 shrink-0 flex-col overflow-y-auto rounded-2xl border border-line bg-card p-5"
+      className="pointer-events-auto flex max-h-full w-80 shrink-0 flex-col overflow-y-auto rounded-2xl border border-line bg-card p-5 shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)]"
     >
       {note ? (
         <>
           <p className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft">
-            Selected {note.task ? "task" : KIND_LABEL[note.kind].toLowerCase()}
+            Selected {note.task ? "task" : "card"}
           </p>
-          <p className="mt-1 font-serif text-xl leading-snug text-pretty">{note.text}</p>
+          <p className="mt-1 font-serif text-xl leading-snug text-pretty">
+            {note.text.trim() || <span className="text-ink-soft italic">Blank card</span>}
+          </p>
           <div className="mt-5 flex-1">
             {mode === "labels" ? (
               <LabelPanel note={note} onToggle={onToggleLabel} />

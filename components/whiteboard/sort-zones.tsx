@@ -10,7 +10,7 @@ export function SortZones({ notes }: { notes: Note[] }) {
   const outside = notes.filter((n) => n.bucket === null).length
 
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+    <div aria-hidden="true" className="pointer-events-none">
       {(["want", "must"] as const).map((id) => {
         const zone = ZONES[id]
         const copy = ZONE_COPY[id]
@@ -19,23 +19,21 @@ export function SortZones({ notes }: { notes: Note[] }) {
           <div
             key={id}
             className={clsx("absolute rounded-3xl border-2 border-dashed", copy.tint)}
-            style={{
-              left: `${zone.left * 100}%`,
-              top: `${zone.top * 100}%`,
-              width: `${zone.width * 100}%`,
-              height: `${zone.height * 100}%`,
-            }}
+            style={{ left: zone.left, top: zone.top, width: zone.width, height: zone.height }}
           >
-            <div className="absolute bottom-4 left-5 flex items-baseline gap-3">
-              <span className="font-serif text-5xl font-medium italic">{copy.title}</span>
-              <span className="text-xs uppercase tracking-[0.18em] opacity-80">
+            <div className="absolute bottom-5 left-6 flex items-baseline gap-3">
+              <span className="font-serif text-6xl font-medium italic">{copy.title}</span>
+              <span className="text-sm uppercase tracking-[0.18em] opacity-80">
                 {copy.caption} · {count}
               </span>
             </div>
           </div>
         )
       })}
-      <p className="absolute right-6 bottom-4 text-xs uppercase tracking-[0.18em] text-ink-soft/80">
+      <p
+        className="absolute text-sm whitespace-nowrap uppercase tracking-[0.18em] text-ink-soft/80"
+        style={{ left: ZONES.want.left, top: ZONES.want.top + ZONES.want.height + 24 }}
+      >
         Outside both zones · {outside}
       </p>
     </div>

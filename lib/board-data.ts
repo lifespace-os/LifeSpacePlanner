@@ -1,7 +1,5 @@
 export type Mode = "unload" | "sort" | "mission" | "labels" | "task"
 
-export type NoteKind = "wish" | "worry" | "obligation" | "task"
-
 export type Bucket = "want" | "must" | null
 
 export type MissionChoice = "keep" | "release" | null
@@ -15,11 +13,14 @@ export type TaskDetails = {
   owner: string
 }
 
+export type CardColorId = "butter" | "peach" | "rose" | "sage" | "sky" | "lilac" | "paper"
+
 export type Note = {
   id: string
   text: string
-  kind: NoteKind
-  /** Top-left position as a fraction of the board size (0–1). */
+  color: CardColorId
+  hashtags: string[]
+  /** Top-left position in canvas pixels (world space, unaffected by pan and zoom). */
   x: number
   y: number
   rotation: number
@@ -30,21 +31,50 @@ export type Note = {
   task: TaskDetails | null
 }
 
+export type View = { x: number; y: number; zoom: number }
+
+export const CARD_WIDTH = 196
+export const CARD_MIN_HEIGHT = 132
+export const MIN_ZOOM = 0.15
+export const MAX_ZOOM = 2.5
+
 export const MODES: { id: Mode; name: string; hint: string }[] = [
-  { id: "unload", name: "Unload", hint: "Get it out of your head. Write a note and drop it anywhere." },
-  { id: "sort", name: "Want / Must", hint: "Drag notes into Want or Must. A note can stay outside both." },
-  { id: "mission", name: "Mission", hint: "Read the mission, then mark each note Keep or Release." },
-  { id: "labels", name: "Labels", hint: "Select a note, then answer the three questions in the panel." },
-  { id: "task", name: "Make a task", hint: "Select a note and turn it into a task. One note, one task." },
+  {
+    id: "unload",
+    name: "Unload",
+    hint: "Drag a blank card from the dock and write whatever is on your mind.",
+  },
+  { id: "sort", name: "Want / Must", hint: "Drag cards into Want or Must. A card can stay outside both." },
+  { id: "mission", name: "Mission", hint: "Read the mission, then mark each card Keep or Release." },
+  { id: "labels", name: "Labels", hint: "Select a card, then answer the three questions in the panel." },
+  { id: "task", name: "Make a task", hint: "Select a card and turn it into a task. One card, one task." },
 ]
 
 export const MISSION = "I build clear systems that help people live more calmly."
 
-export const KIND_LABEL: Record<NoteKind, string> = {
-  wish: "Wish",
-  worry: "Worry",
-  obligation: "Obligation",
-  task: "Task",
+export const CARD_COLORS: { id: CardColorId; name: string; fill: string; edge: string }[] = [
+  { id: "butter", name: "Butter", fill: "#f7e8a4", edge: "#e6d27c" },
+  { id: "peach", name: "Peach", fill: "#f6d4bd", edge: "#e8b896" },
+  { id: "rose", name: "Rose", fill: "#f3cdd1", edge: "#e2aab1" },
+  { id: "sage", name: "Sage", fill: "#d6e5c9", edge: "#b9cfa6" },
+  { id: "sky", name: "Sky", fill: "#d1e2ec", edge: "#acc8d8" },
+  { id: "lilac", name: "Lilac", fill: "#e0d6ec", edge: "#c6b6db" },
+  { id: "paper", name: "Paper", fill: "#fffdf8", edge: "#ddd3c2" },
+]
+
+const COLOR_INDEX = new Map(CARD_COLORS.map((color) => [color.id, color]))
+
+export function getCardColor(id: CardColorId) {
+  return COLOR_INDEX.get(id) ?? CARD_COLORS[0]
+}
+
+export function normalizeHashtag(value: string) {
+  return value
+    .trim()
+    .replace(/^#+/, "")
+    .replace(/\s+/g, "-")
+    .replace(/[^\p{L}\p{N}_-]/gu, "")
+    .slice(0, 24)
 }
 
 export type LabelOption = { id: string; name: string; color: string }
@@ -104,10 +134,10 @@ export function getLabel(id: string | null | undefined) {
   return id ? LABEL_INDEX.get(id) ?? null : null
 }
 
-/** Want and Must zones, as fractions of the board. */
+/** Want and Must zones, in canvas pixels. */
 export const ZONES: Record<Exclude<Bucket, null>, { left: number; top: number; width: number; height: number }> = {
-  want: { left: 0.025, top: 0.05, width: 0.4, height: 0.6 },
-  must: { left: 0.575, top: 0.05, width: 0.4, height: 0.6 },
+  want: { left: 0, top: 0, width: 760, height: 640 },
+  must: { left: 900, top: 0, width: 760, height: 640 },
 }
 
 export function bucketAt(cx: number, cy: number): Bucket {
@@ -118,148 +148,39 @@ export function bucketAt(cx: number, cy: number): Bucket {
   return null
 }
 
-export const SAMPLE_NOTES: Note[] = [
-  {
-    id: "n1",
-    text: "Run a half marathon next spring",
-    kind: "wish",
-    x: 0.05,
-    y: 0.1,
-    rotation: -2,
-    z: 1,
-    bucket: "want",
-    mission: "keep",
-    labels: { area: "body", happiness: "health", budget: "investment" },
-    task: null,
-  },
-  {
-    id: "n2",
-    text: "Renew passport before June",
-    kind: "obligation",
-    x: 0.62,
-    y: 0.12,
-    rotation: 1.5,
-    z: 2,
-    bucket: "must",
-    mission: null,
-    labels: { area: "home", happiness: "safety" },
-    task: null,
-  },
-  {
-    id: "n3",
-    text: "Am I saving enough for later?",
-    kind: "worry",
-    x: 0.44,
-    y: 0.7,
-    rotation: -1,
-    z: 3,
-    bucket: null,
-    mission: null,
-    labels: {},
-    task: null,
-  },
-  {
-    id: "n4",
-    text: "Call Mom on Sunday",
-    kind: "task",
-    x: 0.24,
-    y: 0.36,
-    rotation: 2.5,
-    z: 4,
-    bucket: "want",
-    mission: "keep",
-    labels: { area: "relationships", happiness: "love" },
-    task: null,
-  },
-  {
-    id: "n5",
-    text: "Learn to bake sourdough",
-    kind: "wish",
-    x: 0.08,
-    y: 0.74,
-    rotation: 1,
-    z: 5,
-    bucket: null,
-    mission: null,
-    labels: {},
-    task: null,
-  },
+type Seed = Pick<Note, "id" | "text" | "color" | "x" | "y" | "rotation"> & Partial<Note>
+
+const SEEDS: Seed[] = [
+  { id: "n1", text: "Run a half marathon next spring", color: "sage", x: 60, y: 70, rotation: -2, bucket: "want", mission: "keep", labels: { area: "body", happiness: "health", budget: "investment" }, hashtags: ["health"] },
+  { id: "n2", text: "Renew passport before June", color: "butter", x: 960, y: 80, rotation: 1.5, bucket: "must", labels: { area: "home", happiness: "safety" } },
+  { id: "n3", text: "Am I saving enough for later?", color: "sky", x: 720, y: 820, rotation: -1 },
+  { id: "n4", text: "Call Mom on Sunday", color: "rose", x: 380, y: 300, rotation: 2.5, bucket: "want", mission: "keep", labels: { area: "relationships", happiness: "love" }, hashtags: ["family"] },
+  { id: "n5", text: "Learn to bake sourdough", color: "peach", x: 120, y: 860, rotation: 1 },
   {
     id: "n6",
     text: "Fix the leaking kitchen tap",
-    kind: "task",
-    x: 0.78,
-    y: 0.38,
+    color: "butter",
+    x: 1280,
+    y: 340,
     rotation: -1.5,
-    z: 6,
     bucket: "must",
     mission: "keep",
     labels: { area: "home", budget: "expense" },
     task: { title: "Replace kitchen tap washer", labelId: "home", due: "2026-10-18", owner: "Me" },
   },
-  {
-    id: "n7",
-    text: "Quarterly tax filing",
-    kind: "obligation",
-    x: 0.8,
-    y: 0.72,
-    rotation: 2,
-    z: 7,
-    bucket: null,
-    mission: null,
-    labels: {},
-    task: null,
-  },
-  {
-    id: "n8",
-    text: "Tired most afternoons",
-    kind: "worry",
-    x: 0.27,
-    y: 0.72,
-    rotation: -2.5,
-    z: 8,
-    bucket: null,
-    mission: null,
-    labels: {},
-    task: null,
-  },
-  {
-    id: "n9",
-    text: "Write an onboarding guide for the new tool",
-    kind: "task",
-    x: 0.6,
-    y: 0.72,
-    rotation: 1,
-    z: 9,
-    bucket: null,
-    mission: null,
-    labels: { area: "work" },
-    task: null,
-  },
-  {
-    id: "n10",
-    text: "A slow week by the sea",
-    kind: "wish",
-    x: 0.44,
-    y: 0.14,
-    rotation: -1,
-    z: 10,
-    bucket: null,
-    mission: null,
-    labels: {},
-    task: null,
-  },
-  {
-    id: "n11",
-    text: "Reply to every unread group chat",
-    kind: "obligation",
-    x: 0.44,
-    y: 0.42,
-    rotation: 1.5,
-    z: 11,
-    bucket: null,
-    mission: "release",
-    labels: {},
-    task: null,
-  },
+  { id: "n7", text: "Quarterly tax filing", color: "paper", x: 1320, y: 840, rotation: 2 },
+  { id: "n8", text: "Tired most afternoons", color: "lilac", x: 420, y: 860, rotation: -2.5 },
+  { id: "n9", text: "Write an onboarding guide for the new tool", color: "sky", x: 1020, y: 830, rotation: 1, labels: { area: "work" }, hashtags: ["work"] },
+  { id: "n10", text: "A slow week by the sea", color: "sage", x: 720, y: 140, rotation: -1 },
+  { id: "n11", text: "Reply to every unread group chat", color: "peach", x: 740, y: 470, rotation: 1.5, mission: "release" },
 ]
+
+export const SAMPLE_NOTES: Note[] = SEEDS.map((seed, index) => ({
+  hashtags: [],
+  bucket: null,
+  mission: null,
+  labels: {},
+  task: null,
+  z: index + 1,
+  ...seed,
+}))

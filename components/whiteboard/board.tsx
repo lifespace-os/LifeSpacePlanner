@@ -1,61 +1,154 @@
 "use client"
 
-import { useRef } from "react"
-import type { Bucket, MissionChoice, Mode, Note } from "@/lib/board-data"
+import { useEffect, useRef, useState, type RefObject } from "react"
+import clsx from "clsx"
+import type { Bucket, MissionChoice, Mode, Note, View } from "@/lib/board-data"
 import { NoteCard } from "./note-card"
 import { SortZones } from "./sort-zones"
+
+type PanState = { pointerId: number; lastX: number; lastY: number }
+
+const GRID = 22
 
 export function Board({
   notes,
   mode,
+  view,
+  viewRef,
+  viewportRef,
   selectedId,
+  editingId,
+  onPan,
+  onZoomAt,
+  onCanvasMenu,
+  onClearSelection,
   onSelect,
   onMove,
   onFront,
   onMission,
+  onEditStart,
+  onEditEnd,
+  onCardMenu,
   onDelete,
 }: {
   notes: Note[]
   mode: Mode
+  view: View
+  viewRef: RefObject<View>
+  viewportRef: RefObject<HTMLDivElement | null>
   selectedId: string | null
-  onSelect: (id: string | null) => void
+  editingId: string | null
+  onPan: (dx: number, dy: number) => void
+  onZoomAt: (factor: number, clientX: number, clientY: number) => void
+  onCanvasMenu: (clientX: number, clientY: number) => void
+  onClearSelection: () => void
+  onSelect: (id: string) => void
   onMove: (id: string, x: number, y: number, bucket: Bucket) => void
   onFront: (id: string) => void
   onMission: (id: string, choice: Exclude<MissionChoice, null>) => void
+  onEditStart: (id: string) => void
+  onEditEnd: (id: string, text: string) => void
+  onCardMenu: (id: string, clientX: number, clientY: number) => void
   onDelete: (id: string) => void
 }) {
-  const boardRef = useRef<HTMLElement>(null)
+  const pan = useRef<PanState | null>(null)
+  const [panning, setPanning] = useState(false)
+  const zoomAtRef = useRef(onZoomAt)
+  zoomAtRef.current = onZoomAt
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    function handleWheel(event: WheelEvent) {
+      if ((event.target as HTMLElement).closest("textarea")) return
+      event.preventDefault()
+      const intensity = event.ctrlKey ? 0.01 : 0.0015
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY
+      zoomAtRef.current(Math.exp(-delta * intensity), event.clientX, event.clientY)
+    }
+    viewport.addEventListener("wheel", handleWheel, { passive: false })
+    return () => viewport.removeEventListener("wheel", handleWheel)
+  }, [viewportRef])
+
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0 && event.button !== 1) return
+    if ((event.target as HTMLElement).closest("[data-note-card]")) return
+    if (event.button === 0) onClearSelection()
+    if (document.activeElement instanceof HTMLTextAreaElement) document.activeElement.blur()
+    pan.current = { pointerId: event.pointerId, lastX: event.clientX, lastY: event.clientY }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setPanning(true)
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const state = pan.current
+    if (!state || state.pointerId !== event.pointerId) return
+    onPan(event.clientX - state.lastX, event.clientY - state.lastY)
+    state.lastX = event.clientX
+    state.lastY = event.clientY
+  }
+
+  function handlePointerEnd(event: React.PointerEvent<HTMLDivElement>) {
+    if (pan.current?.pointerId !== event.pointerId) return
+    pan.current = null
+    setPanning(false)
+  }
+
+  const gridSize = GRID * view.zoom
 
   return (
-    <section
-      ref={boardRef}
-      aria-label="Whiteboard"
+    <div
+      ref={viewportRef}
+      role="region"
+      aria-label="Whiteboard canvas"
       aria-describedby="board-help"
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onSelect(null)
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerEnd}
+      onPointerCancel={handlePointerEnd}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        onCanvasMenu(event.clientX, event.clientY)
       }}
-      className="board-grain relative min-w-0 flex-1 overflow-hidden rounded-2xl border border-line shadow-[0_1px_0_rgba(255,255,255,0.8)_inset,0_10px_30px_-18px_rgba(35,39,43,0.35)]"
+      style={{
+        backgroundSize: `${gridSize}px ${gridSize}px`,
+        backgroundPosition: `${view.x}px ${view.y}px`,
+      }}
+      className={clsx(
+        "board-grain absolute inset-0 touch-none overflow-hidden select-none",
+        panning ? "cursor-grabbing" : "cursor-grab",
+      )}
     >
       <p id="board-help" className="sr-only">
-        Drag a note with the mouse, or focus it and use the arrow keys to move it. Press Enter to select it.
+        Drag empty space to pan and use the mouse wheel to zoom. Drag a card to move it, double-click or press Enter to
+        write on it, and right-click or press Shift F10 for color and hashtags. Arrow keys move a focused card.
       </p>
 
-      {mode === "sort" ? <SortZones notes={notes} /> : null}
+      <div
+        className="absolute top-0 left-0 origin-top-left will-change-transform"
+        style={{ transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.zoom})` }}
+      >
+        {mode === "sort" ? <SortZones notes={notes} /> : null}
 
-      {notes.map((note) => (
-        <NoteCard
-          key={note.id}
-          note={note}
-          mode={mode}
-          selected={note.id === selectedId}
-          boardRef={boardRef}
-          onSelect={onSelect}
-          onMove={onMove}
-          onFront={onFront}
-          onMission={onMission}
-          onDelete={onDelete}
-        />
-      ))}
-    </section>
+        {notes.map((note) => (
+          <NoteCard
+            key={note.id}
+            note={note}
+            mode={mode}
+            selected={note.id === selectedId}
+            editing={note.id === editingId}
+            viewRef={viewRef}
+            onSelect={onSelect}
+            onMove={onMove}
+            onFront={onFront}
+            onMission={onMission}
+            onEditStart={onEditStart}
+            onEditEnd={onEditEnd}
+            onMenu={onCardMenu}
+            onDelete={onDelete}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
