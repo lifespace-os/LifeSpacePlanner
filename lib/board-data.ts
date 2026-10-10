@@ -1,8 +1,10 @@
-export type Mode = "unload" | "clusters" | "mission" | "labels" | "task"
+export type Mode = "unload" | "clusters" | "mission" | "goals" | "labels" | "task"
 
 export type ClusterView = "wantmust" | "groups"
 
 export type MissionView = "sentence" | "ikigai" | "markers"
+
+export type GoalView = "needs" | "life" | "project" | "tasks" | "map"
 
 export type ZoneId = "want" | "must"
 
@@ -69,6 +71,11 @@ export const MODES: { id: Mode; name: string; hint: string }[] = [
     hint: "Sort the same cards two ways. Open either view first. Neither is required.",
   },
   { id: "mission", name: "Mission", hint: "Write your mission sentence, then mark each card Keep or Release." },
+  {
+    id: "goals",
+    name: "Goals",
+    hint: "Give each card a level, from a need or dream down to a task. A card does not need a parent.",
+  },
   { id: "labels", name: "Labels", hint: "Select a card, then answer the three questions in the panel." },
   { id: "task", name: "Make a task", hint: "Select a card and turn it into a task. One card, one task." },
 ]
@@ -414,6 +421,41 @@ export function getMarker(id: string | null | undefined) {
 /** How many of the ten markers a card carries. */
 export function countMarkers(note: Note) {
   return MARKERS.reduce((total, item) => total + (hasHashtag(note, item.tag) ? 1 : 0), 0)
+}
+
+/** A level a card can hold in Goals. Its id is its hashtag. */
+export type GoalLevel = { id: string; name: string; tag: string; description: string }
+
+function goalLevel(tag: string, name: string, description: string): GoalLevel {
+  return { id: tag, name, tag, description }
+}
+
+export const GOAL_LEVELS: GoalLevel[] = [
+  goalLevel("need", "Need", "Something you cannot do without."),
+  goalLevel("dream", "Dream", "Something you wish for, with no plan yet."),
+  goalLevel("want", "Want", "Something you would like to have or do."),
+  goalLevel("life-goal", "Life goal", "A direction for years, not weeks."),
+  goalLevel("project-goal", "Project goal", "An outcome with an end, within a project."),
+  goalLevel("task", "Task", "One step you can do next."),
+]
+
+export const GOAL_TAGS = GOAL_LEVELS.map((level) => level.tag)
+
+/** The levels that each view takes drops for. Map takes none. */
+export const GOAL_VIEW_LEVELS: Record<Exclude<GoalView, "map">, string[]> = {
+  needs: ["need", "dream", "want"],
+  life: ["life-goal"],
+  project: ["project-goal"],
+  tasks: ["task"],
+}
+
+export function getGoalLevel(tag: string | null | undefined) {
+  return GOAL_LEVELS.find((level) => level.tag === tag) ?? null
+}
+
+/** Sets a card's level. A new level replaces the previous one; other hashtags stay. */
+export function setGoalLevel(note: Note, tag: string): Note {
+  return retag(note, GOAL_TAGS, tag)
 }
 
 export const GROUP_MIN_SIZE = { width: 260, height: 220 }

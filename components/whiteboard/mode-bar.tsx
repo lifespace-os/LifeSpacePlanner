@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useId, useState } from "react"
 import clsx from "clsx"
-import type { ClusterView, MODES, MissionView, Note } from "@/lib/board-data"
+import type { ClusterView, GoalView, MODES, MissionView, Note } from "@/lib/board-data"
 
 type ModeInfo = (typeof MODES)[number]
 
@@ -19,17 +19,29 @@ const IKIGAI_HINT = "Pick a step or a circle, then drop cards on it to add its h
 const MARKERS_HINT =
   "Pick a marker, then drop cards on it to add its hashtag. Cards stay where they are. Ten markers do not write the sentence by themselves."
 
+const GOAL_HINTS: Record<GoalView, string> = {
+  needs:
+    "Drop a card in Need, Dream, or Want to set its level. A new level replaces the previous one. Cards stay where they are.",
+  life: "Drop a card in the window to make it a life goal. A new level replaces the previous one. Cards stay where they are.",
+  project:
+    "Drop a card in the window to make it a project goal. A new level replaces the previous one. Cards stay where they are.",
+  tasks: "Drop a card in the window to make it a task. A new level replaces the previous one. Cards stay where they are.",
+  map: "The six levels and how many cards sit on each. A card does not need a parent.",
+}
+
 export function ModeBar({
   mode,
   notes,
   clusterView,
   missionView,
+  goalView,
   missionText,
 }: {
   mode: ModeInfo
   notes: Note[]
   clusterView: ClusterView
   missionView: MissionView
+  goalView: GoalView
   missionText: string
 }) {
   const isMission = mode.id === "mission"
@@ -37,6 +49,7 @@ export function ModeBar({
 
   let hint = mode.hint
   if (mode.id === "clusters") hint = CLUSTER_HINTS[clusterView]
+  if (mode.id === "goals") hint = GOAL_HINTS[goalView]
   if (isMission) {
     if (missionView === "ikigai") hint = IKIGAI_HINT
     else if (missionView === "markers") hint = MARKERS_HINT

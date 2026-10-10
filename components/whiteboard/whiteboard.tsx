@@ -17,6 +17,7 @@ import {
   ZONE_MIN_SIZE,
   ZONE_TAGS,
   areaTagAt,
+  getGoalLevel,
   getIkigaiItem,
   getMarker,
   groupAreas,
@@ -26,9 +27,11 @@ import {
   nextGroupRect,
   reconcile,
   retag,
+  setGoalLevel,
   zoneAreas,
   type CardColorId,
   type ClusterView,
+  type GoalView,
   type Group,
   type IkigaiCenter,
   type LabelGroupId,
@@ -52,6 +55,7 @@ import { ClustersPanel } from "./clusters-panel"
 import { MissionWindow } from "./mission-window"
 import { IkigaiPanel } from "./ikigai-panel"
 import { MarkersPanel, MarkersWindow } from "./markers-panel"
+import { GoalsPanel, MissionStrip } from "./goals-panel"
 import { IkigaiStepsWindow } from "./ikigai-guide"
 import { CardDock } from "./card-dock"
 import { ZoomControls } from "./zoom-controls"
@@ -83,6 +87,8 @@ export function Whiteboard() {
   const [markerActive, setMarkerActive] = useState<string | null>(null)
   const [markersListOpen, setMarkersListOpen] = useState(true)
   const [markersPanelOpen, setMarkersPanelOpen] = useState(true)
+  const [goalView, setGoalView] = useState<GoalView>("needs")
+  const [goalsPanelOpen, setGoalsPanelOpen] = useState(true)
   const [dropHover, setDropHover] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>(NO_IDS)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -99,6 +105,8 @@ export function Whiteboard() {
 
   const ikigaiOn = mode === "mission" && missionView === "ikigai"
   const markersOn = mode === "mission" && missionView === "markers"
+  const goalsOn = mode === "goals"
+  const goalsDropOn = goalsOn && goalView !== "map"
   const ikigaiOnRef = useRef(ikigaiOn)
   const ikigaiActiveRef = useRef(ikigaiActive)
   const selectionRef = useRef(selectedIds)
@@ -461,6 +469,7 @@ export function Whiteboard() {
     (clientX: number, clientY: number): string | null => {
       const top = document.elementsFromPoint(clientX, clientY).find((el) => !el.closest("[data-note-card], [data-selection-box]"))
       if (!top) return null
+      if (goalsDropOn) return top.closest<HTMLElement>("[data-goal-area]")?.dataset.goalArea ?? null
       if (markersOn) {
         if (top.closest("[data-marker-drop]")) return "panel"
         return top.closest<HTMLElement>("[data-marker-item]")?.dataset.markerItem ?? null
@@ -472,7 +481,7 @@ export function Whiteboard() {
       const point = screenToWorld(clientX, clientY)
       return ikigaiRegionAt(point.x, point.y, ikigaiCenter)
     },
-    [ikigaiCenter, markersOn, screenToWorld],
+    [goalsDropOn, ikigaiCenter, markersOn, screenToWorld],
   )
 
   const handleTagDrag = useCallback(
@@ -488,6 +497,12 @@ export function Whiteboard() {
       }
       setDropHover(null)
       const ids = selectionRef.current.includes(id) ? selectionRef.current : [id]
+      if (goalsDropOn) {
+        const level = getGoalLevel(target)
+        if (!level) return false
+        setNotes((prev) => prev.map((note) => (ids.includes(note.id) ? setGoalLevel(note, level.tag) : note)))
+        return true
+      }
       if (markersOn) {
         const marker = getMarker(target === "panel" ? markerActive : target)
         if (!marker) return false
@@ -502,7 +517,7 @@ export function Whiteboard() {
       if (target !== "panel") setIkigaiActive(item.id)
       return true
     },
-    [ikigaiTargetAt, markerActive, markersOn, tagCards],
+    [goalsDropOn, ikigaiTargetAt, markerActive, markersOn, tagCards],
   )
 
   const deleteNote = useCallback((id: string) => {
@@ -569,6 +584,14 @@ export function Whiteboard() {
     },
     [changeMissionView],
   )
+
+  const openGoalView = useCallback((next: GoalView) => {
+    setMode("goals")
+    setGoalView(next)
+    setMenu(null)
+    setDropHover(null)
+    setMissionOpen(false)
+  }, [])
 
   const hideSteps = useCallback(() => setStepsOpen(false), [])
   const hideDetails = useCallback(() => setDetailsOpen(false), [])
@@ -640,7 +663,7 @@ export function Whiteboard() {
               }
             : null
         }
-        tagOnly={markersOn}
+        tagOnly={markersOn || goalsDropOn}
         onZoneMove={moveZone}
         onZoneResize={resizeZone}
         onGroupMove={moveGroup}
@@ -664,11 +687,12 @@ export function Whiteboard() {
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4">
         <ModeBar
-          key={`${mode}:${mode === "clusters" ? clusterView : mode === "mission" ? missionView : ""}`}
+          key={`${mode}:${mode === "clusters" ? clusterView : mode === "mission" ? missionView : mode === "goals" ? goalView : ""}`}
           mode={activeMode}
           notes={notes}
           clusterView={clusterView}
           missionView={missionView}
+          goalView={goalView}
           missionText={missionText}
         />
         <div className="pointer-events-auto flex items-center gap-2">
@@ -676,9 +700,11 @@ export function Whiteboard() {
             mode={mode}
             clusterView={clusterView}
             missionView={missionView}
-            onChange={changeMode}
+            goalView={goalView}
+            onChange={(next) => (next === "goals" ? openGoalView(goalView) : changeMode(next))}
             onClusterView={openClusterView}
             onMissionView={openMissionView}
+            onGoalView={openGoalView}
           />
           <button
             type="button"
@@ -837,6 +863,40 @@ export function Whiteboard() {
               onClick={() => setMarkersPanelOpen(true)}
               aria-label="Show details window"
               title="Show details window"
+              className="pointer-events-auto absolute top-[11.5rem] right-0 flex h-24 w-9 items-center justify-center rounded-l-xl border border-r-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <ChevronLeft className="size-5" aria-hidden="true" />
+            </button>
+          )}
+        </>
+      ) : null}
+
+      {goalsOn ? (
+        <>
+          <div className="pointer-events-none absolute top-[11.5rem] left-4">
+            <MissionStrip missionText={missionText} />
+          </div>
+          <div
+            inert={!goalsPanelOpen}
+            aria-hidden={!goalsPanelOpen}
+            className={`pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex transition-transform duration-300 ease-out motion-reduce:transition-none ${
+              goalsPanelOpen ? "translate-x-0" : "translate-x-[calc(100%+1.5rem)]"
+            }`}
+          >
+            <GoalsPanel
+              view={goalView}
+              notes={notes}
+              hoverId={dropHover}
+              onClose={() => setGoalsPanelOpen(false)}
+              onRemoveLevel={untagCard}
+            />
+          </div>
+          {goalsPanelOpen ? null : (
+            <button
+              type="button"
+              onClick={() => setGoalsPanelOpen(true)}
+              aria-label="Show goals window"
+              title="Show goals window"
               className="pointer-events-auto absolute top-[11.5rem] right-0 flex h-24 w-9 items-center justify-center rounded-l-xl border border-r-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <ChevronLeft className="size-5" aria-hidden="true" />

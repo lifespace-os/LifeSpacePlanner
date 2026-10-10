@@ -151,7 +151,7 @@ export function readTagHashtag(tag: string) {
   return hasHashtag as unknown as (note: Note, value: string) => boolean
 }
 
-export const READ_TAGS = TOOLS.map(([tag]) => tag)
+export const READ_TAGS: string[] = TOOLS.map(([tag]) => tag)
 
 export function tagReadCards(notes: Note[], tag: string) {
   return notes.filter((note) => hasHashtag(note, tag))

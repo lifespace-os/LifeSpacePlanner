@@ -1,5 +1,13 @@
 import clsx from "clsx"
-import { MODES, type ClusterView, type Mode, type MissionView } from "@/lib/board-data"
+import { MODES, type ClusterView, type GoalView, type Mode, type MissionView } from "@/lib/board-data"
+
+const GOAL_CONTROLS: { id: GoalView; name: string }[] = [
+  { id: "needs", name: "Needs, dreams, and wants" },
+  { id: "life", name: "Life goals" },
+  { id: "project", name: "Project goals" },
+  { id: "tasks", name: "Tasks" },
+  { id: "map", name: "Map" },
+]
 
 const CLUSTER_CONTROLS: { id: ClusterView; name: string }[] = [
   { id: "wantmust", name: "Want / Must" },
@@ -16,19 +24,27 @@ export function ModeSwitcher({
   mode,
   clusterView,
   missionView,
+  goalView,
   onChange,
   onClusterView,
   onMissionView,
+  onGoalView,
 }: {
   mode: Mode
   clusterView: ClusterView
   missionView: MissionView
+  goalView: GoalView
   onChange: (mode: Mode) => void
   onClusterView: (view: ClusterView) => void
   onMissionView: (view: MissionView) => void
+  onGoalView: (view: GoalView) => void
 }) {
   return (
-    <div role="group" aria-label="Board mode" className="flex items-center gap-1 rounded-xl border border-line bg-board p-1 shadow-sm">
+    <div
+      role="group"
+      aria-label="Board mode"
+      className="relative flex items-center gap-1 rounded-xl border border-line bg-board p-1 shadow-sm"
+    >
       {MODES.map((m, index) => {
         const active = m.id === mode
         return (
@@ -72,6 +88,15 @@ export function ModeSwitcher({
           </div>
         )
       })}
+      {mode === "goals" ? (
+        <ViewControls
+          label="Goals view"
+          items={GOAL_CONTROLS}
+          current={goalView}
+          onPick={onGoalView}
+          align="right"
+        />
+      ) : null}
     </div>
   )
 }
@@ -81,17 +106,22 @@ function ViewControls<T extends string>({
   items,
   current,
   onPick,
+  align = "left",
 }: {
   label: string
   items: { id: T; name: string }[]
   current: T
   onPick: (id: T) => void
+  align?: "left" | "right"
 }) {
   return (
     <div
       role="group"
       aria-label={label}
-      className="absolute top-full left-0 z-10 mt-2 flex w-max items-center gap-1 rounded-xl border border-line bg-board p-1 shadow-sm"
+      className={clsx(
+        "absolute top-full z-10 mt-2 flex w-max items-center gap-1 rounded-xl border border-line bg-board p-1 shadow-sm",
+        align === "right" ? "right-0" : "left-0",
+      )}
     >
       {items.map((item) => {
         const active = item.id === current
