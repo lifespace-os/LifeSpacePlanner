@@ -12,3 +12,9 @@ Thumbs.db
 
 # docs
 ./docs
+# deps & build
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.env*.local
