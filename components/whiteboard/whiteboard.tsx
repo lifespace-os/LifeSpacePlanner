@@ -481,16 +481,28 @@ export function Whiteboard() {
     [missionText],
   )
 
+  const openClusterView = useCallback(
+    (next: ClusterView) => {
+      setClusterView(next)
+      if (mode !== "clusters") changeMode("clusters")
+    },
+    [mode, changeMode],
+  )
+
+  const openMissionView = useCallback(
+    (next: MissionView) => {
+      setMode("mission")
+      changeMissionView(next)
+      if (next === "sentence") setMissionOpen(true)
+    },
+    [changeMissionView],
+  )
+
   const closeIkigaiPanel = useCallback(() => setIkigaiActive(null), [])
 
   const saveMission = useCallback((text: string) => {
     setMissionText(text)
     setMissionOpen(false)
-  }, [])
-
-  const openMission = useCallback(() => {
-    setMenu(null)
-    setMissionOpen(true)
   }, [])
 
   const closeMission = useCallback(() => setMissionOpen(false), [])
@@ -573,17 +585,22 @@ export function Whiteboard() {
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4">
         <ModeBar
+          key={`${mode}:${mode === "clusters" ? clusterView : mode === "mission" ? missionView : ""}`}
           mode={activeMode}
           notes={notes}
           clusterView={clusterView}
           missionView={missionView}
           missionText={missionText}
-          onClusterViewChange={setClusterView}
-          onMissionViewChange={changeMissionView}
-          onEditMission={openMission}
         />
         <div className="pointer-events-auto flex items-center gap-2">
-          <ModeSwitcher mode={mode} onChange={changeMode} />
+          <ModeSwitcher
+            mode={mode}
+            clusterView={clusterView}
+            missionView={missionView}
+            onChange={changeMode}
+            onClusterView={openClusterView}
+            onMissionView={openMissionView}
+          />
           <button
             type="button"
             onClick={toggleFocusMode}
@@ -602,7 +619,7 @@ export function Whiteboard() {
       </div>
 
       {mode === "clusters" ? (
-        <div className="pointer-events-none absolute top-[7.5rem] right-4 bottom-24 flex">
+        <div className="pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex">
           <ClustersPanel
             groups={groups}
             notes={notes}
