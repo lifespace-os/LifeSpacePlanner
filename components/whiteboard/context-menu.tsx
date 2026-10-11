@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import clsx from "clsx"
 import { Hash, PencilLine, Plus, Trash2, X } from "lucide-react"
-import { CARD_COLORS, normalizeHashtag, type CardColorId, type Note } from "@/lib/board-data"
+import { CARD_COLORS, getCardColor, normalizeHashtag, type CardColorId, type Note } from "@/lib/board-data"
 
 export type MenuState =
   | { kind: "canvas"; clientX: number; clientY: number }
@@ -97,6 +97,7 @@ export function CardMenu({
   clientX,
   clientY,
   note,
+  dockColor,
   onColor,
   onAddHashtag,
   onRemoveHashtag,
@@ -110,6 +111,8 @@ export function CardMenu({
   clientX: number
   clientY: number
   note: Note
+  /** The color new cards start with. A sector drop can replace a card's color, and this puts it back. */
+  dockColor: CardColorId
   onColor: (color: CardColorId) => void
   onAddHashtag: (tag: string) => void
   onRemoveHashtag: (tag: string) => void
@@ -184,6 +187,19 @@ export function CardMenu({
             )
           })}
         </div>
+        <button
+          type="button"
+          disabled={note.color === dockColor}
+          onClick={() => onColor(dockColor)}
+          className="mt-2.5 flex items-center gap-2 rounded-md border border-line px-2 py-1 text-xs text-ink transition-colors hover:bg-desk focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <span
+            aria-hidden="true"
+            className="size-3 rounded-full border border-ink/20"
+            style={{ backgroundColor: getCardColor(dockColor).fill }}
+          />
+          Restore dock color
+        </button>
 
         <div className="mt-4">
           <label

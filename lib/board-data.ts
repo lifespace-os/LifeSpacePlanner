@@ -204,7 +204,36 @@ export const LABEL_GROUPS: LabelGroup[] = [
 ]
 
 /** One sector of a life-spheres or happiness list. Its hashtag is the name written as a tag. */
-export type Sector = { id: string; name: string }
+export type Sector = { id: string; name: string; color: `#${string}` }
+
+/** Wheel sizes in world units. The reach includes the names written outside the ring. */
+export const WHEEL_OUTER = 230
+export const WHEEL_INNER = 64
+export const WHEEL_REACH = 380
+export const WHEEL_GAP = 90
+
+/** Soft paper colors given to a card dropped on a life sphere. */
+export const SECTOR_COLORS: `#${string}`[] = [
+  "#f2b8a2",
+  "#f4d58d",
+  "#b9d9a5",
+  "#a9d3e0",
+  "#c5b8e6",
+  "#f0b3c8",
+  "#9fc5e8",
+  "#d9c7a0",
+  "#a8dccb",
+  "#e5a9a9",
+]
+
+/** Prototype colors for the four starting happiness components. They are a first draft, not a final palette. */
+export const HAPPINESS_COLORS: `#${string}`[] = ["#9fc5e8", "#b9d9a5", "#f4d58d", "#f0b3c8"]
+
+/** The first color no sector of the list uses yet, or the next one in turn when all are taken. */
+export function nextSectorColor(sectors: Sector[], palette: `#${string}`[] = SECTOR_COLORS): `#${string}` {
+  const used = new Set(sectors.map((sector) => sector.color))
+  return palette.find((color) => !used.has(color)) ?? palette[sectors.length % palette.length]
+}
 
 export type SphereSetId = "five" | "seven" | "eight" | "ten"
 
@@ -245,8 +274,8 @@ export function sectorTag(name: string) {
   return groupTag(name)
 }
 
-function sectorsFrom(prefix: string, names: string[]): Sector[] {
-  return names.map((name, i) => ({ id: `${prefix}-${i}`, name }))
+function sectorsFrom(prefix: string, names: string[], palette: `#${string}`[] = SECTOR_COLORS): Sector[] {
+  return names.map((name, i) => ({ id: `${prefix}-${i}`, name, color: palette[i % palette.length] }))
 }
 
 export function startingSectorLists(): Record<SectorListId, Sector[]> {
@@ -255,7 +284,7 @@ export function startingSectorLists(): Record<SectorListId, Sector[]> {
     seven: sectorsFrom("seven", LIFE_SPHERE_SETS[1].sectors),
     eight: sectorsFrom("eight", LIFE_SPHERE_SETS[2].sectors),
     ten: sectorsFrom("ten", LIFE_SPHERE_SETS[3].sectors),
-    happiness: sectorsFrom("happiness", HAPPINESS_START),
+    happiness: sectorsFrom("happiness", HAPPINESS_START, HAPPINESS_COLORS),
   }
 }
 

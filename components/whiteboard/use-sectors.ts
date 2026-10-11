@@ -2,8 +2,11 @@
 
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import {
+  HAPPINESS_COLORS,
+  SECTOR_COLORS,
   SECTOR_NAME_MAX,
   hasHashtag,
+  nextSectorColor,
   sectorTag,
   startingSectorLists,
   type LabelView,
@@ -20,11 +23,14 @@ export function useSectors(setNotes: Dispatch<SetStateAction<Note[]>>) {
   const [view, setView] = useState<LabelView>("spheres")
   const [setId, setSetId] = useState<SphereSetId>("five")
   const [lists, setLists] = useState(startingSectorLists)
+  const [openSectorId, setOpenSectorId] = useState<string | null>(null)
   const nextId = useRef(0)
 
   const activeId: SectorListId = view === "happiness" ? "happiness" : setId
   const otherId: SectorListId = view === "happiness" ? setId : "happiness"
   const sectors = lists[activeId]
+  /** The sector whose cards are listed in the window. It belongs to the chosen set, so switching sets closes it. */
+  const openSector = sectors.find((sector) => sector.id === openSectorId) ?? null
 
   /** A hashtag the other view's list also uses stays on the cards when this list drops or renames it. */
   const usedByOtherView = useCallback(
@@ -39,7 +45,8 @@ export function useSectors(setNotes: Dispatch<SetStateAction<Note[]>>) {
       if (!tag) return "Give the sector a name."
       if (sectors.some((sector) => sectorTag(sector.name) === tag)) return "This list already has that sector."
       const id = `${activeId}-new-${nextId.current++}`
-      setLists((prev) => ({ ...prev, [activeId]: [...prev[activeId], { id, name: clean }] }))
+      const color = nextSectorColor(sectors, activeId === "happiness" ? [...HAPPINESS_COLORS, ...SECTOR_COLORS] : SECTOR_COLORS)
+      setLists((prev) => ({ ...prev, [activeId]: [...prev[activeId], { id, name: clean, color }] }))
       return null
     },
     [activeId, sectors],
@@ -106,5 +113,42 @@ export function useSectors(setNotes: Dispatch<SetStateAction<Note[]>>) {
     [setNotes],
   )
 
-  return { view, setView, setId, setSetId, sectors, usedByOtherView, addSector, renameSector, removeSector, setOnCards }
+  /**
+   * Cards dropped on a sector get its hashtag and its color. Hashtags already on a card stay, so a card can
+   * belong to several sectors, and its paper keeps the color of the latest drop.
+   */
+  const dropOnSector = useCallback(
+    (ids: string[], sectorId: string): boolean => {
+      const sector = sectors.find((item) => item.id === sectorId)
+      if (!sector || ids.length === 0) return false
+      const tag = sectorTag(sector.name)
+      setNotes((prev) =>
+        prev.map((note) => {
+          if (!ids.includes(note.id)) return note
+          return { ...note, color: sector.color, hashtags: hasHashtag(note, tag) ? note.hashtags : [...note.hashtags, tag] }
+        }),
+      )
+      return true
+    },
+    [sectors, setNotes],
+  )
+
+  const closeSector = useCallback(() => setOpenSectorId(null), [])
+
+  return {
+    view,
+    setView,
+    setId,
+    setSetId,
+    sectors,
+    openSector,
+    setOpenSectorId,
+    closeSector,
+    usedByOtherView,
+    addSector,
+    renameSector,
+    removeSector,
+    setOnCards,
+    dropOnSector,
+  }
 }

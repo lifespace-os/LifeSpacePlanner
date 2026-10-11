@@ -2,9 +2,10 @@
 
 import { useId, useState } from "react"
 import clsx from "clsx"
-import { Check, ChevronRight, Minus, Plus, X } from "lucide-react"
+import { Check, ChevronRight, List, Minus, Plus, X } from "lucide-react"
 import {
   LIFE_SPHERE_SETS,
+  getCardColor,
   SECTOR_NAME_MAX,
   hasHashtag,
   sectorTag,
@@ -17,12 +18,12 @@ import {
 const COPY: Record<LabelView, { title: string; hint: string; other: string }> = {
   spheres: {
     title: "Life spheres",
-    hint: "Select cards, then switch on a sphere to give them its hashtag. A card may have none.",
+    hint: "Drag cards onto a sector of the wheel to give them its hashtag and color. Right-click a sector to list its cards.",
     other: "Happiness components",
   },
   happiness: {
     title: "Happiness components",
-    hint: "Select cards, then switch on a component to give them its hashtag. A card may have none.",
+    hint: "Drag cards onto a component of the wheel to give them its hashtag. Right-click a component to list its cards. Colors here are a prototype.",
     other: "Life spheres",
   },
 }
@@ -34,6 +35,9 @@ export function LabelsPanel({
   notes,
   selectedIds,
   usedByOtherView,
+  openSector,
+  dropOver,
+  onOpenSector,
   onSetId,
   onAdd,
   onRename,
@@ -47,6 +51,10 @@ export function LabelsPanel({
   notes: Note[]
   selectedIds: string[]
   usedByOtherView: (tag: string) => boolean
+  /** The sector whose cards are listed, or null. Its drop area is the second drop target of the window. */
+  openSector: Sector | null
+  dropOver: boolean
+  onOpenSector: (id: string | null) => void
   onSetId: (id: SphereSetId) => void
   onAdd: (name: string) => string | null
   onRename: (id: string, name: string) => string | null
@@ -124,27 +132,40 @@ export function LabelsPanel({
           : `${selected.length} ${selected.length === 1 ? "card" : "cards"} selected.`}
       </p>
 
-      <ul className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        {sectors.length === 0 ? <li className="px-3 py-4 text-sm text-ink-soft">No sectors. Add one below.</li> : null}
-        {sectors.map((sector) => (
-          <SectorRow
-            key={sector.id}
-            sector={sector}
-            count={notes.filter((note) => hasHashtag(note, sectorTag(sector.name))).length}
-            selected={selected}
-            confirming={confirmId === sector.id}
-            sharedWith={usedByOtherView(sectorTag(sector.name)) ? copy.other : null}
-            onRename={onRename}
-            onToggle={onToggle}
-            onAskRemove={() => setConfirmId(sector.id)}
-            onKeep={() => setConfirmId(null)}
-            onRemove={() => {
-              setConfirmId(null)
-              onRemove(sector.id)
-            }}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {openSector ? (
+          <OpenSector
+            sector={openSector}
+            cards={notes.filter((note) => hasHashtag(note, sectorTag(openSector.name)))}
+            dropOver={dropOver}
+            onClose={() => onOpenSector(null)}
+            onTakeOff={(id) => onToggle([id], sectorTag(openSector.name), false)}
           />
-        ))}
-      </ul>
+        ) : null}
+        <ul className="px-2 py-2">
+          {sectors.length === 0 ? <li className="px-3 py-4 text-sm text-ink-soft">No sectors. Add one below.</li> : null}
+          {sectors.map((sector) => (
+            <SectorRow
+              key={sector.id}
+              sector={sector}
+              count={notes.filter((note) => hasHashtag(note, sectorTag(sector.name))).length}
+              selected={selected}
+              confirming={confirmId === sector.id}
+              opened={openSector?.id === sector.id}
+              sharedWith={usedByOtherView(sectorTag(sector.name)) ? copy.other : null}
+              onOpen={() => onOpenSector(openSector?.id === sector.id ? null : sector.id)}
+              onRename={onRename}
+              onToggle={onToggle}
+              onAskRemove={() => setConfirmId(sector.id)}
+              onKeep={() => setConfirmId(null)}
+              onRemove={() => {
+                setConfirmId(null)
+                onRemove(sector.id)
+              }}
+            />
+          ))}
+        </ul>
+      </div>
 
       <form onSubmit={submit} className="border-t border-line p-4" noValidate>
         <label htmlFor={inputId} className="text-xs font-medium uppercase tracking-[0.16em] text-ink-soft">
@@ -188,7 +209,9 @@ function SectorRow({
   count,
   selected,
   confirming,
+  opened,
   sharedWith,
+  onOpen,
   onRename,
   onToggle,
   onAskRemove,
@@ -199,7 +222,9 @@ function SectorRow({
   count: number
   selected: Note[]
   confirming: boolean
+  opened: boolean
   sharedWith: string | null
+  onOpen: () => void
   onRename: (id: string, name: string) => string | null
   onToggle: (ids: string[], tag: string, on: boolean) => void
   onAskRemove: () => void
@@ -220,8 +245,13 @@ function SectorRow({
   }
 
   return (
-    <li className="rounded-lg px-1 py-1 hover:bg-desk">
+    <li className={clsx("rounded-lg px-1 py-1 hover:bg-desk", opened && "bg-desk")}>
       <div className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="size-3 shrink-0 rounded-full border border-ink/20"
+          style={{ backgroundColor: sector.color }}
+        />
         <button
           type="button"
           disabled={selected.length === 0}
@@ -264,6 +294,19 @@ function SectorRow({
         <span className="text-sm text-ink-soft tabular-nums" aria-label={`${count} cards`}>
           {count}
         </span>
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-pressed={opened}
+          aria-label={`List the cards in ${sector.name}`}
+          title="List the cards in this sector"
+          className={clsx(
+            "flex size-7 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-board hover:text-ink focus-visible:outline-2 focus-visible:outline-accent",
+            opened ? "bg-board text-ink" : "text-ink-soft",
+          )}
+        >
+          <List className="size-4" aria-hidden="true" />
+        </button>
         <button
           type="button"
           onClick={onAskRemove}
@@ -309,5 +352,82 @@ function SectorRow({
         </div>
       ) : null}
     </li>
+  )
+}
+
+function OpenSector({
+  sector,
+  cards,
+  dropOver,
+  onClose,
+  onTakeOff,
+}: {
+  sector: Sector
+  cards: Note[]
+  dropOver: boolean
+  onClose: () => void
+  onTakeOff: (id: string) => void
+}) {
+  const tag = sectorTag(sector.name)
+  return (
+    <section aria-label={`Cards in ${sector.name}`} className="mx-3 mt-3 rounded-xl border border-line bg-board p-3">
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="size-3 shrink-0 rounded-full border border-ink/20"
+          style={{ backgroundColor: sector.color }}
+        />
+        <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-ink">{sector.name}</h3>
+        <span className="text-xs text-ink-soft tabular-nums">
+          {cards.length} {cards.length === 1 ? "card" : "cards"}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close the card list"
+          className="flex size-6 shrink-0 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          <X className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div
+        data-sector-drop=""
+        role="group"
+        aria-label={`Drop area for ${sector.name}`}
+        className={clsx(
+          "mt-2.5 flex h-14 items-center justify-center rounded-lg border-2 border-dashed px-3 text-center text-xs text-pretty transition-colors",
+          dropOver ? "border-accent bg-accent/10 text-ink" : "border-line text-ink-soft",
+        )}
+      >
+        Drop cards here to add #{tag}
+      </div>
+
+      {cards.length === 0 ? (
+        <p className="mt-2.5 text-xs text-ink-soft">No card is in this sector yet.</p>
+      ) : (
+        <ul className="mt-2.5 flex max-h-40 flex-col gap-1 overflow-y-auto">
+          {cards.map((card) => (
+            <li key={card.id} className="flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-desk">
+              <span
+                aria-hidden="true"
+                className="size-3 shrink-0 rounded-sm border border-ink/20"
+                style={{ backgroundColor: getCardColor(card.color).fill }}
+              />
+              <span className="min-w-0 flex-1 truncate text-sm text-ink">{card.text.trim() || "Untitled card"}</span>
+              <button
+                type="button"
+                onClick={() => onTakeOff(card.id)}
+                aria-label={`Take #${tag} off ${card.text.trim().slice(0, 30) || "this card"}`}
+                title={`Take #${tag} off this card`}
+                className="flex size-6 shrink-0 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-board hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

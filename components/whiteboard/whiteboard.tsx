@@ -22,9 +22,11 @@ import {
   MIN_ZOOM,
   MODES,
   SAMPLE_NOTES,
+  WHEEL_REACH,
   ZONE_MIN_SIZE,
   ZONE_TAGS,
   areaTagAt,
+  sectorTag,
   getGoalLevel,
   getIkigaiItem,
   getMarker,
@@ -82,6 +84,7 @@ const ZOOM_STEP = 1.25
 const NO_IDS: string[] = []
 const FIT_PADDING = { top: 150, right: 60, bottom: 130, left: 60 }
 const IKIGAI_FIT_PADDING = { top: 270, right: 400, bottom: 130, left: 400 }
+const WHEEL_FIT_PADDING = { top: 200, right: 400, bottom: 130, left: 60 }
 const MAP_FIT_PADDING = { top: 200, right: 400, bottom: 110, left: 40 }
 
 function clampZoom(zoom: number) {
@@ -97,6 +100,22 @@ export function Whiteboard() {
   const [labelsOpen, setLabelsOpen] = useState(true)
   const sectorState = useSectors(setNotes)
   const labelView = sectorState.view
+  const { dropOnSector, setOpenSectorId } = sectorState
+  const sectorCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const sector of sectorState.sectors) {
+      const tag = sectorTag(sector.name)
+      counts[sector.id] = notes.filter((note) => hasHashtag(note, tag)).length
+    }
+    return counts
+  }, [notes, sectorState.sectors])
+  const openSectorWindow = useCallback(
+    (id: string) => {
+      setOpenSectorId(id)
+      setLabelsOpen(true)
+    },
+    [setOpenSectorId],
+  )
   const [mode, setMode] = useState<Mode>("unload")
   const [missionText, setMissionText] = useState("")
   const [missionOpen, setMissionOpen] = useState(false)
@@ -105,6 +124,7 @@ export function Whiteboard() {
   const [ikigaiActive, setIkigaiActive] = useState<string | null>(null)
   const [ikigaiCenter, setIkigaiCenter] = useState<IkigaiCenter>({ x: 0, y: 0 })
   const [goalMapCenter, setGoalMapCenter] = useState<IkigaiCenter | null>(null)
+  const [wheelCenter, setWheelCenter] = useState<IkigaiCenter | null>(null)
   const [stepsOpen, setStepsOpen] = useState(true)
   const [detailsOpen, setDetailsOpen] = useState(true)
   const [markerActive, setMarkerActive] = useState<string | null>(null)
@@ -203,7 +223,7 @@ export function Whiteboard() {
   const fitAll = useCallback(() => {
     const viewport = viewportRef.current
     if (!viewport) return
-    const cards = viewport.querySelectorAll<HTMLElement>("[data-note-card], [data-zone]")
+    const cards = viewport.querySelectorAll<HTMLElement>("[data-note-card], [data-zone], [data-wheel]")
     if (cards.length === 0) {
       updateView(() => ({ x: viewport.clientWidth / 2, y: viewport.clientHeight / 2, zoom: 1 }))
       return
@@ -218,7 +238,11 @@ export function Whiteboard() {
       maxX = Math.max(maxX, card.offsetLeft + card.offsetWidth)
       maxY = Math.max(maxY, card.offsetTop + card.offsetHeight)
     }
-    const padding = viewport.querySelector("[data-ikigai]") ? IKIGAI_FIT_PADDING : FIT_PADDING
+    const padding = viewport.querySelector("[data-wheel]")
+      ? WHEEL_FIT_PADDING
+      : viewport.querySelector("[data-ikigai]")
+        ? IKIGAI_FIT_PADDING
+        : FIT_PADDING
     const availW = Math.max(200, viewport.clientWidth - padding.left - padding.right)
     const availH = Math.max(200, viewport.clientHeight - padding.top - padding.bottom)
     const zoom = clampZoom(Math.min(availW / (maxX - minX), availH / (maxY - minY), 1.2))
@@ -308,7 +332,30 @@ export function Whiteboard() {
     setGoalMapCenter({ x: Math.round(right + IKIGAI_GAP + rings[rings.length - 1]), y: Math.round((top + bottom) / 2) })
   }, [mapOn, goalMapCenter, ikigaiCenter, screenToWorld])
 
-  const visibleLayer = mode === "clusters" ? clusterView : ikigaiOn ? "ikigai" : mapOn && goalMapCenter ? "map" : null
+  useLayoutEffect(() => {
+    if (mode !== "labels" || wheelCenter) return
+    const viewport = viewportRef.current
+    if (!viewport) return
+    let right = -Infinity
+    let top = Infinity
+    let bottom = -Infinity
+    viewport.querySelectorAll<HTMLElement>("[data-note-card]").forEach((card) => {
+      right = Math.max(right, card.offsetLeft + card.offsetWidth)
+      top = Math.min(top, card.offsetTop)
+      bottom = Math.max(bottom, card.offsetTop + card.offsetHeight)
+    })
+    if (right === -Infinity) {
+      const rect = viewport.getBoundingClientRect()
+      const open = screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2)
+      setWheelCenter({ x: Math.round(open.x), y: Math.round(open.y) })
+      return
+    }
+    setWheelCenter({ x: Math.round(right + IKIGAI_GAP + WHEEL_REACH), y: Math.round((top + bottom) / 2) })
+  }, [mode, wheelCenter, screenToWorld])
+
+  const wheelOn = mode === "labels" && wheelCenter !== null
+  const visibleLayer =
+    mode === "clusters" ? clusterView : ikigaiOn ? "ikigai" : mapOn && goalMapCenter ? "map" : wheelOn ? "wheel" : null
   useEffect(() => {
     if (!visibleLayer) return
     const frame = requestAnimationFrame(() => (visibleLayer === "map" ? fitMap(mapFocusRef.current) : fitAll()))
@@ -648,6 +695,10 @@ export function Whiteboard() {
         if (top.closest("[data-marker-drop]")) return "panel"
         return top.closest<HTMLElement>("[data-marker-item]")?.dataset.markerItem ?? null
       }
+      if (mode === "labels") {
+        if (top.closest("[data-sector-drop]")) return "panel"
+        return top.closest<HTMLElement>("[data-sector-item]")?.dataset.sectorItem ?? null
+      }
       if (top.closest("[data-ikigai-drop]")) return "panel"
       const item = top.closest<HTMLElement>("[data-ikigai-item]")?.dataset.ikigaiItem
       if (item) return item
@@ -655,7 +706,7 @@ export function Whiteboard() {
       const point = screenToWorld(clientX, clientY)
       return ikigaiRegionAt(point.x, point.y, ikigaiCenter)
     },
-    [goalsDropOn, ikigaiCenter, markersOn, screenToWorld],
+    [goalsDropOn, ikigaiCenter, markersOn, mode, screenToWorld],
   )
 
   const handleTagDrag = useCallback(
@@ -685,13 +736,17 @@ export function Whiteboard() {
         setSelectedIds(NO_IDS)
         return true
       }
+      if (mode === "labels") {
+        const sectorId = target === "panel" ? sectorState.openSector?.id : target
+        return sectorId ? dropOnSector(ids, sectorId) : false
+      }
       const item = getIkigaiItem(target === "panel" ? ikigaiActiveRef.current : target)
       if (!item) return false
       tagCards(ids, item.tag)
       if (target !== "panel") setIkigaiActive(item.id)
       return true
     },
-    [goalsDropOn, ikigaiTargetAt, markerActive, markersOn, tagCards],
+    [dropOnSector, goalsDropOn, ikigaiTargetAt, markerActive, markersOn, mode, sectorState.openSector, tagCards],
   )
 
   const deleteNote = useCallback((id: string) => {
@@ -890,7 +945,20 @@ export function Whiteboard() {
               }
             : null
         }
-        tagOnly={markersOn || goalsDropOn}
+        wheel={
+          wheelOn && wheelCenter
+            ? {
+                center: wheelCenter,
+                title: labelView === "happiness" ? "Happiness components" : "Life spheres",
+                sectors: sectorState.sectors,
+                counts: sectorCounts,
+                hoverId: dropHover && dropHover !== "panel" ? dropHover : null,
+                openId: sectorState.openSector?.id ?? null,
+                onOpen: openSectorWindow,
+              }
+            : null
+        }
+        tagOnly={markersOn || goalsDropOn || mode === "labels"}
         onZoneMove={moveZone}
         onZoneResize={resizeZone}
         onGroupMove={moveGroup}
@@ -1205,6 +1273,9 @@ export function Whiteboard() {
               notes={notes}
               selectedIds={selectedIds}
               usedByOtherView={sectorState.usedByOtherView}
+              openSector={sectorState.openSector}
+              dropOver={dropHover === "panel"}
+              onOpenSector={(id) => (id ? openSectorWindow(id) : sectorState.closeSector())}
               onSetId={sectorState.setSetId}
               onAdd={sectorState.addSector}
               onRename={sectorState.renameSector}
@@ -1277,6 +1348,7 @@ export function Whiteboard() {
           clientX={menu.clientX}
           clientY={menu.clientY}
           note={menuNote}
+          dockColor={dockColor}
           onClose={closeMenu}
           onColor={(color) => updateNote(menuNote.id, (note) => ({ ...note, color }))}
           onAddHashtag={(tag) =>

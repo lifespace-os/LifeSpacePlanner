@@ -24,6 +24,7 @@ import { SortZones } from "./sort-zones"
 import { GroupAreas } from "./group-areas"
 import { IkigaiCircles, IkigaiLabels } from "./ikigai-diagram"
 import { GoalMapLayer, type GoalMapCommit } from "./goal-map"
+import { SectorWheel, type SectorWheelBoardState } from "./sector-wheel"
 
 type PanState = {
   pointerId: number
@@ -83,6 +84,7 @@ export function Board({
   editingId,
   ikigai,
   goalMap,
+  wheel,
   tagOnly,
   onZoneMove,
   onZoneResize,
@@ -119,6 +121,8 @@ export function Board({
   ikigai: IkigaiBoardState | null
   /** Set only while Goals > Map is open. The rings are not drawn anywhere else. */
   goalMap: GoalMapBoardState | null
+  /** Set only while a Labels view is open. The wheel sits to the right of the cards and is a drop target. */
+  wheel: SectorWheelBoardState | null
   /** Markers view: cards move freely, and a drop on the marker area tags them and sends them back. */
   tagOnly: boolean
   onZoneMove: (id: ZoneId, dx: number, dy: number) => void
@@ -312,6 +316,8 @@ export function Board({
             hoverLens={hoverLens}
           />
         ) : null}
+
+        {wheel ? <SectorWheel wheel={wheel} /> : null}
 
         {goalMap ? (
           <GoalMapLayer
