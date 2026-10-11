@@ -32,25 +32,6 @@ const VIEW_TITLES: Record<GoalView, string> = {
   map: "Map",
 }
 
-/** A strip under the header that repeats the saved mission sentence, or says it is not written yet. */
-export function MissionStrip({ missionText }: { missionText: string }) {
-  const saved = missionText.length > 0
-  return (
-    <section
-      aria-label="Mission sentence"
-      className="pointer-events-auto w-fit max-w-xl shrink-0 rounded-xl border border-accent/30 bg-accent-soft/95 px-4 py-2.5 shadow-sm backdrop-blur"
-    >
-      {saved ? (
-        <p className="line-clamp-2 font-serif text-base leading-snug italic text-ink text-pretty break-words">
-          {`\u201C${missionText}\u201D`}
-        </p>
-      ) : (
-        <p className="text-sm text-ink-soft">The mission is not written yet.</p>
-      )}
-    </section>
-  )
-}
-
 /** The selected point, each goal above it, then the mission. It stops, and says so, where a link is missing. */
 function GoalChainList({ chain, missionText }: { chain: GoalChain; missionText: string }) {
   const saved = missionText.length > 0

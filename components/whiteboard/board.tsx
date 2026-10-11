@@ -6,6 +6,7 @@ import {
   getIkigaiItem,
   ikigaiRegionAt,
   type ClusterView,
+  type GoalNameMode,
   type IkigaiCenter,
   type Group,
   type MissionChoice,
@@ -48,9 +49,11 @@ export type IkigaiBoardState = {
 
 export type GoalMapBoardState = {
   center: IkigaiCenter
-  missionText: string
   /** Factor on the ring widths, set by the thickness control. */
   scale: number
+  /** Point diameter in world units, typed in the left window. */
+  pointSize: number
+  names: GoalNameMode
   selectedId: string | null
   showAllThreads: boolean
   /** The ring the list zoomed to, or null for the whole map. Only that ring's points show. */
@@ -59,6 +62,8 @@ export type GoalMapBoardState = {
   onSelect: (id: string) => void
   onMenu: (id: string, clientX: number, clientY: number) => void
   onCommit: (id: string, change: GoalMapCommit) => void
+  /** The Mission circle in the center: opens the window with the sentence, or the mission field when it is empty. */
+  onMission: () => void
 }
 
 const GRID = 22
@@ -311,9 +316,11 @@ export function Board({
         {goalMap ? (
           <GoalMapLayer
             center={goalMap.center}
-            missionText={goalMap.missionText}
-            notes={notes}
-            scale={goalMap.scale}
+              notes={notes}
+              scale={goalMap.scale}
+              pointSize={goalMap.pointSize}
+              names={goalMap.names}
+              onMission={goalMap.onMission}
             zoom={view.zoom}
             selectedId={goalMap.selectedId}
             showAllThreads={goalMap.showAllThreads}

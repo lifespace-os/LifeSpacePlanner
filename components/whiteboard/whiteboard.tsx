@@ -10,7 +10,7 @@ import {
   DEFAULT_GROUPS,
   DEFAULT_ZONES,
   GOAL_LEVELS,
-  GOAL_MAP_RADIUS,
+  GOAL_POINT_SIZE,
   GOAL_RING_SCALE,
   IKIGAI_GAP,
   goalLevelOf,
@@ -37,9 +37,11 @@ import {
   reconcile,
   retag,
   setGoalLevel,
+  spaceGoalPoints,
   zoneAreas,
   type CardColorId,
   type ClusterView,
+  type GoalNameMode,
   type GoalView,
   type Group,
   type IkigaiCenter,
@@ -64,8 +66,9 @@ import { ClustersPanel } from "./clusters-panel"
 import { MissionReadWindow, MissionWindow } from "./mission-window"
 import { IkigaiPanel } from "./ikigai-panel"
 import { MarkersPanel, MarkersWindow } from "./markers-panel"
-import { GoalsPanel, MissionStrip } from "./goals-panel"
-import { GoalMapControls, type GoalMapCommit } from "./goal-map"
+import { GoalsPanel } from "./goals-panel"
+import type { GoalMapCommit } from "./goal-map"
+import { GoalMapWindow } from "./goal-map-window"
 import { GoalCardPanel, type GoalDraft } from "./goal-card-panel"
 import { IkigaiStepsWindow } from "./ikigai-guide"
 import { CardDock } from "./card-dock"
@@ -107,6 +110,9 @@ export function Whiteboard() {
   const [mapFocus, setMapFocus] = useState<number | null>(null)
   const [mapScale, setMapScale] = useState(GOAL_RING_SCALE.initial)
   const [mapAllThreads, setMapAllThreads] = useState(false)
+  const [mapPointSize, setMapPointSize] = useState(GOAL_POINT_SIZE.initial)
+  const [mapNames, setMapNames] = useState<GoalNameMode>("pointer")
+  const [mapWindowOpen, setMapWindowOpen] = useState(true)
   const [goalCard, setGoalCard] = useState<{ id: string; fresh: boolean } | null>(null)
   const [dropHover, setDropHover] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>(NO_IDS)
@@ -292,7 +298,8 @@ export function Whiteboard() {
       setGoalMapCenter({ x: Math.round(open.x), y: Math.round(open.y) })
       return
     }
-    setGoalMapCenter({ x: Math.round(right + IKIGAI_GAP + GOAL_MAP_RADIUS), y: Math.round((top + bottom) / 2) })
+    const rings = goalMapEdges(mapScaleRef.current)
+    setGoalMapCenter({ x: Math.round(right + IKIGAI_GAP + rings[rings.length - 1]), y: Math.round((top + bottom) / 2) })
   }, [mapOn, goalMapCenter, ikigaiCenter, screenToWorld])
 
   const visibleLayer = mode === "clusters" ? clusterView : ikigaiOn ? "ikigai" : mapOn && goalMapCenter ? "map" : null
@@ -772,6 +779,18 @@ export function Whiteboard() {
     else openMissionView("sentence")
   }, [missionText, openMissionView])
 
+  const writeMapMission = useCallback(() => openMissionView("sentence"), [openMissionView])
+
+  const pressMapMission = useCallback(() => {
+    if (missionText.length > 0) setMapWindowOpen(true)
+    else openMissionView("sentence")
+  }, [missionText, openMissionView])
+
+  const spaceMapPoints = useCallback(
+    () => setNotes((prev) => spaceGoalPoints(prev, mapScale, mapPointSize)),
+    [mapScale, mapPointSize],
+  )
+
   const closeMenu = useCallback(() => setMenu(null), [])
   const clearSelection = useCallback(() => {
     setSelectedIds((prev) => (prev.length > 0 ? NO_IDS : prev))
@@ -841,8 +860,9 @@ export function Whiteboard() {
           mapOn && goalMapCenter
             ? {
                 center: goalMapCenter,
-                missionText,
                 scale: mapScale,
+                pointSize: mapPointSize,
+                names: mapNames,
                 selectedId: mapSelected,
                 showAllThreads: mapAllThreads,
                 focusRing: mapFocus,
@@ -850,6 +870,7 @@ export function Whiteboard() {
                 onSelect: setMapSelected,
                 onMenu: openCardMenu,
                 onCommit: commitMapPoint,
+                onMission: pressMapMission,
               }
             : null
         }
@@ -1065,15 +1086,6 @@ export function Whiteboard() {
       {goalsOn ? (
         <>
           <div className="pointer-events-none absolute top-[11.5rem] bottom-24 left-4 flex min-h-0 flex-col items-start gap-3">
-            {mapOn ? <MissionStrip missionText={missionText} /> : null}
-            {mapOn ? (
-              <GoalMapControls
-                scale={mapScale}
-                onScale={setMapScale}
-                showAll={mapAllThreads}
-                onShowAll={setMapAllThreads}
-              />
-            ) : null}
             {goalFormNote && goalCard ? (
               <GoalCardPanel
                 key={`${goalFormNote.id}:${goalFormNote.text}:${goalFormNote.parentId ?? ""}:${goalCard.fresh}`}
@@ -1087,6 +1099,43 @@ export function Whiteboard() {
               />
             ) : null}
           </div>
+          {mapOn ? (
+            <>
+              <div
+                inert={!mapWindowOpen}
+                aria-hidden={!mapWindowOpen}
+                className={`pointer-events-none absolute top-[11.5rem] bottom-24 left-4 flex transition-transform duration-300 ease-out motion-reduce:transition-none ${
+                  mapWindowOpen ? "translate-x-0" : "-translate-x-[calc(100%+1.5rem)]"
+                }`}
+              >
+                <GoalMapWindow
+                  missionText={missionText}
+                  scale={mapScale}
+                  pointSize={mapPointSize}
+                  names={mapNames}
+                  showAll={mapAllThreads}
+                  onWriteMission={writeMapMission}
+                  onScale={setMapScale}
+                  onPointSize={setMapPointSize}
+                  onNames={setMapNames}
+                  onShowAll={setMapAllThreads}
+                  onSpace={spaceMapPoints}
+                  onClose={() => setMapWindowOpen(false)}
+                />
+              </div>
+              {mapWindowOpen ? null : (
+                <button
+                  type="button"
+                  onClick={() => setMapWindowOpen(true)}
+                  aria-label="Show map window"
+                  title="Show map window"
+                  className="pointer-events-auto absolute top-[11.5rem] left-0 flex h-24 w-9 items-center justify-center rounded-r-xl border border-l-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <ChevronRight className="size-5" aria-hidden="true" />
+                </button>
+              )}
+            </>
+          ) : null}
           <div
             inert={!goalsPanelOpen}
             aria-hidden={!goalsPanelOpen}

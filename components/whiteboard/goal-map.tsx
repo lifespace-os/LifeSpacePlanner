@@ -2,10 +2,7 @@
 
 import { useRef, useState, type CSSProperties } from "react"
 import {
-  GOAL_MAP_RADIUS,
-  GOAL_MAP_SIZE,
   GOAL_RING_NAMES,
-  GOAL_RING_SCALE,
   GOAL_RING_TAGS,
   clampGoalAngle,
   getCardColor,
@@ -16,18 +13,12 @@ import {
   goalSectorStart,
   goalThreadsFor,
   layoutGoalMap,
+  type GoalNameMode,
   type IkigaiCenter,
   type Note,
 } from "@/lib/board-data"
 
-const HALF = GOAL_MAP_RADIUS
-
-const LOCAL_CENTER: IkigaiCenter = { x: HALF, y: HALF }
-
 const SECTOR = (2 * Math.PI) / 3
-
-/** At or above this zoom every point shows its name. Below it, only the hovered or selected point does. */
-const LABEL_ZOOM = 0.9
 
 const halo: CSSProperties = {
   paintOrder: "stroke",
@@ -43,21 +34,21 @@ export type GoalMapCommit = {
   level: string | null
 }
 
-function polar(radius: number, angle: number) {
-  return `${HALF + radius * Math.cos(angle)} ${HALF + radius * Math.sin(angle)}`
+function polar(half: number, radius: number, angle: number) {
+  return `${half + radius * Math.cos(angle)} ${half + radius * Math.sin(angle)}`
 }
 
-function annulus(inner: number, outer: number) {
-  const circle = (r: number) => `M ${HALF - r} ${HALF} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0 Z`
+function annulus(half: number, inner: number, outer: number) {
+  const circle = (r: number) => `M ${half - r} ${half} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 ${-2 * r} 0 Z`
   return `${circle(outer)} ${circle(inner)}`
 }
 
-function sector(inner: number, outer: number, from: number, to: number) {
+function sector(half: number, inner: number, outer: number, from: number, to: number) {
   return [
-    `M ${polar(outer, from)}`,
-    `A ${outer} ${outer} 0 0 1 ${polar(outer, to)}`,
-    `L ${polar(inner, to)}`,
-    `A ${inner} ${inner} 0 0 0 ${polar(inner, from)}`,
+    `M ${polar(half, outer, from)}`,
+    `A ${outer} ${outer} 0 0 1 ${polar(half, outer, to)}`,
+    `L ${polar(half, inner, to)}`,
+    `A ${inner} ${inner} 0 0 0 ${polar(half, inner, from)}`,
     "Z",
   ].join(" ")
 }
@@ -72,14 +63,15 @@ type Press = { id: string; pointerId: number; startX: number; startY: number; mo
 type DragState = { id: string; angle: number; level: string | null }
 
 /**
- * The Map: the mission at the center, four rings around it, and a point for every card that has a level.
+ * The Map: a small Mission circle at the center, four rings around it, and a point for every card that has a level.
  * It replaces the whiteboard cards while Map is open, and it moves with pan and zoom.
  */
 export function GoalMapLayer({
   center,
-  missionText,
   notes,
   scale,
+  pointSize,
+  names,
   zoom,
   selectedId,
   showAllThreads,
@@ -88,11 +80,13 @@ export function GoalMapLayer({
   onSelect,
   onMenu,
   onCommit,
+  onMission,
 }: {
   center: IkigaiCenter
-  missionText: string
   notes: Note[]
   scale: number
+  pointSize: number
+  names: GoalNameMode
   zoom: number
   selectedId: string | null
   showAllThreads: boolean
@@ -101,6 +95,7 @@ export function GoalMapLayer({
   onSelect: (id: string) => void
   onMenu: (id: string, clientX: number, clientY: number) => void
   onCommit: (id: string, change: GoalMapCommit) => void
+  onMission: () => void
 }) {
   const [drag, setDrag] = useState<DragState | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
@@ -108,15 +103,18 @@ export function GoalMapLayer({
   const dragRef = useRef<DragState | null>(null)
 
   const edges = goalMapEdges(scale)
-  const saved = missionText.length > 0
-  const { points, threads } = layoutGoalMap(notes, LOCAL_CENTER, {
+  const half = edges[edges.length - 1]
+  const size = half * 2
+  const { points, threads } = layoutGoalMap(notes, { x: half, y: half }, {
     scale,
+    pointSize,
     drag: drag ? { id: drag.id, angle: drag.angle } : null,
   })
   const byId = new Map(notes.map((note) => [note.id, note]))
   const shown = new Set(points.filter((p) => focusRing === null || p.ring === focusRing).map((p) => p.id))
   const chain = selectedId ? goalThreadsFor(notes, selectedId) : null
   const k = Math.max(1, Math.min(2.2, 0.75 / zoom))
+  const base = pointSize / 2
 
   const dragged = drag ? byId.get(drag.id) : null
   const hoverTag = drag && dragged && drag.level && drag.level !== goalLevelOf(dragged) ? drag.level : null
@@ -126,8 +124,15 @@ export function GoalMapLayer({
     const inner = edges[hoverRing]
     const outer = edges[hoverRing + 1]
     const index = GOAL_RING_TAGS[0].indexOf(hoverTag ?? "")
-    if (hoverRing > 0 || index < 0) return annulus(inner, outer)
-    return sector(inner, outer, goalSectorStart(index), goalSectorStart(index) + SECTOR)
+    if (hoverRing > 0 || index < 0) return annulus(half, inner, outer)
+    return sector(half, inner, outer, goalSectorStart(index), goalSectorStart(index) + SECTOR)
+  }
+
+  function showsName(id: string) {
+    if (drag?.id === id) return true
+    if (names === "always") return true
+    if (names === "selected") return selectedId === id
+    return hoverId === id
   }
 
   function moveTo(id: string, level: string, event: React.PointerEvent<SVGGElement>) {
@@ -179,20 +184,20 @@ export function GoalMapLayer({
     <div
       data-goal-map=""
       className="pointer-events-none absolute"
-      style={{ left: center.x - HALF, top: center.y - HALF, width: GOAL_MAP_SIZE, height: GOAL_MAP_SIZE }}
+      style={{ left: center.x - half, top: center.y - half, width: size, height: size }}
     >
       <svg
-        viewBox={`0 0 ${GOAL_MAP_SIZE} ${GOAL_MAP_SIZE}`}
-        width={GOAL_MAP_SIZE}
-        height={GOAL_MAP_SIZE}
+        viewBox={`0 0 ${size} ${size}`}
+        width={size}
+        height={size}
         role="group"
-        aria-label="Goal map. The mission is in the center, with rings for needs, dreams, and wants, life goals, project goals, and tasks."
+        aria-label="Goal map. The Mission circle is in the center, with rings for needs, dreams, and wants, life goals, project goals, and tasks."
         className="absolute inset-0 overflow-visible"
       >
         {GOAL_RING_NAMES.map((name, ring) => (
           <path
             key={name}
-            d={annulus(edges[ring], edges[ring + 1])}
+            d={annulus(half, edges[ring], edges[ring + 1])}
             fillRule="evenodd"
             fill="var(--color-accent)"
             fillOpacity={0.035 + ring * 0.03 + (focusRing === ring ? 0.08 : 0)}
@@ -203,10 +208,10 @@ export function GoalMapLayer({
         {GOAL_RING_TAGS[0].map((tag, i) => (
           <line
             key={tag}
-            x1={HALF + edges[0] * Math.cos(goalSectorStart(i))}
-            y1={HALF + edges[0] * Math.sin(goalSectorStart(i))}
-            x2={HALF + edges[1] * Math.cos(goalSectorStart(i))}
-            y2={HALF + edges[1] * Math.sin(goalSectorStart(i))}
+            x1={half + edges[0] * Math.cos(goalSectorStart(i))}
+            y1={half + edges[0] * Math.sin(goalSectorStart(i))}
+            x2={half + edges[1] * Math.cos(goalSectorStart(i))}
+            y2={half + edges[1] * Math.sin(goalSectorStart(i))}
             stroke="var(--color-line)"
             strokeWidth={3}
           />
@@ -224,34 +229,56 @@ export function GoalMapLayer({
           />
         ) : null}
 
-        <circle cx={HALF} cy={HALF} r={edges[0]} fill="var(--color-card)" stroke="var(--color-accent)" strokeWidth={4} />
-        <foreignObject
-          x={HALF - edges[0] + 28}
-          y={HALF - edges[0] + 28}
-          width={(edges[0] - 28) * 2}
-          height={(edges[0] - 28) * 2}
+        <g
+          data-goal-mission=""
+          data-board-control=""
+          role="button"
+          tabIndex={0}
+          aria-label="Mission"
+          className="group/mission pointer-events-auto cursor-pointer outline-none"
+          onPointerDown={(event) => {
+            if (event.button === 0) event.stopPropagation()
+          }}
+          onClick={onMission}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault()
+              onMission()
+            }
+          }}
         >
-          <div className="flex size-full items-center justify-center text-center">
-            {saved ? (
-              <p className="line-clamp-6 font-serif text-[22px] leading-snug text-pretty break-words text-ink italic">
-                {`\u201C${missionText}\u201D`}
-              </p>
-            ) : (
-              <p className="text-[20px] leading-snug text-pretty text-ink-soft">The mission is not written yet.</p>
-            )}
-          </div>
-        </foreignObject>
+          <circle
+            cx={half}
+            cy={half}
+            r={edges[0]}
+            strokeWidth={4}
+            className="fill-card stroke-accent transition-colors group-hover/mission:fill-desk group-focus-visible/mission:stroke-ink"
+          />
+          <text
+            x={half}
+            y={half}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={28}
+            fontWeight={600}
+            fill="var(--color-ink)"
+            pointerEvents="none"
+          >
+            Mission
+          </text>
+        </g>
 
         {GOAL_RING_NAMES.map((name, ring) => (
           <text
             key={name}
-            x={HALF}
-            y={HALF - (edges[ring] + edges[ring + 1]) / 2 + 6}
+            x={half}
+            y={half - (edges[ring] + edges[ring + 1]) / 2 + 6}
             textAnchor="middle"
             fontSize={20}
             fontWeight={600}
             letterSpacing={1.5}
             fill="var(--color-ink-soft)"
+            pointerEvents="none"
             style={halo}
           >
             {name.toUpperCase()}
@@ -262,11 +289,12 @@ export function GoalMapLayer({
           return (
             <text
               key={tag}
-              x={HALF + (edges[0] + 30) * Math.cos(angle)}
-              y={HALF + (edges[0] + 30) * Math.sin(angle) + 6}
+              x={half + (edges[0] + 30) * Math.cos(angle)}
+              y={half + (edges[0] + 30) * Math.sin(angle) + 6}
               textAnchor="middle"
               fontSize={18}
               fill="var(--color-ink-soft)"
+              pointerEvents="none"
               style={halo}
             >
               {getGoalLevel(tag)?.name}
@@ -317,6 +345,8 @@ export function GoalMapLayer({
               className="group/point pointer-events-auto cursor-grab outline-none active:cursor-grabbing"
               onPointerEnter={() => setHoverId(point.id)}
               onPointerLeave={() => setHoverId((current) => (current === point.id ? null : current))}
+              onFocus={() => setHoverId(point.id)}
+              onBlur={() => setHoverId((current) => (current === point.id ? null : current))}
               onPointerDown={(event) => {
                 if (event.button !== 0) return
                 event.stopPropagation()
@@ -343,11 +373,11 @@ export function GoalMapLayer({
               }}
               onKeyDown={(event) => handleKeyDown(event, point.id)}
             >
-              <circle cx={point.x} cy={point.y} r={22 * k} fill="transparent" />
+              <circle cx={point.x} cy={point.y} r={Math.max(22, base * 1.6) * k} fill="transparent" />
               <circle
                 cx={point.x}
                 cy={point.y}
-                r={(active ? 17 : 13) * k}
+                r={base * (active ? 1.55 : 1.18) * k}
                 fill="none"
                 stroke="var(--color-accent)"
                 strokeWidth={selected ? 4 * k : 3 * k}
@@ -357,7 +387,7 @@ export function GoalMapLayer({
               <circle
                 cx={point.x}
                 cy={point.y}
-                r={11 * k}
+                r={base * k}
                 fill={color.fill}
                 stroke="var(--color-ink)"
                 strokeWidth={2.5 * Math.min(k, 1.6)}
@@ -368,15 +398,13 @@ export function GoalMapLayer({
 
         {points.map((point) => {
           const note = byId.get(point.id)
-          if (!note || !shown.has(point.id)) return null
-          const show = zoom >= LABEL_ZOOM || selectedId === point.id || hoverId === point.id || drag?.id === point.id
-          if (!show) return null
+          if (!note || !shown.has(point.id) || !showsName(point.id)) return null
           return (
             <text
               key={point.id}
               data-goal-label={point.id}
               x={point.x}
-              y={point.y + 34 * k}
+              y={point.y + (base + 23) * k}
               textAnchor="middle"
               fontSize={16 * k}
               fill="var(--color-ink)"
@@ -389,51 +417,5 @@ export function GoalMapLayer({
         })}
       </svg>
     </div>
-  )
-}
-
-/** Two controls that belong to the Map and nothing else: ring thickness, and showing every thread. */
-export function GoalMapControls({
-  scale,
-  onScale,
-  showAll,
-  onShowAll,
-}: {
-  scale: number
-  onScale: (scale: number) => void
-  showAll: boolean
-  onShowAll: (showAll: boolean) => void
-}) {
-  return (
-    <section
-      aria-label="Map controls"
-      className="pointer-events-auto flex w-64 flex-col gap-3 rounded-xl border border-line bg-card px-4 py-3 shadow-sm"
-    >
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="goal-map-thickness" className="flex items-center justify-between text-xs font-medium text-ink">
-          Ring thickness
-          <span className="text-ink-soft tabular-nums">{Math.round(scale * 100)}%</span>
-        </label>
-        <input
-          id="goal-map-thickness"
-          type="range"
-          min={GOAL_RING_SCALE.min}
-          max={GOAL_RING_SCALE.max}
-          step={GOAL_RING_SCALE.step}
-          value={scale}
-          onChange={(event) => onScale(Number(event.target.value))}
-          className="w-full accent-accent"
-        />
-      </div>
-      <label className="flex items-center gap-2.5 text-sm text-ink">
-        <input
-          type="checkbox"
-          checked={showAll}
-          onChange={(event) => onShowAll(event.target.checked)}
-          className="size-4 accent-accent"
-        />
-        Show every thread
-      </label>
-    </section>
   )
 }

@@ -511,27 +511,31 @@ export function setGoalLevel(note: Note, tag: string): Note {
   return ring !== nextRing && kept.parentId ? { ...kept, parentId: null } : kept
 }
 
-/** Radius of the mission disc in canvas pixels. It does not change with ring thickness. */
-export const GOAL_MAP_MISSION_RADIUS = 170
+/** Radius of the small mission circle in canvas pixels. It does not change with ring thickness. */
+export const GOAL_MAP_MISSION_RADIUS = 110
 
 const GOAL_RING_WIDTHS = [120, 150, 200, 260]
 
-/** The thickness control: a factor on every ring width. */
-export const GOAL_RING_SCALE = { min: 0.6, max: 1.6, step: 0.1, initial: 1 }
+/** The thickness field: a factor on every ring width, typed as a percent. The top is a guard against a typo, not a design limit. */
+export const GOAL_RING_SCALE = { min: 0.2, max: 10, step: 0.1, initial: 1 }
 
-/** Radii of the Map: the mission disc, then four rings that widen toward the outside. */
+/** The point size field: the diameter of a point in canvas pixels. */
+export const GOAL_POINT_SIZE = { min: 8, max: 120, initial: 22 }
+
+export type GoalNameMode = "pointer" | "selected" | "always"
+
+export const GOAL_NAME_MODES: { id: GoalNameMode; label: string }[] = [
+  { id: "pointer", label: "Under the pointer" },
+  { id: "selected", label: "On the selected point" },
+  { id: "always", label: "Always" },
+]
+
+/** Radii of the Map: the mission circle, then four rings that widen toward the outside. */
 export function goalMapEdges(scale = GOAL_RING_SCALE.initial): number[] {
   const edges = [GOAL_MAP_MISSION_RADIUS]
   for (const width of GOAL_RING_WIDTHS) edges.push(edges[edges.length - 1] + width * scale)
   return edges
 }
-
-const MAX_EDGES = goalMapEdges(GOAL_RING_SCALE.max)
-
-/** Half the frame the Map is drawn in. It fits the thickest rings, so the frame never moves. */
-export const GOAL_MAP_RADIUS = MAX_EDGES[MAX_EDGES.length - 1]
-
-export const GOAL_MAP_SIZE = GOAL_MAP_RADIUS * 2
 
 /** Radius the points of a ring sit on. The first ring keeps its points toward the outer edge, clear of its title. */
 export function goalRingRadius(edges: number[], ring: number) {
@@ -691,10 +695,11 @@ const POINT_GAP = 78
 export function layoutGoalMap(
   notes: Note[],
   center: IkigaiCenter,
-  options: { scale?: number; drag?: { id: string; angle: number } | null } = {},
+  options: { scale?: number; pointSize?: number; drag?: { id: string; angle: number } | null } = {},
 ): { points: GoalMapPoint[]; threads: GoalMapThread[] } {
   const edges = goalMapEdges(options.scale)
   const drag = options.drag ?? null
+  const pointGap = Math.max(POINT_GAP, (options.pointSize ?? GOAL_POINT_SIZE.initial) * 2.4)
   const byId = new Map(notes.map((note) => [note.id, note]))
   const angles = new Map<string, number>()
 
@@ -721,7 +726,7 @@ export function layoutGoalMap(
       return { note, angle: drag?.id === note.id ? drag.angle : (note.mapAngle ?? fallback) }
     })
     wanted.sort((a, b) => a.angle - b.angle)
-    const gap = Math.min(POINT_GAP / radius, (2 * Math.PI) / Math.max(1, wanted.length))
+    const gap = Math.min(pointGap / radius, (2 * Math.PI) / Math.max(1, wanted.length))
     wanted.forEach((entry, i) => {
       if (drag?.id === entry.note.id) {
         angles.set(entry.note.id, entry.angle)
@@ -760,6 +765,28 @@ export function layoutGoalMap(
     if (to) threads.push({ id: note.id, to: link, x1: from.x, y1: from.y, x2: to.x, y2: to.y })
   }
   return { points, threads }
+}
+
+/**
+ * Spaces the points of every ring evenly along that ring, keeping their order.
+ * The first ring spaces each level inside its own sector. Only the saved angle changes.
+ */
+export function spaceGoalPoints(notes: Note[], scale: number, pointSize?: number): Note[] {
+  const { points } = layoutGoalMap(notes, { x: 0, y: 0 }, { scale, pointSize })
+  const angles = new Map<string, number>()
+  for (let ring = 1; ring < GOAL_RING_TAGS.length; ring++) {
+    const onRing = points.filter((point) => point.ring === ring).sort((a, b) => a.angle - b.angle)
+    onRing.forEach((point, i) => {
+      angles.set(point.id, goalAngle(onRing[0].angle + (2 * Math.PI * i) / onRing.length))
+    })
+  }
+  return notes.map((note) => {
+    const ring = goalRingOf(note)
+    if (ring < 0) return note
+    if (ring === 0) return note.mapAngle == null ? note : { ...note, mapAngle: null }
+    const angle = angles.get(note.id)
+    return angle === undefined ? note : { ...note, mapAngle: angle }
+  })
 }
 
 export const GROUP_MIN_SIZE = { width: 260, height: 220 }
