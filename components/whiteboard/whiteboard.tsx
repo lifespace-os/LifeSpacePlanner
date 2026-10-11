@@ -61,7 +61,7 @@ import { ModeBar } from "./mode-bar"
 import { Board } from "./board"
 import { Inspector } from "./inspector"
 import { ClustersPanel } from "./clusters-panel"
-import { MissionWindow } from "./mission-window"
+import { MissionReadWindow, MissionWindow } from "./mission-window"
 import { IkigaiPanel } from "./ikigai-panel"
 import { MarkersPanel, MarkersWindow } from "./markers-panel"
 import { GoalsPanel, MissionStrip } from "./goals-panel"
@@ -91,6 +91,7 @@ export function Whiteboard() {
   const [mode, setMode] = useState<Mode>("unload")
   const [missionText, setMissionText] = useState("")
   const [missionOpen, setMissionOpen] = useState(false)
+  const [missionReadOpen, setMissionReadOpen] = useState(false)
   const [missionView, setMissionView] = useState<MissionView>("sentence")
   const [ikigaiActive, setIkigaiActive] = useState<string | null>(null)
   const [ikigaiCenter, setIkigaiCenter] = useState<IkigaiCenter>({ x: 0, y: 0 })
@@ -713,6 +714,7 @@ export function Whiteboard() {
       setMode(next)
       setMenu(null)
       setDropHover(null)
+      setMissionReadOpen(false)
       setMissionOpen(next === "mission" && missionView === "sentence" && missionText.length === 0)
     },
     [missionText, missionView],
@@ -751,6 +753,7 @@ export function Whiteboard() {
     setMenu(null)
     setDropHover(null)
     setMissionOpen(false)
+    setMissionReadOpen(false)
   }, [])
 
   const hideSteps = useCallback(() => setStepsOpen(false), [])
@@ -762,6 +765,12 @@ export function Whiteboard() {
   }, [])
 
   const closeMission = useCallback(() => setMissionOpen(false), [])
+  const closeMissionRead = useCallback(() => setMissionReadOpen(false), [])
+
+  const pressMissionButton = useCallback(() => {
+    if (missionText.length > 0) setMissionReadOpen(true)
+    else openMissionView("sentence")
+  }, [missionText, openMissionView])
 
   const closeMenu = useCallback(() => setMenu(null), [])
   const clearSelection = useCallback(() => {
@@ -874,9 +883,10 @@ export function Whiteboard() {
           clusterView={clusterView}
           missionView={missionView}
           goalView={goalView}
-          missionText={missionText}
-        />
-        <div className="pointer-events-auto flex items-center gap-2">
+  missionText={missionText}
+  onMissionButton={pressMissionButton}
+  />
+  <div className="pointer-events-auto flex items-center gap-2">
           <ModeSwitcher
             mode={mode}
             clusterView={clusterView}
@@ -1055,7 +1065,7 @@ export function Whiteboard() {
       {goalsOn ? (
         <>
           <div className="pointer-events-none absolute top-[11.5rem] bottom-24 left-4 flex min-h-0 flex-col items-start gap-3">
-            <MissionStrip missionText={missionText} />
+            {mapOn ? <MissionStrip missionText={missionText} /> : null}
             {mapOn ? (
               <GoalMapControls
                 scale={mapScale}
@@ -1137,6 +1147,10 @@ export function Whiteboard() {
 
       {missionOpen && mode === "mission" ? (
         <MissionWindow initialText={missionText} onSave={saveMission} onCancel={closeMission} />
+      ) : null}
+
+      {missionReadOpen && goalsOn && missionText.length > 0 ? (
+        <MissionReadWindow text={missionText} onClose={closeMissionRead} />
       ) : null}
 
       {menu?.kind === "canvas" ? (

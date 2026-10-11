@@ -3,6 +3,54 @@
 import { useEffect, useId, useRef, useState } from "react"
 import { MISSION_MAX_LENGTH } from "@/lib/board-data"
 
+/** Shows the saved mission sentence on its own. It is not placed on the canvas. */
+export function MissionReadWindow({ text, onClose }: { text: string; onClose: () => void }) {
+  const titleId = useId()
+  const closeRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    closeRef.current?.focus()
+  }, [])
+
+  return (
+    <div
+      className="absolute inset-0 z-40 flex items-start justify-center bg-ink/15 px-4 pt-[18dvh]"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+      onWheel={(event) => event.stopPropagation()}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault()
+            onClose()
+          }
+        }}
+        className="w-full max-w-xl rounded-2xl border border-line bg-board p-5 shadow-[0_24px_60px_-20px_rgba(35,39,43,0.55)]"
+      >
+        <h2 id={titleId} className="text-[11px] font-medium uppercase tracking-[0.18em] text-accent">
+          Mission
+        </h2>
+        <p className="mt-2 font-serif text-2xl leading-snug italic text-pretty break-words text-ink">{`\u201C${text}\u201D`}</p>
+        <div className="mt-4 flex justify-end">
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-ink px-4 py-2 text-sm font-medium text-board shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function MissionWindow({
   initialText,
   onSave,

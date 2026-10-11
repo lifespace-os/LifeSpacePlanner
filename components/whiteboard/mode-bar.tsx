@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useId, useState } from "react"
 import clsx from "clsx"
+import { Quote } from "lucide-react"
 import type { ClusterView, GoalView, MODES, MissionView, Note } from "@/lib/board-data"
 
 type ModeInfo = (typeof MODES)[number]
@@ -36,6 +37,7 @@ export function ModeBar({
   missionView,
   goalView,
   missionText,
+  onMissionButton,
 }: {
   mode: ModeInfo
   notes: Note[]
@@ -43,6 +45,7 @@ export function ModeBar({
   missionView: MissionView
   goalView: GoalView
   missionText: string
+  onMissionButton: () => void
 }) {
   const isMission = mode.id === "mission"
   const saved = missionText.length > 0
@@ -62,7 +65,24 @@ export function ModeBar({
   const open = notes.length - kept - released
 
   return (
-    <CornerCard name={mode.name} tone={isMission ? "mission" : "plain"}>
+    <CornerCard
+      name={mode.name}
+      tone={isMission ? "mission" : "plain"}
+      action={
+        mode.id === "goals" && goalView !== "map" ? (
+          <button
+            type="button"
+            onClick={onMissionButton}
+            aria-label={saved ? "Show the mission sentence" : "Write the mission sentence"}
+            title={saved ? "Show the mission sentence" : "Write the mission sentence"}
+            className="flex items-center gap-1.5 rounded-lg border border-accent/40 bg-accent-soft px-2.5 py-1 text-sm font-medium text-ink transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <Quote className="size-4" aria-hidden="true" />
+            Mission
+          </button>
+        ) : null
+      }
+    >
       {isMission && saved ? (
         <blockquote className="mt-1 line-clamp-3 font-serif text-xl leading-snug italic text-ink text-pretty break-words">
           {`\u201C${missionText}\u201D`}
@@ -88,10 +108,12 @@ export function ModeBar({
 function CornerCard({
   name,
   tone,
+  action,
   children,
 }: {
   name: string
   tone: "plain" | "mission"
+  action: React.ReactNode
   children: React.ReactNode
 }) {
   const [expanded, setExpanded] = useState(true)
@@ -112,17 +134,20 @@ function CornerCard({
           tone === "mission" ? "max-w-xl border-accent/30 bg-accent-soft/95" : "border-line bg-board/95",
         )}
       >
-        <h1 className="font-serif text-3xl leading-tight font-medium tracking-tight">
-          <button
-            type="button"
-            aria-expanded={expanded}
-            aria-controls={regionId}
-            onClick={() => setExpanded((value) => !value)}
-            className="rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            {name}
-          </button>
-        </h1>
+        <div className="flex items-center gap-3">
+          <h1 className="font-serif text-3xl leading-tight font-medium tracking-tight">
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={regionId}
+              onClick={() => setExpanded((value) => !value)}
+              className="rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {name}
+            </button>
+          </h1>
+          {action}
+        </div>
         {children}
       </section>
     </ExplanationContext.Provider>
