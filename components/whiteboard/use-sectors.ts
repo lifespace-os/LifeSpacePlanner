@@ -1,7 +1,9 @@
 "use client"
 
-import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from "react"
+import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import {
+  BUDGET_COLORS,
+  BUDGET_ZONE_IDS,
   HAPPINESS_COLORS,
   SCORE_MAX,
   SECTOR_COLORS,
@@ -151,7 +153,22 @@ export function useSectors(setNotes: Dispatch<SetStateAction<Note[]>>) {
 
   const closeSector = useCallback(() => setOpenSectorId(null), [])
 
+  /**
+   * The color of every Labels hashtag: a sector's color or a zone's color. When two lists share a name, the
+   * list in view wins, then the other view's list, then the remaining sets. The zones come last.
+   */
+  const tagColors = useMemo(() => {
+    const order: SectorListId[] = [activeId, otherId, ...(Object.keys(lists) as SectorListId[]).filter((id) => id !== activeId && id !== otherId)]
+    const colors: Record<string, string> = {}
+    for (const id of BUDGET_ZONE_IDS) colors[id] = BUDGET_COLORS[id]
+    for (const listId of [...order].reverse()) {
+      for (const sector of lists[listId]) colors[sectorTag(sector.name)] = sector.color
+    }
+    return colors
+  }, [activeId, otherId, lists])
+
   return {
+    tagColors,
     view,
     setView,
     wheelOnly,

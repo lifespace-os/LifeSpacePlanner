@@ -4,6 +4,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import clsx from "clsx"
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
 import {
+  BUDGET_TAGS,
+  BUDGET_ZONE_GAP,
+  BUDGET_ZONE_SIZE,
+  budgetAreas,
+  type BudgetZoneId,
+  type BudgetZones,
   CARD_MIN_HEIGHT,
   CARD_WIDTH,
   DEFAULT_GOAL_PLAN,
@@ -68,6 +74,7 @@ import { Board } from "./board"
 import { Inspector } from "./inspector"
 import { ClustersPanel } from "./clusters-panel"
 import { LabelsPanel } from "./labels-panel"
+import { BudgetPanel } from "./budget-panel"
 import { useSectors } from "./use-sectors"
 import type { WheelPoint } from "./sector-wheel"
 import { MissionReadWindow, MissionWindow } from "./mission-window"
@@ -96,6 +103,10 @@ function clampZoom(zoom: number) {
 export function Whiteboard() {
   const [notes, setNotes] = useState<Note[]>(SAMPLE_NOTES)
   const [zones, setZones] = useState<Zones>(DEFAULT_ZONES)
+  const [budgetZones, setBudgetZones] = useState<BudgetZones>({
+    investment: { left: 0, top: 0, ...BUDGET_ZONE_SIZE },
+    expense: { left: BUDGET_ZONE_SIZE.width + BUDGET_ZONE_GAP, top: 0, ...BUDGET_ZONE_SIZE },
+  })
   const [groups, setGroups] = useState<Group[]>(DEFAULT_GROUPS)
   const [clusterView, setClusterView] = useState<ClusterView>("wantmust")
   const [groupsOpen, setGroupsOpen] = useState(true)
@@ -342,7 +353,7 @@ export function Whiteboard() {
   }, [mapOn, goalMapCenter, ikigaiCenter, screenToWorld])
 
   useLayoutEffect(() => {
-    if (mode !== "labels" || wheelCenter) return
+    if (mode !== "labels" || labelView === "budget" || wheelCenter) return
     const viewport = viewportRef.current
     if (!viewport) return
     let right = -Infinity
@@ -360,11 +371,22 @@ export function Whiteboard() {
       return
     }
     setWheelCenter({ x: Math.round(right + IKIGAI_GAP + WHEEL_REACH), y: Math.round((top + bottom) / 2) })
-  }, [mode, wheelCenter, screenToWorld])
+  }, [mode, labelView, wheelCenter, screenToWorld])
 
-  const wheelOn = mode === "labels" && wheelCenter !== null
+  const budgetOn = mode === "labels" && labelView === "budget"
+  const wheelOn = mode === "labels" && !budgetOn && wheelCenter !== null
   const visibleLayer =
-    mode === "clusters" ? clusterView : ikigaiOn ? "ikigai" : mapOn && goalMapCenter ? "map" : wheelOn ? "wheel" : null
+    mode === "clusters"
+      ? clusterView
+      : ikigaiOn
+        ? "ikigai"
+        : mapOn && goalMapCenter
+          ? "map"
+          : budgetOn
+            ? "budget"
+            : wheelOn
+              ? "wheel"
+              : null
   useEffect(() => {
     if (!visibleLayer) return
     const frame = requestAnimationFrame(() => (visibleLayer === "map" ? fitMap(mapFocusRef.current) : fitAll()))
@@ -378,10 +400,11 @@ export function Whiteboard() {
   }, [mapOn])
 
   const layer = useMemo<{ areas: TaggedArea[]; tags: string[] } | null>(() => {
+    if (budgetOn) return { areas: budgetAreas(budgetZones), tags: BUDGET_TAGS }
     if (mode !== "clusters") return null
     if (clusterView === "wantmust") return { areas: zoneAreas(zones), tags: ZONE_TAGS }
     return { areas: groupAreas(groups), tags: groups.map((g) => g.tag) }
-  }, [mode, clusterView, zones, groups])
+  }, [budgetOn, budgetZones, mode, clusterView, zones, groups])
 
   const updateNote = useCallback((id: string, change: (note: Note) => Note) => {
     setNotes((prev) => prev.map((note) => (note.id === id ? change(note) : note)))
@@ -569,6 +592,34 @@ export function Whiteboard() {
       reshapeAreas(ZONE_TAGS, zoneAreas(zones), zoneAreas(next), null, 0, 0)
     },
     [reshapeAreas, zones],
+  )
+
+  const moveBudgetZone = useCallback(
+    (id: BudgetZoneId, dx: number, dy: number) => {
+      const next: BudgetZones = {
+        ...budgetZones,
+        [id]: { ...budgetZones[id], left: budgetZones[id].left + dx, top: budgetZones[id].top + dy },
+      }
+      setBudgetZones(next)
+      reshapeAreas(BUDGET_TAGS, budgetAreas(budgetZones), budgetAreas(next), id, dx, dy)
+    },
+    [budgetZones, reshapeAreas],
+  )
+
+  const resizeBudgetZone = useCallback(
+    (id: BudgetZoneId, zone: Zone) => {
+      const next: BudgetZones = {
+        ...budgetZones,
+        [id]: {
+          ...zone,
+          width: Math.max(ZONE_MIN_SIZE.width, zone.width),
+          height: Math.max(ZONE_MIN_SIZE.height, zone.height),
+        },
+      }
+      setBudgetZones(next)
+      reshapeAreas(BUDGET_TAGS, budgetAreas(budgetZones), budgetAreas(next), null, 0, 0)
+    },
+    [budgetZones, reshapeAreas],
   )
 
   const moveGroup = useCallback(
@@ -970,7 +1021,8 @@ export function Whiteboard() {
               }
             : null
         }
-        tagOnly={markersOn || goalsDropOn || mode === "labels"}
+        budget={budgetOn ? { zones: budgetZones, onMove: moveBudgetZone, onResize: resizeBudgetZone } : null}
+        tagOnly={markersOn || goalsDropOn || (mode === "labels" && !budgetOn)}
         onZoneMove={moveZone}
         onZoneResize={resizeZone}
         onGroupMove={moveGroup}
@@ -1194,6 +1246,7 @@ export function Whiteboard() {
                 notes={notes}
                 missionText={missionText}
                 fresh={goalCard.fresh}
+                tagColors={sectorState.tagColors}
                 onSave={saveGoalCard}
                 onSplit={splitGoalCard}
                 onClose={() => setGoalCard(null)}
@@ -1280,6 +1333,13 @@ export function Whiteboard() {
               labelsOpen ? "translate-x-0" : "translate-x-[calc(100%+1.5rem)]"
             }`}
           >
+            {labelView === "budget" ? (
+              <BudgetPanel
+                notes={notes}
+                selectedIds={selectedIds}
+                onClose={() => setLabelsOpen(false)}
+              />
+            ) : (
             <LabelsPanel
               view={labelView}
               setId={sectorState.setId}
@@ -1298,6 +1358,7 @@ export function Whiteboard() {
               onScore={sectorState.setScore}
               onClose={() => setLabelsOpen(false)}
             />
+            )}
           </div>
           {labelsOpen ? null : (
             <button
@@ -1364,6 +1425,7 @@ export function Whiteboard() {
           clientY={menu.clientY}
           note={menuNote}
           dockColor={dockColor}
+          tagColors={sectorState.tagColors}
           onClose={closeMenu}
           onColor={(color) => updateNote(menuNote.id, (note) => ({ ...note, color }))}
           onAddHashtag={(tag) =>

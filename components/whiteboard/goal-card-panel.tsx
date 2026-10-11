@@ -125,9 +125,12 @@ export function GoalCardPanel({
   onSave,
   onSplit,
   onClose,
+  tagColors,
 }: {
   note: Note
   notes: Note[]
+  /** Labels hashtags show in the color of their sector or zone. */
+  tagColors?: Record<string, string>
   missionText: string
   /** True right after the card was created, when the reminder shows. */
   fresh: boolean
@@ -193,7 +196,14 @@ export function GoalCardPanel({
           <h2 className="mt-1 font-serif text-2xl leading-tight font-medium text-balance">{level?.name ?? "Goal"}</h2>
           <p className="mt-1 flex flex-wrap gap-1.5">
             {note.hashtags.map((tag) => (
-              <span key={tag} className="rounded-full bg-desk px-2 py-0.5 text-xs text-ink-soft">
+              <span
+                key={tag}
+                style={tagColors?.[tag.toLowerCase()] ? { backgroundColor: tagColors[tag.toLowerCase()] } : undefined}
+                className={clsx(
+                  "rounded-full px-2 py-0.5 text-xs",
+                  tagColors?.[tag.toLowerCase()] ? "text-ink" : "bg-desk text-ink-soft",
+                )}
+              >
                 #{tag}
               </span>
             ))}

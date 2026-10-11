@@ -4,6 +4,7 @@ import { MODES, type ClusterView, type GoalView, type LabelView, type Mode, type
 const LABEL_CONTROLS: { id: LabelView; name: string }[] = [
   { id: "spheres", name: "Life spheres" },
   { id: "happiness", name: "Happiness components" },
+  { id: "budget", name: "Investment and Expense" },
 ]
 
 const GOAL_CONTROLS: { id: GoalView; name: string }[] = [
@@ -96,7 +97,7 @@ export function ModeSwitcher({
                 items={LABEL_CONTROLS}
                 current={labelView}
                 onPick={onLabelView}
-                toggle={{ name: "Wheel view", pressed: wheelOnly, onToggle: onWheelOnly }}
+                toggle={labelView === "budget" ? undefined : { name: "Wheel view", pressed: wheelOnly, onToggle: onWheelOnly }}
               />
             ) : null}
             {active && m.id === "mission" ? (

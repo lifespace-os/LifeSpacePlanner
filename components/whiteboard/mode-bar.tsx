@@ -19,6 +19,8 @@ const LABEL_HINTS: Record<LabelView, string> = {
   spheres: "Select cards, then switch on a life sphere in the window. A sphere is a hashtag. A card may have none.",
   happiness:
     "Select cards, then switch on a happiness component in the window. A component is a hashtag. A card may have none.",
+  budget:
+    "Drop a card in Investment for #investment or in Expense for #expense. Each drop removes the other hashtag. A card may stay outside both.",
 }
 
 const IKIGAI_HINT = "Pick a step or a circle, then drop cards on it to add its hashtag. Cards stay where they are."

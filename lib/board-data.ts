@@ -2,7 +2,7 @@ export type Mode = "unload" | "clusters" | "mission" | "goals" | "labels" | "tas
 
 export type ClusterView = "wantmust" | "groups"
 
-export type LabelView = "spheres" | "happiness"
+export type LabelView = "spheres" | "happiness" | "budget"
 
 export type MissionView = "sentence" | "ikigai" | "markers"
 
@@ -318,6 +318,29 @@ export const ZONE_TAGS: string[] = ZONE_IDS
 
 export function zoneAreas(zones: Zones): TaggedArea[] {
   return ZONE_IDS.map((id) => ({ ...zones[id], tag: id }))
+}
+
+/** The two zones of the Labels > Investment and Expense view. A card may sit in one or in neither. */
+export type BudgetZoneId = "investment" | "expense"
+
+export type BudgetZones = Record<BudgetZoneId, Zone>
+
+export const BUDGET_ZONE_IDS: BudgetZoneId[] = ["investment", "expense"]
+
+export const BUDGET_TAGS: string[] = BUDGET_ZONE_IDS
+
+export const BUDGET_ZONE_SIZE = { width: 520, height: 480 }
+
+export const BUDGET_ZONE_GAP = 60
+
+/** Colors of the two zones. Their hashtags are shown in these colors in the Tags and task windows. */
+export const BUDGET_COLORS: Record<BudgetZoneId, `#${string}`> = {
+  investment: "#7fbf9a",
+  expense: "#e0a07f",
+}
+
+export function budgetAreas(zones: BudgetZones): TaggedArea[] {
+  return BUDGET_ZONE_IDS.map((id) => ({ ...zones[id], tag: id }))
 }
 
 export function groupAreas(groups: Group[]): TaggedArea[] {

@@ -102,6 +102,7 @@ export function CardMenu({
   onAddHashtag,
   onRemoveHashtag,
   goalAbove,
+  tagColors,
   fields,
   showEditWords,
   onEdit,
@@ -111,6 +112,8 @@ export function CardMenu({
   clientX: number
   clientY: number
   note: Note
+  /** Labels hashtags show in the color of their sector or zone. Other hashtags keep the plain look. */
+  tagColors?: Record<string, string>
   /** The color new cards start with. A sector drop can replace a card's color, and this puts it back. */
   dockColor: CardColorId
   onColor: (color: CardColorId) => void
@@ -291,7 +294,11 @@ export function CardMenu({
                   type="button"
                   onClick={() => onRemoveHashtag(tag)}
                   aria-label={`Remove hashtag ${tag}`}
-                  className="inline-flex items-center gap-1 rounded-full border border-line bg-board py-0.5 pr-1.5 pl-2 text-xs font-medium text-ink-soft transition-colors hover:border-release/40 hover:text-release focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+                  style={tagColors?.[tag.toLowerCase()] ? { backgroundColor: tagColors[tag.toLowerCase()] } : undefined}
+                  className={clsx(
+                    "inline-flex items-center gap-1 rounded-full border py-0.5 pr-1.5 pl-2 text-xs font-medium transition-colors hover:border-release/40 hover:text-release focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent",
+                    tagColors?.[tag.toLowerCase()] ? "border-ink/15 text-ink" : "border-line bg-board text-ink-soft",
+                  )}
                 >
                   #{tag}
                   <X className="size-3" aria-hidden="true" />

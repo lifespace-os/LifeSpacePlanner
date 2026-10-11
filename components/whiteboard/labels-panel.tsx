@@ -16,7 +16,9 @@ import {
   type SphereSetId,
 } from "@/lib/board-data"
 
-const COPY: Record<LabelView, { title: string; hint: string; other: string }> = {
+type SectorView = Exclude<LabelView, "budget">
+
+const COPY: Record<SectorView, { title: string; hint: string; other: string }> = {
   spheres: {
     title: "Life spheres",
     hint: "Drag cards onto a sector of the wheel to give them its hashtag and color. Click or right-click a sector to list its cards and set its satisfaction.",
@@ -47,7 +49,7 @@ export function LabelsPanel({
   onScore,
   onClose,
 }: {
-  view: LabelView
+  view: SectorView
   setId: SphereSetId
   sectors: Sector[]
   notes: Note[]

@@ -13,6 +13,8 @@ import {
   type Mode,
   type Note,
   type View,
+  type BudgetZoneId,
+  type BudgetZones,
   type Zone,
   type ZoneId,
   type Zones,
@@ -21,6 +23,7 @@ import type { GroupMove } from "@/lib/group-drag"
 import { NoteCard } from "./note-card"
 import { SelectionBox } from "./selection-box"
 import { SortZones } from "./sort-zones"
+import { BudgetZonesLayer } from "./budget-zones"
 import { GroupAreas } from "./group-areas"
 import { IkigaiCircles, IkigaiLabels } from "./ikigai-diagram"
 import { GoalMapLayer, type GoalMapCommit } from "./goal-map"
@@ -85,6 +88,7 @@ export function Board({
   ikigai,
   goalMap,
   wheel,
+  budget,
   tagOnly,
   onZoneMove,
   onZoneResize,
@@ -123,6 +127,12 @@ export function Board({
   goalMap: GoalMapBoardState | null
   /** Set only while a Labels view is open. The wheel sits to the right of the cards and is a drop target. */
   wheel: SectorWheelBoardState | null
+  /** Set only in Labels > Investment and Expense. The two zones tag cards like Want and Must do. */
+  budget: {
+    zones: BudgetZones
+    onMove: (id: BudgetZoneId, dx: number, dy: number) => void
+    onResize: (id: BudgetZoneId, zone: Zone) => void
+  } | null
   /** Markers view: cards move freely, and a drop on the marker area tags them and sends them back. */
   tagOnly: boolean
   onZoneMove: (id: ZoneId, dx: number, dy: number) => void
@@ -302,6 +312,15 @@ export function Board({
       >
         {mode === "clusters" && clusterView === "wantmust" ? (
           <SortZones notes={notes} zones={zones} zoom={view.zoom} onMove={onZoneMove} onResize={onZoneResize} />
+        ) : null}
+        {budget ? (
+          <BudgetZonesLayer
+            notes={notes}
+            zones={budget.zones}
+            zoom={view.zoom}
+            onMove={budget.onMove}
+            onResize={budget.onResize}
+          />
         ) : null}
         {mode === "clusters" && clusterView === "groups" ? (
           <GroupAreas notes={notes} groups={groups} zoom={view.zoom} onMove={onGroupMove} onResize={onGroupResize} />
