@@ -27,6 +27,7 @@ import {
   ZONE_TAGS,
   areaTagAt,
   sectorTag,
+  getCardColor,
   getGoalLevel,
   getIkigaiItem,
   getMarker,
@@ -68,6 +69,7 @@ import { Inspector } from "./inspector"
 import { ClustersPanel } from "./clusters-panel"
 import { LabelsPanel } from "./labels-panel"
 import { useSectors } from "./use-sectors"
+import type { WheelPoint } from "./sector-wheel"
 import { MissionReadWindow, MissionWindow } from "./mission-window"
 import { IkigaiPanel } from "./ikigai-panel"
 import { MarkersPanel, MarkersWindow } from "./markers-panel"
@@ -101,13 +103,20 @@ export function Whiteboard() {
   const sectorState = useSectors(setNotes)
   const labelView = sectorState.view
   const { dropOnSector, setOpenSectorId } = sectorState
-  const sectorCounts = useMemo(() => {
+  const { sectorCounts, sectorPoints } = useMemo(() => {
     const counts: Record<string, number> = {}
+    const points: Record<string, WheelPoint[]> = {}
     for (const sector of sectorState.sectors) {
       const tag = sectorTag(sector.name)
-      counts[sector.id] = notes.filter((note) => hasHashtag(note, tag)).length
+      const attached = notes.filter((note) => hasHashtag(note, tag))
+      counts[sector.id] = attached.length
+      points[sector.id] = attached.map((note) => ({
+        id: note.id,
+        text: note.text,
+        fill: getCardColor(note.color).fill,
+      }))
     }
-    return counts
+    return { sectorCounts: counts, sectorPoints: points }
   }, [notes, sectorState.sectors])
   const openSectorWindow = useCallback(
     (id: string) => {
@@ -952,6 +961,9 @@ export function Whiteboard() {
                 title: labelView === "happiness" ? "Happiness components" : "Life spheres",
                 sectors: sectorState.sectors,
                 counts: sectorCounts,
+                points: sectorPoints,
+                scoring: labelView === "spheres",
+                cardsHidden: sectorState.wheelOnly,
                 hoverId: dropHover && dropHover !== "panel" ? dropHover : null,
                 openId: sectorState.openSector?.id ?? null,
                 onOpen: openSectorWindow,
@@ -999,6 +1011,8 @@ export function Whiteboard() {
             missionView={missionView}
             goalView={goalView}
             labelView={labelView}
+            wheelOnly={sectorState.wheelOnly}
+            onWheelOnly={sectorState.setWheelOnly}
             onChange={(next) => (next === "goals" ? openGoalView(goalView) : changeMode(next))}
             onClusterView={openClusterView}
             onMissionView={openMissionView}
@@ -1281,6 +1295,7 @@ export function Whiteboard() {
               onRename={sectorState.renameSector}
               onRemove={sectorState.removeSector}
               onToggle={sectorState.setOnCards}
+              onScore={sectorState.setScore}
               onClose={() => setLabelsOpen(false)}
             />
           </div>

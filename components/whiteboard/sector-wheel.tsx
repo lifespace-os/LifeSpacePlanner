@@ -1,13 +1,21 @@
 "use client"
 
-import clsx from "clsx"
-import { WHEEL_INNER, WHEEL_OUTER, WHEEL_REACH, type IkigaiCenter, type Sector } from "@/lib/board-data"
+import { useState } from "react"
+import { SCORE_MAX, WHEEL_INNER, WHEEL_OUTER, WHEEL_REACH, type IkigaiCenter, type Sector } from "@/lib/board-data"
+
+/** A card shown as a point inside a sector. It keeps the card's own color, which the latest drop set. */
+export type WheelPoint = { id: string; text: string; fill: string }
 
 export type SectorWheelBoardState = {
   center: IkigaiCenter
   title: string
   sectors: Sector[]
   counts: Record<string, number>
+  points: Record<string, WheelPoint[]>
+  /** Life spheres carry a satisfaction score. Happiness components never do. */
+  scoring: boolean
+  /** The Wheel view: the board of cards is hidden and a click on a sector lists its cards. */
+  cardsHidden: boolean
   /** The sector under a dragged card. */
   hoverId: string | null
   /** The sector whose cards are listed in the window. */
@@ -18,27 +26,41 @@ export type SectorWheelBoardState = {
 const SIZE = WHEEL_REACH * 2
 const GAP_DEGREES = 1.2
 const NAME_MAX = 20
+const POINT_RADIUS = 7
+const GOLDEN = 0.6180339887
 
 function point(radius: number, angle: number) {
   return [WHEEL_REACH + radius * Math.cos(angle), WHEEL_REACH + radius * Math.sin(angle)] as const
 }
 
-function slicePath(start: number, end: number) {
-  const [ox1, oy1] = point(WHEEL_OUTER, start)
-  const [ox2, oy2] = point(WHEEL_OUTER, end)
-  const [ix2, iy2] = point(WHEEL_INNER, end)
-  const [ix1, iy1] = point(WHEEL_INNER, start)
+function slicePath(start: number, end: number, inner = WHEEL_INNER, outer = WHEEL_OUTER) {
+  const [ox1, oy1] = point(outer, start)
+  const [ox2, oy2] = point(outer, end)
+  const [ix2, iy2] = point(inner, end)
+  const [ix1, iy1] = point(inner, start)
   const large = end - start > Math.PI ? 1 : 0
-  return `M${ox1} ${oy1} A${WHEEL_OUTER} ${WHEEL_OUTER} 0 ${large} 1 ${ox2} ${oy2} L${ix2} ${iy2} A${WHEEL_INNER} ${WHEEL_INNER} 0 ${large} 0 ${ix1} ${iy1}Z`
+  return `M${ox1} ${oy1} A${outer} ${outer} 0 ${large} 1 ${ox2} ${oy2} L${ix2} ${iy2} A${inner} ${inner} 0 ${large} 0 ${ix1} ${iy1}Z`
 }
 
 function shortName(name: string) {
   return name.length > NAME_MAX ? `${name.slice(0, NAME_MAX - 1)}…` : name
 }
 
-/** The wheel of the chosen set. A dropped card gets the sector's hashtag and color, then stays where it was. */
+/** Spreads a sector's points over its ring with a golden-ratio spiral, so the same card keeps the same spot. */
+function pointPosition(index: number, total: number, start: number, end: number) {
+  const radius = WHEEL_INNER + 22 + (WHEEL_OUTER - WHEEL_INNER - 44) * Math.sqrt((index + 0.5) / Math.max(total, 1))
+  const spread = Math.max(end - start - (POINT_RADIUS * 3) / radius, 0.05)
+  const turn = (index * GOLDEN) % 1
+  return point(radius, start + (end - start - spread) / 2 + spread * turn)
+}
+
+/**
+ * The wheel of the chosen set. A dropped card gets the sector's hashtag and color, then stays where it was.
+ * Life spheres are drawn as outlines and fill outward from the center once a satisfaction score is saved.
+ */
 export function SectorWheel({ wheel }: { wheel: SectorWheelBoardState }) {
   const { center, sectors } = wheel
+  const [hovered, setHovered] = useState<string | null>(null)
   const step = (Math.PI * 2) / Math.max(sectors.length, 1)
   const gap = sectors.length > 1 ? (GAP_DEGREES * Math.PI) / 180 : 0
 
@@ -55,21 +77,30 @@ export function SectorWheel({ wheel }: { wheel: SectorWheelBoardState }) {
           const end = -Math.PI / 2 + (index + 1) * step - gap / 2 - (sectors.length === 1 ? 0.001 : 0)
           const mid = (start + end) / 2
           const count = wheel.counts[sector.id] ?? 0
-          const hover = wheel.hoverId === sector.id
+          const dots = wheel.points[sector.id] ?? []
+          const dragHover = wheel.hoverId === sector.id
           const open = wheel.openId === sector.id
-          const [cx, cy] = point((WHEEL_OUTER + WHEEL_INNER) / 2, mid)
+          const preview = hovered === sector.id
+          const scored = wheel.scoring && typeof sector.score === "number"
           const [lx, ly] = point(WHEEL_OUTER + 16, mid)
           const side = Math.cos(mid)
           const anchor = side > 0.25 ? "start" : side < -0.25 ? "end" : "middle"
           const dy = Math.sin(mid) > 0.6 ? "0.8em" : Math.sin(mid) < -0.6 ? "0" : "0.35em"
+          const fillTo = scored ? WHEEL_INNER + ((WHEEL_OUTER - WHEEL_INNER) * (sector.score ?? 0)) / SCORE_MAX : WHEEL_INNER
+          const scoreText = scored ? `${sector.score}%` : ""
+          const label = `${sector.name}${scored ? `, satisfaction ${sector.score} percent` : ""}, ${count} ${count === 1 ? "card" : "cards"}. Press Enter to list its cards.`
           return (
             <g
               key={sector.id}
               data-sector-item={sector.id}
+              data-board-control={wheel.cardsHidden ? "" : undefined}
               role="button"
               tabIndex={0}
-              aria-label={`${sector.name}, ${count} ${count === 1 ? "card" : "cards"}. Press Enter or right-click to list its cards.`}
+              aria-label={label}
               className="pointer-events-auto cursor-context-menu focus-visible:outline-none"
+              onPointerEnter={() => setHovered(sector.id)}
+              onPointerLeave={() => setHovered((current) => (current === sector.id ? null : current))}
+              onClick={wheel.cardsHidden ? () => wheel.onOpen(sector.id) : undefined}
               onContextMenu={(event) => {
                 event.preventDefault()
                 event.stopPropagation()
@@ -82,24 +113,54 @@ export function SectorWheel({ wheel }: { wheel: SectorWheelBoardState }) {
                 }
               }}
             >
+              {wheel.scoring && preview ? (
+                <path d={slicePath(start, end)} fill={sector.color} opacity={0.35} className="pointer-events-none" />
+              ) : null}
+              {scored && (sector.score ?? 0) > 0 ? (
+                <path d={slicePath(start, end, WHEEL_INNER, fillTo)} fill={sector.color} opacity={0.95} className="pointer-events-none" />
+              ) : null}
               <path
                 d={slicePath(start, end)}
-                fill={sector.color}
-                className={clsx(
-                  "transition-[stroke-width,opacity] duration-150",
-                  hover ? "stroke-ink" : open ? "stroke-accent" : "stroke-transparent",
-                )}
-                strokeWidth={hover ? 4 : open ? 3 : 0}
-                opacity={hover || open ? 1 : 0.88}
+                fill="none"
+                stroke={sector.color}
+                strokeWidth={6}
+                strokeLinejoin="round"
+                opacity={0.9}
+                pointerEvents="all"
               />
-              {count > 0 ? (
-                <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" className="fill-ink text-[22px] font-medium">
-                  {count}
-                </text>
-              ) : null}
+              <path
+                d={slicePath(start, end)}
+                fill="none"
+                strokeLinejoin="round"
+                className={dragHover ? "stroke-ink" : open ? "stroke-accent" : "stroke-ink-soft"}
+                strokeWidth={dragHover ? 4 : open ? 3 : 1.25}
+                pointerEvents="none"
+              />
+              {dots.map((dot, i) => {
+                const [px, py] = pointPosition(i, dots.length, start, end)
+                return (
+                  <circle
+                    key={dot.id}
+                    data-wheel-point={dot.id}
+                    cx={px}
+                    cy={py}
+                    r={POINT_RADIUS}
+                    fill={dot.fill}
+                    className="stroke-ink"
+                    strokeWidth={1.5}
+                  >
+                    <title>{dot.text.trim() || "Untitled card"}</title>
+                  </circle>
+                )
+              })}
               <text x={lx} y={ly} textAnchor={anchor} dy={dy} className="fill-ink text-[16px] font-medium">
                 <title>{sector.name}</title>
                 {shortName(sector.name)}
+                {scoreText ? (
+                  <tspan dx={6} data-sector-score={sector.id} className="fill-accent font-semibold">
+                    {scoreText}
+                  </tspan>
+                ) : null}
               </text>
             </g>
           )

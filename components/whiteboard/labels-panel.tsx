@@ -6,6 +6,7 @@ import { Check, ChevronRight, List, Minus, Plus, X } from "lucide-react"
 import {
   LIFE_SPHERE_SETS,
   getCardColor,
+  SCORE_MAX,
   SECTOR_NAME_MAX,
   hasHashtag,
   sectorTag,
@@ -18,7 +19,7 @@ import {
 const COPY: Record<LabelView, { title: string; hint: string; other: string }> = {
   spheres: {
     title: "Life spheres",
-    hint: "Drag cards onto a sector of the wheel to give them its hashtag and color. Right-click a sector to list its cards.",
+    hint: "Drag cards onto a sector of the wheel to give them its hashtag and color. Click or right-click a sector to list its cards and set its satisfaction.",
     other: "Happiness components",
   },
   happiness: {
@@ -43,6 +44,7 @@ export function LabelsPanel({
   onRename,
   onRemove,
   onToggle,
+  onScore,
   onClose,
 }: {
   view: LabelView
@@ -60,6 +62,7 @@ export function LabelsPanel({
   onRename: (id: string, name: string) => string | null
   onRemove: (id: string) => void
   onToggle: (ids: string[], tag: string, on: boolean) => void
+  onScore: (id: string, score: number | null) => void
   onClose: () => void
 }) {
   const [name, setName] = useState("")
@@ -140,6 +143,7 @@ export function LabelsPanel({
             dropOver={dropOver}
             onClose={() => onOpenSector(null)}
             onTakeOff={(id) => onToggle([id], sectorTag(openSector.name), false)}
+            onScore={view === "spheres" ? onScore : undefined}
           />
         ) : null}
         <ul className="px-2 py-2">
@@ -355,18 +359,77 @@ function SectorRow({
   )
 }
 
+/** Satisfaction from 0 to 100. The value is saved when the slider is released, and the wheel fills to it. */
+function ScoreSlider({ sector, onScore }: { sector: Sector; onScore: (id: string, score: number | null) => void }) {
+  const [draft, setDraft] = useState(sector.score ?? 50)
+  const id = useId()
+  const saved = typeof sector.score === "number"
+
+  function save() {
+    onScore(sector.id, draft)
+  }
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <label htmlFor={id} className="text-xs font-medium uppercase tracking-[0.16em] text-ink-soft">
+          Satisfaction
+        </label>
+        <span className="text-sm text-ink tabular-nums" aria-live="polite">
+          {saved ? `Saved ${sector.score}%` : "Not scored yet"}
+        </span>
+      </div>
+      <input
+        id={id}
+        type="range"
+        min={0}
+        max={SCORE_MAX}
+        step={1}
+        value={draft}
+        aria-valuetext={`${draft} percent`}
+        onChange={(event) => setDraft(Number(event.target.value))}
+        onPointerUp={save}
+        onKeyUp={(event) => {
+          if (event.key.startsWith("Arrow") || event.key === "Home" || event.key === "End" || event.key.startsWith("Page")) save()
+        }}
+        onBlur={() => {
+          if (!saved || sector.score !== draft) save()
+        }}
+        className="mt-1.5 w-full accent-accent"
+      />
+      <div className="flex items-center justify-between text-xs text-ink-soft">
+        <span className="tabular-nums">{draft}%</span>
+        {saved ? (
+          <button
+            type="button"
+            onClick={() => onScore(sector.id, null)}
+            className="rounded-md px-1.5 py-0.5 transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            Clear score
+          </button>
+        ) : (
+          <span>Release the slider to save</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function OpenSector({
   sector,
   cards,
   dropOver,
   onClose,
   onTakeOff,
+  onScore,
 }: {
   sector: Sector
   cards: Note[]
   dropOver: boolean
   onClose: () => void
   onTakeOff: (id: string) => void
+  /** Present only for life spheres. Happiness components have no satisfaction score. */
+  onScore?: (id: string, score: number | null) => void
 }) {
   const tag = sectorTag(sector.name)
   return (
@@ -390,6 +453,8 @@ function OpenSector({
           <X className="size-4" aria-hidden="true" />
         </button>
       </div>
+
+      {onScore ? <ScoreSlider key={sector.id} sector={sector} onScore={onScore} /> : null}
 
       <div
         data-sector-drop=""

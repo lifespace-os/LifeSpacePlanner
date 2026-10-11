@@ -336,7 +336,7 @@ export function Board({
             onMenu={goalMap.onMenu}
             onCommit={goalMap.onCommit}
           />
-        ) : (
+        ) : wheel?.cardsHidden ? null : (
           <>
             <SelectionBox
               notes={notes}

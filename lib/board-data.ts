@@ -204,7 +204,15 @@ export const LABEL_GROUPS: LabelGroup[] = [
 ]
 
 /** One sector of a life-spheres or happiness list. Its hashtag is the name written as a tag. */
-export type Sector = { id: string; name: string; color: `#${string}` }
+export type Sector = {
+  id: string
+  name: string
+  color: `#${string}`
+  /** Satisfaction from 0 to 100. Only life spheres have one, and it is unset until a score is saved. */
+  score?: number
+}
+
+export const SCORE_MAX = 100
 
 /** Wheel sizes in world units. The reach includes the names written outside the ring. */
 export const WHEEL_OUTER = 230

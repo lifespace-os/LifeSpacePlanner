@@ -31,17 +31,21 @@ export function ModeSwitcher({
   missionView,
   goalView,
   labelView,
+  wheelOnly,
   onChange,
   onClusterView,
   onMissionView,
   onGoalView,
   onLabelView,
+  onWheelOnly,
 }: {
   mode: Mode
   clusterView: ClusterView
   missionView: MissionView
   goalView: GoalView
   labelView: LabelView
+  wheelOnly: boolean
+  onWheelOnly: (on: boolean) => void
   onChange: (mode: Mode) => void
   onClusterView: (view: ClusterView) => void
   onMissionView: (view: MissionView) => void
@@ -87,7 +91,13 @@ export function ModeSwitcher({
               />
             ) : null}
             {active && m.id === "labels" ? (
-              <ViewControls label="Labels view" items={LABEL_CONTROLS} current={labelView} onPick={onLabelView} />
+              <ViewControls
+                label="Labels view"
+                items={LABEL_CONTROLS}
+                current={labelView}
+                onPick={onLabelView}
+                toggle={{ name: "Wheel view", pressed: wheelOnly, onToggle: onWheelOnly }}
+              />
             ) : null}
             {active && m.id === "mission" ? (
               <ViewControls
@@ -119,12 +129,15 @@ function ViewControls<T extends string>({
   current,
   onPick,
   align = "left",
+  toggle,
 }: {
   label: string
   items: { id: T; name: string }[]
   current: T
   onPick: (id: T) => void
   align?: "left" | "right"
+  /** An extra on/off view that sits after a divider and does not replace the chosen item. */
+  toggle?: { name: string; pressed: boolean; onToggle: (on: boolean) => void }
 }) {
   return (
     <div
@@ -152,6 +165,22 @@ function ViewControls<T extends string>({
           </button>
         )
       })}
+      {toggle ? (
+        <>
+          <span aria-hidden="true" className="mx-0.5 h-6 w-px bg-line" />
+          <button
+            type="button"
+            aria-pressed={toggle.pressed}
+            onClick={() => toggle.onToggle(!toggle.pressed)}
+            className={clsx(
+              "rounded-lg px-3.5 py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+              toggle.pressed ? "bg-ink text-board shadow" : "text-ink-soft hover:bg-desk hover:text-ink",
+            )}
+          >
+            {toggle.name}
+          </button>
+        </>
+      ) : null}
     </div>
   )
 }

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from "react"
 import {
   HAPPINESS_COLORS,
+  SCORE_MAX,
   SECTOR_COLORS,
   SECTOR_NAME_MAX,
   hasHashtag,
@@ -21,6 +22,8 @@ import {
  */
 export function useSectors(setNotes: Dispatch<SetStateAction<Note[]>>) {
   const [view, setView] = useState<LabelView>("spheres")
+  /** The Wheel view: the same wheel of the chosen set, without the card board. */
+  const [wheelOnly, setWheelOnly] = useState(false)
   const [setId, setSetId] = useState<SphereSetId>("five")
   const [lists, setLists] = useState(startingSectorLists)
   const [openSectorId, setOpenSectorId] = useState<string | null>(null)
@@ -133,11 +136,27 @@ export function useSectors(setNotes: Dispatch<SetStateAction<Note[]>>) {
     [sectors, setNotes],
   )
 
+  /** Saves a satisfaction score for a life sphere, or clears it with null. Happiness components never take one. */
+  const setScore = useCallback(
+    (id: string, score: number | null) => {
+      if (activeId === "happiness") return
+      const value = score === null ? undefined : Math.min(SCORE_MAX, Math.max(0, Math.round(score)))
+      setLists((prev) => ({
+        ...prev,
+        [activeId]: prev[activeId].map((sector) => (sector.id === id ? { ...sector, score: value } : sector)),
+      }))
+    },
+    [activeId],
+  )
+
   const closeSector = useCallback(() => setOpenSectorId(null), [])
 
   return {
     view,
     setView,
+    wheelOnly,
+    setWheelOnly,
+    setScore,
     setId,
     setSetId,
     sectors,
