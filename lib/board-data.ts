@@ -2,6 +2,8 @@ export type Mode = "unload" | "clusters" | "mission" | "goals" | "labels" | "tas
 
 export type ClusterView = "wantmust" | "groups"
 
+export type LabelView = "spheres" | "happiness"
+
 export type MissionView = "sentence" | "ikigai" | "markers"
 
 export type GoalView = "needs" | "life" | "project" | "tasks" | "map"
@@ -108,7 +110,7 @@ export const MODES: { id: Mode; name: string; hint: string }[] = [
     name: "Goals",
     hint: "Give each card a level, from a need or dream down to a task. A card does not need a parent.",
   },
-  { id: "labels", name: "Labels", hint: "Select a card, then answer the three questions in the panel." },
+  { id: "labels", name: "Labels", hint: "Two views, open either first. Neither is required." },
   { id: "task", name: "Make a task", hint: "Select a card and turn it into a task. One card, one task." },
 ]
 
@@ -200,6 +202,62 @@ export const LABEL_GROUPS: LabelGroup[] = [
     ],
   },
 ]
+
+/** One sector of a life-spheres or happiness list. Its hashtag is the name written as a tag. */
+export type Sector = { id: string; name: string }
+
+export type SphereSetId = "five" | "seven" | "eight" | "ten"
+
+export type SectorListId = SphereSetId | "happiness"
+
+export const LIFE_SPHERE_SETS: { id: SphereSetId; name: string; starter: boolean; sectors: string[] }[] = [
+  {
+    id: "five",
+    name: "Five",
+    starter: false,
+    sectors: ["Personal growth", "Family and friends", "Hobby", "Business and work", "Society"],
+  },
+  {
+    id: "seven",
+    name: "Seven",
+    starter: false,
+    sectors: ["Personal growth", "Family", "Friends", "Business and work", "Hobby", "Rest", "Health"],
+  },
+  {
+    id: "eight",
+    name: "Eight",
+    starter: true,
+    sectors: ["Health", "Family", "Friends", "Love", "Work", "Money", "Growth", "Rest"],
+  },
+  {
+    id: "ten",
+    name: "Ten",
+    starter: true,
+    sectors: ["Health", "Work", "Money", "Home", "Relationships", "Growth", "Rest", "Friends", "Creativity", "Contribution"],
+  },
+]
+
+export const HAPPINESS_START = ["Safety", "Health", "Freedom", "Love"]
+
+export const SECTOR_NAME_MAX = 28
+
+export function sectorTag(name: string) {
+  return groupTag(name)
+}
+
+function sectorsFrom(prefix: string, names: string[]): Sector[] {
+  return names.map((name, i) => ({ id: `${prefix}-${i}`, name }))
+}
+
+export function startingSectorLists(): Record<SectorListId, Sector[]> {
+  return {
+    five: sectorsFrom("five", LIFE_SPHERE_SETS[0].sectors),
+    seven: sectorsFrom("seven", LIFE_SPHERE_SETS[1].sectors),
+    eight: sectorsFrom("eight", LIFE_SPHERE_SETS[2].sectors),
+    ten: sectorsFrom("ten", LIFE_SPHERE_SETS[3].sectors),
+    happiness: sectorsFrom("happiness", HAPPINESS_START),
+  }
+}
 
 const LABEL_INDEX = new Map(
   LABEL_GROUPS.flatMap((group) => group.options.map((option) => [option.id, { ...option, group }] as const)),

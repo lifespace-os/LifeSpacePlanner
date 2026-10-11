@@ -1,5 +1,10 @@
 import clsx from "clsx"
-import { MODES, type ClusterView, type GoalView, type Mode, type MissionView } from "@/lib/board-data"
+import { MODES, type ClusterView, type GoalView, type LabelView, type Mode, type MissionView } from "@/lib/board-data"
+
+const LABEL_CONTROLS: { id: LabelView; name: string }[] = [
+  { id: "spheres", name: "Life spheres" },
+  { id: "happiness", name: "Happiness components" },
+]
 
 const GOAL_CONTROLS: { id: GoalView; name: string }[] = [
   { id: "needs", name: "Needs, dreams, and wants" },
@@ -25,19 +30,23 @@ export function ModeSwitcher({
   clusterView,
   missionView,
   goalView,
+  labelView,
   onChange,
   onClusterView,
   onMissionView,
   onGoalView,
+  onLabelView,
 }: {
   mode: Mode
   clusterView: ClusterView
   missionView: MissionView
   goalView: GoalView
+  labelView: LabelView
   onChange: (mode: Mode) => void
   onClusterView: (view: ClusterView) => void
   onMissionView: (view: MissionView) => void
   onGoalView: (view: GoalView) => void
+  onLabelView: (view: LabelView) => void
 }) {
   return (
     <div
@@ -76,6 +85,9 @@ export function ModeSwitcher({
                 current={clusterView}
                 onPick={onClusterView}
               />
+            ) : null}
+            {active && m.id === "labels" ? (
+              <ViewControls label="Labels view" items={LABEL_CONTROLS} current={labelView} onPick={onLabelView} />
             ) : null}
             {active && m.id === "mission" ? (
               <ViewControls

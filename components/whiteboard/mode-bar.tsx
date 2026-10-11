@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useId, useState } from "react"
 import clsx from "clsx"
 import { Quote } from "lucide-react"
-import type { ClusterView, GoalView, MODES, MissionView, Note } from "@/lib/board-data"
+import type { ClusterView, GoalView, LabelView, MODES, MissionView, Note } from "@/lib/board-data"
 
 type ModeInfo = (typeof MODES)[number]
 
@@ -13,6 +13,12 @@ const CLUSTER_HINTS: Record<ClusterView, string> = {
   wantmust:
     "Drop a card in Want for #want or in Must for #must. Moving it out removes the hashtag. A card may stay outside both.",
   groups: "Drop a card in a group to give it that group's hashtag. Moving it out removes it. A card may stay ungrouped.",
+}
+
+const LABEL_HINTS: Record<LabelView, string> = {
+  spheres: "Select cards, then switch on a life sphere in the window. A sphere is a hashtag. A card may have none.",
+  happiness:
+    "Select cards, then switch on a happiness component in the window. A component is a hashtag. A card may have none.",
 }
 
 const IKIGAI_HINT = "Pick a step or a circle, then drop cards on it to add its hashtag. Cards stay where they are."
@@ -36,6 +42,7 @@ export function ModeBar({
   clusterView,
   missionView,
   goalView,
+  labelView,
   missionText,
   onMissionButton,
 }: {
@@ -44,6 +51,7 @@ export function ModeBar({
   clusterView: ClusterView
   missionView: MissionView
   goalView: GoalView
+  labelView: LabelView
   missionText: string
   onMissionButton: () => void
 }) {
@@ -53,6 +61,7 @@ export function ModeBar({
   let hint = mode.hint
   if (mode.id === "clusters") hint = CLUSTER_HINTS[clusterView]
   if (mode.id === "goals") hint = GOAL_HINTS[goalView]
+  if (mode.id === "labels") hint = LABEL_HINTS[labelView]
   if (isMission) {
     if (missionView === "ikigai") hint = IKIGAI_HINT
     else if (missionView === "markers") hint = MARKERS_HINT

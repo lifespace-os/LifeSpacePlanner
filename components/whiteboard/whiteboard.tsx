@@ -46,6 +46,7 @@ import {
   type Group,
   type IkigaiCenter,
   type LabelGroupId,
+  type LabelView,
   type MissionChoice,
   type MissionView,
   type Mode,
@@ -63,6 +64,8 @@ import { ModeBar } from "./mode-bar"
 import { Board } from "./board"
 import { Inspector } from "./inspector"
 import { ClustersPanel } from "./clusters-panel"
+import { LabelsPanel } from "./labels-panel"
+import { useSectors } from "./use-sectors"
 import { MissionReadWindow, MissionWindow } from "./mission-window"
 import { IkigaiPanel } from "./ikigai-panel"
 import { MarkersPanel, MarkersWindow } from "./markers-panel"
@@ -91,6 +94,9 @@ export function Whiteboard() {
   const [groups, setGroups] = useState<Group[]>(DEFAULT_GROUPS)
   const [clusterView, setClusterView] = useState<ClusterView>("wantmust")
   const [groupsOpen, setGroupsOpen] = useState(true)
+  const [labelsOpen, setLabelsOpen] = useState(true)
+  const sectorState = useSectors(setNotes)
+  const labelView = sectorState.view
   const [mode, setMode] = useState<Mode>("unload")
   const [missionText, setMissionText] = useState("")
   const [missionOpen, setMissionOpen] = useState(false)
@@ -745,6 +751,16 @@ export function Whiteboard() {
     [mode, changeMode],
   )
 
+  const { setView: setLabelView } = sectorState
+  const openLabelView = useCallback(
+    (next: LabelView) => {
+      setLabelView(next)
+      setLabelsOpen(true)
+      if (mode !== "labels") changeMode("labels")
+    },
+    [mode, changeMode, setLabelView],
+  )
+
   const openMissionView = useCallback(
     (next: MissionView) => {
       setMode("mission")
@@ -818,7 +834,7 @@ export function Whiteboard() {
 
   const activeMode = MODES.find((m) => m.id === mode) ?? MODES[0]
   const ikigaiItem = getIkigaiItem(ikigaiActive)
-  const showInspector = mode === "labels" || mode === "task"
+  const showInspector = mode === "task"
   const selectedNote = selectedIds.length === 1 ? (notes.find((note) => note.id === selectedIds[0]) ?? null) : null
   const menuNote = menu?.kind === "card" ? notes.find((note) => note.id === menu.noteId) ?? null : null
   const goalFormCandidate = goalFormOn && goalCard ? (notes.find((note) => note.id === goalCard.id) ?? null) : null
@@ -898,12 +914,13 @@ export function Whiteboard() {
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4">
         <ModeBar
-          key={`${mode}:${mode === "clusters" ? clusterView : mode === "mission" ? missionView : mode === "goals" ? goalView : ""}`}
+          key={`${mode}:${mode === "clusters" ? clusterView : mode === "mission" ? missionView : mode === "goals" ? goalView : mode === "labels" ? labelView : ""}`}
           mode={activeMode}
           notes={notes}
           clusterView={clusterView}
           missionView={missionView}
           goalView={goalView}
+          labelView={labelView}
   missionText={missionText}
   onMissionButton={pressMissionButton}
   />
@@ -913,10 +930,12 @@ export function Whiteboard() {
             clusterView={clusterView}
             missionView={missionView}
             goalView={goalView}
+            labelView={labelView}
             onChange={(next) => (next === "goals" ? openGoalView(goalView) : changeMode(next))}
             onClusterView={openClusterView}
             onMissionView={openMissionView}
             onGoalView={openGoalView}
+            onLabelView={openLabelView}
           />
           <button
             type="button"
@@ -1162,6 +1181,44 @@ export function Whiteboard() {
               onClick={() => setGoalsPanelOpen(true)}
               aria-label="Show goals window"
               title="Show goals window"
+              className="pointer-events-auto absolute top-[11.5rem] right-0 flex h-24 w-9 items-center justify-center rounded-l-xl border border-r-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <ChevronLeft className="size-5" aria-hidden="true" />
+            </button>
+          )}
+        </>
+      ) : null}
+
+      {mode === "labels" ? (
+        <>
+          <div
+            inert={!labelsOpen}
+            aria-hidden={!labelsOpen}
+            className={`pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex transition-transform duration-300 ease-out motion-reduce:transition-none ${
+              labelsOpen ? "translate-x-0" : "translate-x-[calc(100%+1.5rem)]"
+            }`}
+          >
+            <LabelsPanel
+              view={labelView}
+              setId={sectorState.setId}
+              sectors={sectorState.sectors}
+              notes={notes}
+              selectedIds={selectedIds}
+              usedByOtherView={sectorState.usedByOtherView}
+              onSetId={sectorState.setSetId}
+              onAdd={sectorState.addSector}
+              onRename={sectorState.renameSector}
+              onRemove={sectorState.removeSector}
+              onToggle={sectorState.setOnCards}
+              onClose={() => setLabelsOpen(false)}
+            />
+          </div>
+          {labelsOpen ? null : (
+            <button
+              type="button"
+              onClick={() => setLabelsOpen(true)}
+              aria-label="Show labels window"
+              title="Show labels window"
               className="pointer-events-auto absolute top-[11.5rem] right-0 flex h-24 w-9 items-center justify-center rounded-l-xl border border-r-0 border-line bg-card text-ink-soft shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               <ChevronLeft className="size-5" aria-hidden="true" />

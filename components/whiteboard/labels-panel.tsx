@@ -1,0 +1,313 @@
+"use client"
+
+import { useId, useState } from "react"
+import clsx from "clsx"
+import { Check, ChevronRight, Minus, Plus, X } from "lucide-react"
+import {
+  LIFE_SPHERE_SETS,
+  SECTOR_NAME_MAX,
+  hasHashtag,
+  sectorTag,
+  type LabelView,
+  type Note,
+  type Sector,
+  type SphereSetId,
+} from "@/lib/board-data"
+
+const COPY: Record<LabelView, { title: string; hint: string; other: string }> = {
+  spheres: {
+    title: "Life spheres",
+    hint: "Select cards, then switch on a sphere to give them its hashtag. A card may have none.",
+    other: "Happiness components",
+  },
+  happiness: {
+    title: "Happiness components",
+    hint: "Select cards, then switch on a component to give them its hashtag. A card may have none.",
+    other: "Life spheres",
+  },
+}
+
+export function LabelsPanel({
+  view,
+  setId,
+  sectors,
+  notes,
+  selectedIds,
+  usedByOtherView,
+  onSetId,
+  onAdd,
+  onRename,
+  onRemove,
+  onToggle,
+  onClose,
+}: {
+  view: LabelView
+  setId: SphereSetId
+  sectors: Sector[]
+  notes: Note[]
+  selectedIds: string[]
+  usedByOtherView: (tag: string) => boolean
+  onSetId: (id: SphereSetId) => void
+  onAdd: (name: string) => string | null
+  onRename: (id: string, name: string) => string | null
+  onRemove: (id: string) => void
+  onToggle: (ids: string[], tag: string, on: boolean) => void
+  onClose: () => void
+}) {
+  const [name, setName] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const inputId = useId()
+  const errorId = useId()
+  const copy = COPY[view]
+  const selected = notes.filter((note) => selectedIds.includes(note.id))
+  const activeSet = LIFE_SPHERE_SETS.find((set) => set.id === setId)
+
+  function submit(event: React.FormEvent) {
+    event.preventDefault()
+    const problem = onAdd(name)
+    setError(problem)
+    if (!problem) setName("")
+  }
+
+  return (
+    <aside
+      aria-label={`${copy.title} window`}
+      className="pointer-events-auto flex max-h-full w-80 shrink-0 flex-col rounded-2xl border border-line bg-card shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)]"
+    >
+      <div className="flex items-center justify-between gap-3 px-5 pt-5">
+        <h2 className="font-serif text-2xl leading-none font-medium">{copy.title}</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Hide labels window"
+          title="Hide window. Sectors and hashtags are kept."
+          className="flex size-8 items-center justify-center rounded-lg text-ink-soft transition-colors hover:bg-desk hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          <ChevronRight className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+      <p className="mt-1.5 px-5 text-sm text-ink-soft text-pretty">{copy.hint}</p>
+
+      {view === "spheres" ? (
+        <div className="px-5 pt-3">
+          <div role="group" aria-label="Ready list" className="flex gap-1 rounded-xl border border-line bg-board p-1">
+            {LIFE_SPHERE_SETS.map((set) => {
+              const active = set.id === setId
+              return (
+                <button
+                  key={set.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    setConfirmId(null)
+                    setError(null)
+                    onSetId(set.id)
+                  }}
+                  className={clsx(
+                    "flex-1 rounded-lg px-2 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                    active ? "bg-ink text-board shadow" : "text-ink-soft hover:bg-desk hover:text-ink",
+                  )}
+                >
+                  {set.name}
+                </button>
+              )
+            })}
+          </div>
+          {activeSet?.starter ? <p className="mt-1.5 text-xs text-ink-soft">A further starter list. Edit it freely.</p> : null}
+        </div>
+      ) : null}
+
+      <p className="mt-3 border-t border-line px-5 pt-3 text-xs text-ink-soft" aria-live="polite">
+        {selected.length === 0
+          ? "No card selected. Select one to switch sectors on."
+          : `${selected.length} ${selected.length === 1 ? "card" : "cards"} selected.`}
+      </p>
+
+      <ul className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+        {sectors.length === 0 ? <li className="px-3 py-4 text-sm text-ink-soft">No sectors. Add one below.</li> : null}
+        {sectors.map((sector) => (
+          <SectorRow
+            key={sector.id}
+            sector={sector}
+            count={notes.filter((note) => hasHashtag(note, sectorTag(sector.name))).length}
+            selected={selected}
+            confirming={confirmId === sector.id}
+            sharedWith={usedByOtherView(sectorTag(sector.name)) ? copy.other : null}
+            onRename={onRename}
+            onToggle={onToggle}
+            onAskRemove={() => setConfirmId(sector.id)}
+            onKeep={() => setConfirmId(null)}
+            onRemove={() => {
+              setConfirmId(null)
+              onRemove(sector.id)
+            }}
+          />
+        ))}
+      </ul>
+
+      <form onSubmit={submit} className="border-t border-line p-4" noValidate>
+        <label htmlFor={inputId} className="text-xs font-medium uppercase tracking-[0.16em] text-ink-soft">
+          Add a sector
+        </label>
+        <div className="mt-1.5 flex gap-2">
+          <input
+            id={inputId}
+            value={name}
+            onChange={(event) => {
+              setName(event.target.value)
+              setError(null)
+            }}
+            maxLength={SECTOR_NAME_MAX}
+            autoComplete="off"
+            placeholder="e.g. Travel"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? errorId : undefined}
+            className="min-w-0 flex-1 rounded-lg border border-line bg-board px-3 py-2 text-sm text-ink placeholder:text-ink-soft/70 focus-visible:outline-2 focus-visible:outline-accent"
+          />
+          <button
+            type="submit"
+            className="flex items-center gap-1 rounded-lg bg-ink px-3 py-2 text-sm text-board transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            Add
+          </button>
+        </div>
+        {error ? (
+          <p id={errorId} role="alert" className="mt-1.5 text-sm text-[#8d3f4a]">
+            {error}
+          </p>
+        ) : null}
+      </form>
+    </aside>
+  )
+}
+
+function SectorRow({
+  sector,
+  count,
+  selected,
+  confirming,
+  sharedWith,
+  onRename,
+  onToggle,
+  onAskRemove,
+  onKeep,
+  onRemove,
+}: {
+  sector: Sector
+  count: number
+  selected: Note[]
+  confirming: boolean
+  sharedWith: string | null
+  onRename: (id: string, name: string) => string | null
+  onToggle: (ids: string[], tag: string, on: boolean) => void
+  onAskRemove: () => void
+  onKeep: () => void
+  onRemove: () => void
+}) {
+  const [draft, setDraft] = useState(sector.name)
+  const [error, setError] = useState<string | null>(null)
+  const tag = sectorTag(sector.name)
+  const withTag = selected.filter((note) => hasHashtag(note, tag)).length
+  const all = selected.length > 0 && withTag === selected.length
+  const some = withTag > 0 && !all
+
+  function commit() {
+    const problem = onRename(sector.id, draft)
+    setError(problem)
+    if (problem) setDraft(sector.name)
+  }
+
+  return (
+    <li className="rounded-lg px-1 py-1 hover:bg-desk">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={selected.length === 0}
+          aria-pressed={all ? true : some ? "mixed" : false}
+          aria-label={`${sector.name} on the selected ${selected.length === 1 ? "card" : "cards"}`}
+          onClick={() =>
+            onToggle(
+              selected.map((note) => note.id),
+              tag,
+              !all,
+            )
+          }
+          className={clsx(
+            "flex size-7 shrink-0 items-center justify-center rounded-md border transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40",
+            all || some ? "border-accent bg-accent text-board" : "border-line bg-board text-transparent",
+          )}
+        >
+          {some ? <Minus className="size-4" aria-hidden="true" /> : <Check className="size-4" aria-hidden="true" />}
+        </button>
+        <input
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value)
+            setError(null)
+          }}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur()
+            if (event.key === "Escape") {
+              setDraft(sector.name)
+              setError(null)
+              event.currentTarget.blur()
+            }
+          }}
+          maxLength={SECTOR_NAME_MAX}
+          autoComplete="off"
+          aria-label={`Name of sector ${sector.name}`}
+          className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm font-medium text-ink hover:border-line focus-visible:border-line focus-visible:bg-board focus-visible:outline-2 focus-visible:outline-accent"
+        />
+        <span className="text-sm text-ink-soft tabular-nums" aria-label={`${count} cards`}>
+          {count}
+        </span>
+        <button
+          type="button"
+          onClick={onAskRemove}
+          aria-label={`Remove sector ${sector.name}`}
+          title="Remove sector"
+          className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-board hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          <X className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+      <p className="truncate px-10 text-xs text-ink-soft">#{tag}</p>
+      {error ? (
+        <p role="alert" className="px-10 pt-0.5 text-sm text-[#8d3f4a]">
+          {error}
+        </p>
+      ) : null}
+      {confirming ? (
+        <div role="group" aria-label={`Remove ${sector.name}?`} className="mx-1 mt-1.5 rounded-lg border border-line bg-board p-3">
+          <p className="text-sm text-ink text-pretty">
+            {sharedWith
+              ? `Remove ${sector.name}? Cards keep #${tag} because ${sharedWith} also uses it.`
+              : count > 0
+                ? `Remove ${sector.name}? This takes #${tag} off ${count} ${count === 1 ? "card" : "cards"}.`
+                : `Remove ${sector.name}? No card has #${tag}.`}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={onRemove}
+              className="rounded-lg bg-ink px-3 py-1.5 text-sm text-board transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              Remove
+            </button>
+            <button
+              type="button"
+              autoFocus
+              onClick={onKeep}
+              className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink transition-colors hover:bg-desk focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              Keep it
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </li>
+  )
+}

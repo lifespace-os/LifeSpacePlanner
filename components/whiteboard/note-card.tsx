@@ -201,7 +201,7 @@ export const NoteCard = memo(function NoteCard({
 
   const isTask = note.task !== null
   const released = note.mission === "release" && mode !== "unload" && mode !== "clusters"
-  const showLabels = mode === "labels" || mode === "task"
+  const showLabels = mode === "task"
   const color = getCardColor(note.color)
   const appliedLabels = LABEL_GROUPS.flatMap((group) => {
     const option = group.options.find((o) => o.id === note.labels[group.id])
