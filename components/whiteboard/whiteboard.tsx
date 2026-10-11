@@ -1197,17 +1197,14 @@ export function Whiteboard() {
   onChange: (value) => updateNote(menuNote.id, (note) => ({ ...note, parentId: value || null })),
   }
   }
-  mapEdit={
-            mapOn
-              ? {
-                  text: menuNote.text,
-                  onText: (text) => updateNote(menuNote.id, (note) => ({ ...note, text })),
-                  level: goalLevelOf(menuNote) ?? "",
-                  levels: GOAL_LEVELS.map((level) => ({ tag: level.tag, name: level.name })),
-                  onLevel: (tag) => updateNote(menuNote.id, (note) => setGoalLevel(note, tag)),
-                }
-              : undefined
-          }
+  fields={{
+            text: menuNote.text,
+            onText: (text) => updateNote(menuNote.id, (note) => ({ ...note, text })),
+            level: goalLevelOf(menuNote) ?? "",
+            levels: GOAL_LEVELS.map((level) => ({ tag: level.tag, name: level.name })),
+            onLevel: (tag) => updateNote(menuNote.id, (note) => setGoalLevel(note, tag)),
+          }}
+          showEditWords={!mapOn}
           onEdit={() => startEdit(menuNote.id)}
           onDelete={() => deleteNote(menuNote.id)}
         />

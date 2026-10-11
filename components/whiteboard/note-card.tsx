@@ -270,14 +270,6 @@ export const NoteCard = memo(function NoteCard({
         </p>
       )}
 
-      {note.hashtags.length > 0 ? (
-        <ul aria-label="Hashtags" className="flex flex-wrap gap-x-2 gap-y-0.5 px-4 pb-2.5 text-xs font-medium text-current/70">
-          {note.hashtags.map((tag) => (
-            <li key={tag}>#{tag}</li>
-          ))}
-        </ul>
-      ) : null}
-
       {showLabels && appliedLabels.length > 0 ? (
         <div className="flex flex-wrap gap-1 px-4 pb-3">
           {appliedLabels.map((label) => (
@@ -285,6 +277,26 @@ export const NoteCard = memo(function NoteCard({
           ))}
         </div>
       ) : null}
+
+      <div className="mt-auto flex px-3 pb-2.5">
+        <button
+          type="button"
+          aria-label={
+            note.hashtags.length > 0
+              ? `Tags, ${note.hashtags.length} ${note.hashtags.length === 1 ? "hashtag" : "hashtags"}. Open the card window`
+              : "Tags. Open the card window"
+          }
+          aria-haspopup="dialog"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            onMenu(note.id, rect.left, rect.bottom + 6)
+          }}
+          className="inline-flex h-6 items-center gap-1 rounded-full border border-current/25 px-2.5 text-xs font-medium text-current/80 transition-colors hover:bg-current/10 hover:text-current focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        >
+          Tags
+          {note.hashtags.length > 0 ? <span className="tabular-nums">{note.hashtags.length}</span> : null}
+        </button>
+      </div>
 
       {mode === "mission" && missionSaved && !fixed && !tagTarget ? <MissionControls note={note} onMission={onMission} /> : null}
 

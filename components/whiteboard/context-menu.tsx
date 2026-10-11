@@ -62,7 +62,7 @@ function MenuShell({
       aria-label={label}
       onContextMenu={(e) => e.preventDefault()}
       style={position}
-      className="fixed z-[90] min-w-52 rounded-xl border border-line bg-card p-1.5 text-sm text-ink shadow-[0_18px_40px_-16px_rgba(35,39,43,0.5)]"
+      className="fixed z-[90] max-h-[calc(100dvh-1rem)] min-w-52 overflow-y-auto rounded-xl border border-line bg-card p-1.5 text-sm text-ink shadow-[0_18px_40px_-16px_rgba(35,39,43,0.5)]"
     >
       {children}
     </div>
@@ -101,7 +101,8 @@ export function CardMenu({
   onAddHashtag,
   onRemoveHashtag,
   goalAbove,
-  mapEdit,
+  fields,
+  showEditWords,
   onEdit,
   onDelete,
   onClose,
@@ -114,14 +115,16 @@ export function CardMenu({
   onRemoveHashtag: (tag: string) => void
   /** Present only for a card that has a goal level. An empty value means no link. */
   goalAbove?: { value: string; options: { id: string; label: string }[]; onChange: (value: string) => void }
-  /** Present only on the Map, where the card is hidden: its words and level are edited here. */
-  mapEdit?: {
+  /** The words and the level of the card, edited in the window. An empty level means no level. */
+  fields: {
     text: string
     onText: (text: string) => void
     level: string
     levels: { tag: string; name: string }[]
     onLevel: (tag: string) => void
   }
+  /** Off on the Map, where the card is hidden and cannot be edited in place. */
+  showEditWords: boolean
   onEdit: () => void
   onDelete: () => void
   onClose: () => void
@@ -139,47 +142,23 @@ export function CardMenu({
   return (
     <MenuShell clientX={clientX} clientY={clientY} label="Card options" role="dialog" onClose={onClose}>
       <div className="w-64 p-1.5">
-        {mapEdit ? (
-          <>
-            <div className="mb-4">
-              <label
-                htmlFor="card-menu-text"
-                className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft"
-              >
-                Text
-              </label>
-              <textarea
-                id="card-menu-text"
-                data-autofocus=""
-                value={mapEdit.text}
-                onChange={(e) => mapEdit.onText(e.target.value)}
-                maxLength={280}
-                rows={3}
-                className="mt-2 w-full resize-none rounded-md border border-line bg-board px-2 py-1.5 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
-              />
-            </div>
-            <div className="mb-4">
-              <label
-                htmlFor="card-menu-level"
-                className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft"
-              >
-                Level
-              </label>
-              <select
-                id="card-menu-level"
-                value={mapEdit.level}
-                onChange={(e) => mapEdit.onLevel(e.target.value)}
-                className="mt-2 h-8 w-full rounded-md border border-line bg-board px-2 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
-              >
-                {mapEdit.levels.map((level) => (
-                  <option key={level.tag} value={level.tag}>
-                    {level.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </>
-        ) : null}
+        <div className="mb-4">
+          <label
+            htmlFor="card-menu-text"
+            className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft"
+          >
+            Text
+          </label>
+          <textarea
+            id="card-menu-text"
+            data-autofocus=""
+            value={fields.text}
+            onChange={(e) => fields.onText(e.target.value)}
+            maxLength={280}
+            rows={3}
+            className="mt-2 w-full resize-none rounded-md border border-line bg-board px-2 py-1.5 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
+          />
+        </div>
         <p id="card-menu-color" className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft">
           Color
         </p>
@@ -205,6 +184,52 @@ export function CardMenu({
             )
           })}
         </div>
+
+        <div className="mt-4">
+          <label
+            htmlFor="card-menu-level"
+            className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft"
+          >
+            Level
+          </label>
+          <select
+            id="card-menu-level"
+            value={fields.level}
+            onChange={(e) => fields.onLevel(e.target.value)}
+            className="mt-2 h-8 w-full rounded-md border border-line bg-board px-2 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
+          >
+            <option value="">No level</option>
+            {fields.levels.map((level) => (
+              <option key={level.tag} value={level.tag}>
+                {level.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {goalAbove ? (
+          <div className="mt-4">
+            <label
+              htmlFor="card-menu-goal-above"
+              className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft"
+            >
+              Goal above
+            </label>
+            <select
+              id="card-menu-goal-above"
+              value={goalAbove.value}
+              onChange={(e) => goalAbove.onChange(e.target.value)}
+              className="mt-2 h-8 w-full rounded-md border border-line bg-board px-2 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
+            >
+              <option value="">No goal above</option>
+              {goalAbove.options.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
 
         <form onSubmit={submitTag} className="mt-4">
           <label
@@ -259,39 +284,15 @@ export function CardMenu({
             ))}
           </ul>
         ) : null}
-
-        {goalAbove ? (
-          <div className="mt-4">
-            <label
-              htmlFor="card-menu-goal-above"
-              className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft"
-            >
-              Goal above
-            </label>
-            <select
-              id="card-menu-goal-above"
-              value={goalAbove.value}
-              onChange={(e) => goalAbove.onChange(e.target.value)}
-              className="mt-2 h-8 w-full rounded-md border border-line bg-board px-2 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
-            >
-              <option value="">No goal above</option>
-              {goalAbove.options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
       </div>
 
       <div className="mt-1.5 border-t border-line pt-1.5">
-        {mapEdit ? null : (
+        {showEditWords ? (
           <button type="button" onClick={onEdit} className={itemClass}>
             <PencilLine className="size-4 text-ink-soft" aria-hidden="true" />
             Edit words
           </button>
-        )}
+        ) : null}
         <button type="button" onClick={onDelete} className={clsx(itemClass, "text-release hover:bg-release/10")}>
           <Trash2 className="size-4" aria-hidden="true" />
           Remove card
