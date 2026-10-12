@@ -36,7 +36,8 @@ const GOAL_HINTS: Record<GoalView, string> = {
     "Drop a card in the window to make it a project goal. A new level replaces the previous one. Cards stay where they are.",
   tasks: "Drop a card in the window to make it a task. A new level replaces the previous one. Cards stay where they are.",
   map: "The rings and how many cards sit on each. A card does not need a parent.",
-  graph: "An empty canvas for the Graph. It does not copy the rings.",
+  graph:
+    "Each Map ring is a cluster. A card with that ring's hashtag sits inside it; a card with none sits alone. Drag a vertex, or right-click empty canvas to add a card.",
 }
 
 export function ModeBar({

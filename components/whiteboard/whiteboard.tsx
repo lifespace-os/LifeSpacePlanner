@@ -90,6 +90,8 @@ import { MarkersPanel, MarkersWindow } from "./markers-panel"
 import { GoalsPanel } from "./goals-panel"
 import type { GoalMapCommit } from "./goal-map"
 import { GoalMapWindow } from "./goal-map-window"
+import { GraphCanvas } from "./graph-canvas"
+import type { GraphSpot } from "@/lib/graph-layout"
 import { GoalCardPanel, type GoalDraft } from "./goal-card-panel"
 import { IkigaiStepsWindow } from "./ikigai-guide"
 import { CardDock } from "./card-dock"
@@ -164,6 +166,8 @@ export function Whiteboard() {
   const [goalView, setGoalView] = useState<GoalView>("needs")
   const [goalsPanelOpen, setGoalsPanelOpen] = useState(true)
   const [mapSelected, setMapSelected] = useState<string | null>(null)
+  const [graphSpots, setGraphSpots] = useState<Record<string, GraphSpot>>({})
+  const [graphSelected, setGraphSelected] = useState<string | null>(null)
   const [mapFocus, setMapFocus] = useState<number | null>(null)
   const [mapScale, setMapScale] = useState(GOAL_RING_SCALE.initial)
   const [rings, setRings] = useState<GoalRing[]>(BUILT_IN_RINGS)
@@ -478,6 +482,35 @@ export function Whiteboard() {
     },
     [layer, goalFormOn, goalView],
   )
+
+  const createGraphCard = useCallback(() => {
+    idCounter.current += 1
+    const id = `card-${idCounter.current}`
+    const rect = viewportRef.current?.getBoundingClientRect()
+    const center = screenToWorld((rect?.left ?? 0) + (rect?.width ?? 0) / 2, (rect?.top ?? 0) + (rect?.height ?? 0) / 2)
+    setNotes((prev) => {
+      const maxZ = prev.reduce((max, note) => Math.max(max, note.z), 0)
+      const card: Note = {
+        id,
+        text: "",
+        color: dockColor,
+        hashtags: [],
+        x: Math.round(center.x - CARD_WIDTH / 2),
+        y: Math.round(center.y - CARD_MIN_HEIGHT / 2),
+        rotation: 0,
+        z: maxZ + 1,
+        mission: null,
+        labels: {},
+        task: null,
+      }
+      return [...prev, card]
+    })
+    return id
+  }, [dockColor, screenToWorld])
+
+  const saveGraphSpot = useCallback((id: string, spot: GraphSpot) => {
+    setGraphSpots((prev) => ({ ...prev, [id]: spot }))
+  }, [])
 
   useEffect(() => {
     if (!goalFormOn) {
@@ -1320,12 +1353,17 @@ export function Whiteboard() {
       ) : null}
 
       {graphOn ? (
-        <section
-          aria-label="Graph"
-          className="absolute inset-x-0 top-[11rem] bottom-0 flex items-center justify-center bg-board"
-        >
-          <h2 className="font-serif text-5xl text-ink-soft">Graph</h2>
-        </section>
+        <GraphCanvas
+          notes={notes}
+          rings={rings}
+          spots={graphSpots}
+          selectedId={graphSelected}
+          onSelect={setGraphSelected}
+          onSpot={saveGraphSpot}
+          onMenu={openCardMenu}
+          onRename={(id, text) => updateNote(id, (note) => ({ ...note, text }))}
+          onAddCard={createGraphCard}
+        />
       ) : null}
 
       {goalsOn && !graphOn ? (
@@ -1484,7 +1522,9 @@ export function Whiteboard() {
         </div>
       ) : null}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-4">
+      <div
+        className={`pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 p-4 ${graphOn ? "hidden" : ""}`}
+      >
         <ZoomControls
           zoom={view.zoom}
           canZoomIn={view.zoom < MAX_ZOOM}
@@ -1563,7 +1603,7 @@ export function Whiteboard() {
             levels: GOAL_LEVELS.map((level) => ({ tag: level.tag, name: level.name })),
             onLevel: (tag) => updateNote(menuNote.id, (note) => setGoalLevel(note, tag, rings)),
           }}
-          showEditWords={!mapOn}
+          showEditWords={!mapOn && !graphOn}
           onEdit={() => startEdit(menuNote.id)}
           onDelete={() => deleteNote(menuNote.id)}
         />

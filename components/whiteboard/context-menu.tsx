@@ -77,17 +77,19 @@ export function CanvasMenu({
   clientY,
   onCreate,
   onClose,
-}: {
+  label = "Create new card",
+  }: {
   clientX: number
   clientY: number
   onCreate: () => void
   onClose: () => void
-}) {
+  label?: string
+  }) {
   return (
-    <MenuShell clientX={clientX} clientY={clientY} label="Canvas" role="menu" onClose={onClose}>
-      <button type="button" role="menuitem" data-autofocus="" onClick={onCreate} className={itemClass}>
-        <Plus className="size-4 text-ink-soft" aria-hidden="true" />
-        Create new card
+  <MenuShell clientX={clientX} clientY={clientY} label="Canvas" role="menu" onClose={onClose}>
+  <button type="button" role="menuitem" data-autofocus="" onClick={onCreate} className={itemClass}>
+  <Plus className="size-4 text-ink-soft" aria-hidden="true" />
+  {label}
       </button>
     </MenuShell>
   )
