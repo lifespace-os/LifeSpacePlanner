@@ -8,14 +8,20 @@ import {
   GRAPH_MISSION,
   GRAPH_MISSION_R,
   GRAPH_VERTEX_R,
+  anchorSpots,
   graphVertexShown,
   layoutGraph,
+  resizeBox,
   spotOf,
+  type GraphBox,
+  type GraphBoxMode,
+  type GraphCluster,
   type GraphFilter,
   type GraphSpot,
   type GraphVertex,
 } from "@/lib/graph-layout"
 import { CanvasMenu } from "./context-menu"
+import { GraphClusterFrame } from "./graph-cluster-frame"
 import { ZoomControls } from "./zoom-controls"
 
 type GraphView = { x: number; y: number; zoom: number }
@@ -47,6 +53,21 @@ function clampZoom(zoom: number) {
 type VertexPress = { id: string; pointerId: number; startX: number; startY: number; dx: number; dy: number; moved: boolean }
 
 type PanPress = { pointerId: number; startX: number; startY: number; originX: number; originY: number }
+
+type Anchors = Record<string, { x: number; y: number }>
+
+type BoxPress = {
+  id: string
+  mode: GraphBoxMode
+  pointerId: number
+  startX: number
+  startY: number
+  world: { x: number; y: number }
+  startBox: GraphBox
+  anchors: Anchors
+  box: GraphBox | null
+  moved: boolean
+}
 
 function NameField({
   x,
@@ -103,9 +124,11 @@ export function GraphCanvas({
   notes,
   rings,
   spots,
+  boxes,
   selectedId,
   onSelect,
   onSpot,
+  onBox,
   onMenu,
   onRename,
   onAddCard,
@@ -127,9 +150,11 @@ export function GraphCanvas({
   showText: boolean
   small: boolean
   spots: Record<string, GraphSpot>
+  boxes: Record<string, GraphBox>
   selectedId: string | null
   onSelect: (id: string | null) => void
   onSpot: (id: string, spot: GraphSpot) => void
+  onBox: (id: string, box: GraphBox) => void
   onMenu: (id: string, clientX: number, clientY: number) => void
   onRename: (id: string, text: string) => void
   onAddCard: () => string
@@ -151,7 +176,18 @@ export function GraphCanvas({
   const dragResolved = useRef<GraphVertex | null>(null)
   const fitted = useRef(false)
 
-  const layout = useMemo(() => layoutGraph(notes, rings, spots, drag), [notes, rings, spots, drag])
+  const [boxDrag, setBoxDrag] = useState<{ id: string; mode: GraphBoxMode; box: GraphBox; anchors: Anchors } | null>(null)
+  const boxPress = useRef<BoxPress | null>(null)
+
+  const liveBoxes = useMemo(() => (boxDrag ? { ...boxes, [boxDrag.id]: boxDrag.box } : boxes), [boxes, boxDrag])
+  const liveSpots = useMemo(
+    () => (boxDrag && boxDrag.mode !== "move" ? anchorSpots(spots, boxDrag.id, boxDrag.box, boxDrag.anchors) : spots),
+    [spots, boxDrag],
+  )
+  const layout = useMemo(
+    () => layoutGraph(notes, rings, liveSpots, drag, liveBoxes),
+    [notes, rings, liveSpots, drag, liveBoxes],
+  )
   const layoutRef = useRef(layout)
   layoutRef.current = layout
   const byId = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes])
@@ -255,6 +291,66 @@ export function GraphCanvas({
     if (panPress.current?.pointerId !== event.pointerId) return
     panPress.current = null
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+
+  function handleBoxDown(event: React.PointerEvent<SVGElement>, cluster: GraphCluster, mode: GraphBoxMode) {
+    if (event.button !== 0) return
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    const anchors: Anchors = {}
+    if (mode !== "move") {
+      for (const v of layoutRef.current.vertices) if (v.home === cluster.id) anchors[v.id] = { x: v.x, y: v.y }
+    }
+    boxPress.current = {
+      id: cluster.id,
+      mode,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      world: toWorld(event.clientX, event.clientY),
+      startBox: { x: cluster.x, y: cluster.y, width: cluster.width, height: cluster.height },
+      anchors,
+      box: null,
+      moved: false,
+    }
+  }
+
+  function handleBoxMove(event: React.PointerEvent<SVGElement>) {
+    const press = boxPress.current
+    if (!press || press.pointerId !== event.pointerId) return
+    if (!press.moved && Math.hypot(event.clientX - press.startX, event.clientY - press.startY) < 4) return
+    press.moved = true
+    const world = toWorld(event.clientX, event.clientY)
+    const box = resizeBox(press.startBox, press.mode, world.x - press.world.x, world.y - press.world.y)
+    press.box = box
+    setBoxDrag({ id: press.id, mode: press.mode, box, anchors: press.anchors })
+  }
+
+  function handleBoxUp(event: React.PointerEvent<SVGElement>) {
+    const press = boxPress.current
+    if (!press || press.pointerId !== event.pointerId) return
+    boxPress.current = null
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    setBoxDrag(null)
+    if (!press.moved || !press.box) {
+      if (press.mode === "move") onSelect(null)
+      return
+    }
+    onBox(press.id, press.box)
+    if (press.mode === "move") return
+    const settled = layoutGraph(
+      notes,
+      rings,
+      anchorSpots(spots, press.id, press.box, press.anchors),
+      null,
+      { ...boxes, [press.id]: press.box },
+    )
+    for (const v of settled.vertices) if (v.home === press.id) onSpot(v.id, spotOf(settled, v))
+  }
+
+  function handleBoxCancel() {
+    boxPress.current = null
+    setBoxDrag(null)
   }
 
   function handleVertexDown(event: React.PointerEvent<SVGGElement>, vertex: GraphVertex) {
@@ -483,40 +579,17 @@ export function GraphCanvas({
         >
           <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
             {shownClusters.map((cluster) => (
-              <g key={cluster.id} data-graph-cluster={cluster.id}>
-                <rect
-                  x={cluster.x}
-                  y={cluster.y}
-                  width={cluster.width}
-                  height={cluster.height}
-                  rx={36}
-                  ry={36}
-                  fill="var(--color-accent)"
-                  fillOpacity={0.05 + cluster.ring * 0.025}
-                  stroke="var(--color-accent)"
-                  strokeOpacity={0.55}
-                  strokeWidth={2.5 * Math.min(k, 1.6)}
-                />
-                <text
-                  x={cluster.x + 28}
-                  y={cluster.y + 36}
-                  fontSize={20 * Math.min(k, 1.4)}
-                  fontWeight={600}
-                  fill="var(--color-ink)"
-                  pointerEvents="none"
-                >
-                  {cluster.name}
-                </text>
-                <text
-                  x={cluster.x + 28}
-                  y={cluster.y + 58}
-                  fontSize={14 * Math.min(k, 1.4)}
-                  fill="var(--color-ink-soft)"
-                  pointerEvents="none"
-                >
-                  {cluster.tags.map((tag) => `#${tag}`).join(" ")}
-                </text>
-              </g>
+              <GraphClusterFrame
+                key={cluster.id}
+                cluster={cluster}
+                k={k}
+                zoom={view.zoom}
+                active={boxDrag?.id === cluster.id}
+                onDown={handleBoxDown}
+                onMove={handleBoxMove}
+                onUp={handleBoxUp}
+                onCancel={handleBoxCancel}
+              />
             ))}
 
             {filter.ringId === null ? (

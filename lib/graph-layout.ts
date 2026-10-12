@@ -33,6 +33,59 @@ export type GraphCluster = {
 
 export type GraphVertex = { id: string; x: number; y: number; home: string }
 
+/** A cluster rectangle the user moved or resized, in Graph world coordinates. It is kept apart from every card. */
+export type GraphBox = { x: number; y: number; width: number; height: number }
+
+/** Which part of a cluster rectangle is being dragged: the body moves it, an edge or corner resizes it. */
+export type GraphBoxMode = "move" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw"
+
+export const MIN_CLUSTER_W = 220
+export const MIN_CLUSTER_H = 200
+
+/** The cluster title is drawn up to this much larger when the Graph is zoomed out, so the default box is measured at that size. */
+const TITLE_SCALE_MAX = 1.4
+const TITLE_SIZE = 20
+const TAGS_SIZE = 14
+
+export function resizeBox(box: GraphBox, mode: GraphBoxMode, dx: number, dy: number): GraphBox {
+  if (mode === "move") return { ...box, x: box.x + dx, y: box.y + dy }
+  let { x, y, width, height } = box
+  if (mode.includes("e")) width = Math.max(MIN_CLUSTER_W, box.width + dx)
+  if (mode.includes("w")) {
+    width = Math.max(MIN_CLUSTER_W, box.width - dx)
+    x = box.x + box.width - width
+  }
+  if (mode.includes("s")) height = Math.max(MIN_CLUSTER_H, box.height + dy)
+  if (mode.includes("n")) {
+    height = Math.max(MIN_CLUSTER_H, box.height - dy)
+    y = box.y + box.height - height
+  }
+  return { x, y, width, height }
+}
+
+/** While a cluster is resized, its vertices keep their place in the world; the layout then clamps them inside the new box. */
+export function anchorSpots(
+  spots: Record<string, GraphSpot>,
+  clusterId: string,
+  box: GraphBox,
+  anchors: Record<string, { x: number; y: number }>,
+): Record<string, GraphSpot> {
+  const next = { ...spots }
+  for (const [id, a] of Object.entries(anchors)) next[id] = { home: clusterId, x: a.x - box.x, y: a.y - box.y }
+  return next
+}
+
+let measureContext: CanvasRenderingContext2D | null | undefined
+
+function textWidth(text: string, size: number, weight: number) {
+  if (measureContext === undefined) {
+    measureContext = typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d")
+  }
+  if (!measureContext) return text.length * size * 0.66
+  measureContext.font = `${weight} ${size}px ${getComputedStyle(document.body).fontFamily}`
+  return measureContext.measureText(text).width
+}
+
 /** The id of the mission vertex. It is the same mission as the Map center, never a card in the list of notes. */
 export const GRAPH_MISSION = "mission"
 export const GRAPH_MISSION_R = 40
@@ -112,6 +165,7 @@ export function layoutGraph(
   rings: GoalRing[],
   spots: Record<string, GraphSpot>,
   drag: { id: string; x: number; y: number } | null = null,
+  boxes: Record<string, GraphBox> = {},
 ): GraphLayout {
   const members: string[][] = rings.map(() => [])
   const lone: string[] = []
@@ -129,14 +183,32 @@ export function layoutGraph(
     const count = members[index].length
     const cols = Math.max(2, Math.ceil(Math.sqrt(count)))
     const rows = Math.max(1, Math.ceil(count / cols))
-    const width = cols * CELL_W + PAD * 2
+    const titleRoom =
+      Math.max(
+        textWidth(ring.name, TITLE_SIZE * TITLE_SCALE_MAX, 600),
+        textWidth(ring.tags.map((tag) => `#${tag}`).join(" "), TAGS_SIZE * TITLE_SCALE_MAX, 400),
+      ) +
+      PAD * 2 +
+      8
+    const width = Math.max(cols * CELL_W + PAD * 2, Math.ceil(titleRoom))
     const height = HEAD + rows * CELL_H + PAD
     if (x > 0 && x + width > ROW_LIMIT) {
       x = 0
       y += rowHeight + GAP
       rowHeight = 0
     }
-    clusters.push({ id: ring.id, name: ring.name, tags: ring.tags, ring: index, x, y, width, height, ids: members[index] })
+    const saved = boxes[ring.id]
+    clusters.push({
+      id: ring.id,
+      name: ring.name,
+      tags: ring.tags,
+      ring: index,
+      x: saved ? saved.x : x,
+      y: saved ? saved.y : y,
+      width: saved ? Math.max(MIN_CLUSTER_W, saved.width) : width,
+      height: saved ? Math.max(MIN_CLUSTER_H, saved.height) : height,
+      ids: members[index],
+    })
     x += width + GAP
     rowHeight = Math.max(rowHeight, height)
   })

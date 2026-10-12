@@ -93,7 +93,14 @@ import { GoalMapWindow } from "./goal-map-window"
 import { GraphCanvas } from "./graph-canvas"
 import { GraphSettingsWindow } from "./graph-settings-window"
 import { GraphVertexWindow } from "./graph-vertex-window"
-import { GRAPH_LONE, NO_GRAPH_FILTER, graphVertexShown, type GraphFilter, type GraphSpot } from "@/lib/graph-layout"
+import {
+  GRAPH_LONE,
+  NO_GRAPH_FILTER,
+  graphVertexShown,
+  type GraphBox,
+  type GraphFilter,
+  type GraphSpot,
+} from "@/lib/graph-layout"
 import { GoalCardPanel, type GoalDraft } from "./goal-card-panel"
 import { IkigaiStepsWindow } from "./ikigai-guide"
 import { CardDock } from "./card-dock"
@@ -169,6 +176,7 @@ export function Whiteboard() {
   const [goalsPanelOpen, setGoalsPanelOpen] = useState(true)
   const [mapSelected, setMapSelected] = useState<string | null>(null)
   const [graphSpots, setGraphSpots] = useState<Record<string, GraphSpot>>({})
+  const [graphBoxes, setGraphBoxes] = useState<Record<string, GraphBox>>({})
   const [graphSelected, setGraphSelected] = useState<string | null>(null)
   const [graphMissionOpen, setGraphMissionOpen] = useState(false)
   const [allBoardLinks, setAllBoardLinks] = useState(false)
@@ -1425,6 +1433,7 @@ export function Whiteboard() {
           notes={notes}
           rings={rings}
           spots={graphSpots}
+          boxes={graphBoxes}
           selectedId={graphSelected}
           filter={graphFilter}
           showText={graphShowText}
@@ -1435,6 +1444,7 @@ export function Whiteboard() {
           onFree={setFreeLine}
           onSelect={selectGraphVertex}
           onSpot={saveGraphSpot}
+          onBox={(id, box) => setGraphBoxes((prev) => ({ ...prev, [id]: box }))}
           onMenu={openCardMenu}
           onRename={(id, text) => updateNote(id, (note) => ({ ...note, text }))}
           onAddCard={createGraphCard}
