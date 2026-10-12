@@ -1,8 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { getCardColor, goalLinks, MAX_ZOOM, MIN_ZOOM, type GoalRing, type Note } from "@/lib/board-data"
-import { cardLinkIssue } from "@/lib/card-links"
+import { freeEdges, getCardColor, goalLinks, MAX_ZOOM, MIN_ZOOM, type GoalRing, type Note } from "@/lib/board-data"
+import { linkIssueFor, type LinkKind } from "@/lib/card-links"
 import {
   GRAPH_LONE,
   GRAPH_MISSION,
@@ -111,6 +111,7 @@ export function GraphCanvas({
   onAddCard,
   onMission,
   onLinks,
+  onFree,
   missionText,
   filter,
   showText,
@@ -121,6 +122,7 @@ export function GraphCanvas({
   missionText: string
   onMission: () => void
   onLinks: (id: string, parentIds: string[]) => void
+  onFree: (a: string, b: string, on: boolean) => void
   filter: GraphFilter
   showText: boolean
   small: boolean
@@ -139,7 +141,7 @@ export function GraphCanvas({
   const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [linking, setLinking] = useState<{ from: string; x: number; y: number } | null>(null)
+  const [linking, setLinking] = useState<{ from: string; kind: LinkKind; x: number; y: number } | null>(null)
   const [hoverLink, setHoverLink] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const linkPress = useRef<number | null>(null)
@@ -361,12 +363,24 @@ export function GraphCanvas({
     })
   })
 
+  const freeLines = freeEdges(notes).flatMap((edge) => {
+    const from = shownById.get(edge.fromId)
+    const to = edge.toId === GRAPH_MISSION ? mission : shownById.get(edge.toId)
+    return from && to ? [{ ...edge, from, to }] : []
+  })
+
   function nameOf(id: string) {
     return id === GRAPH_MISSION ? missionLabel(missionText) : shorten(byId.get(id)?.text ?? "")
   }
 
-  function linkIssue(fromId: string, toId: string): string | null {
-    return cardLinkIssue(fromId, toId, byId, rings)
+  function linkIssue(kind: LinkKind, fromId: string, toId: string): string | null {
+    return linkIssueFor(kind, fromId, toId, byId, rings)
+  }
+
+  function removeFree(a: string, b: string) {
+    onFree(a, b, false)
+    setHoverLink(null)
+    setNotice(`Removed the free line between ${nameOf(a)} and ${nameOf(b)}.`)
   }
 
   function targetAt(point: { x: number; y: number }, fromId: string): string | null {
@@ -399,13 +413,13 @@ export function GraphCanvas({
     setNotice(`Removed the link from ${nameOf(fromId)} to ${nameOf(toId)}.`)
   }
 
-  function handleHandleDown(event: React.PointerEvent<SVGGElement>, fromId: string) {
+  function handleHandleDown(event: React.PointerEvent<SVGGElement>, fromId: string, kind: LinkKind) {
     if (event.button !== 0) return
     event.stopPropagation()
     event.currentTarget.setPointerCapture?.(event.pointerId)
     linkPress.current = event.pointerId
     setNotice(null)
-    setLinking({ from: fromId, ...toWorld(event.clientX, event.clientY) })
+    setLinking({ from: fromId, kind, ...toWorld(event.clientX, event.clientY) })
   }
 
   function handleHandleMove(event: React.PointerEvent<SVGGElement>) {
@@ -414,16 +428,21 @@ export function GraphCanvas({
     setLinking((current) => (current ? { ...current, ...point } : current))
   }
 
-  function handleHandleUp(event: React.PointerEvent<SVGGElement>, fromId: string) {
+  function handleHandleUp(event: React.PointerEvent<SVGGElement>, fromId: string, kind: LinkKind) {
     if (linkPress.current !== event.pointerId) return
     linkPress.current = null
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     const target = targetAt(toWorld(event.clientX, event.clientY), fromId)
     setLinking(null)
     if (!target) return
-    const issue = linkIssue(fromId, target)
+    const issue = linkIssue(kind, fromId, target)
     if (issue) {
       setNotice(issue)
+      return
+    }
+    if (kind === "free") {
+      onFree(fromId, target, true)
+      setNotice(`Joined ${nameOf(fromId)} and ${nameOf(target)} with a free line.`)
       return
     }
     const note = byId.get(fromId)
@@ -514,6 +533,57 @@ export function GraphCanvas({
             ) : null}
 
             <g>
+              {freeLines.map((line) => {
+                const hot = hoverLink === line.id
+                return (
+                  <g
+                    key={line.id}
+                    data-graph-free={line.id}
+                    data-graph-free-line={`${line.fromId}~${line.toId}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Remove the free line between ${nameOf(line.fromId)} and ${nameOf(line.toId)}`}
+                    className="cursor-pointer outline-none"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onPointerEnter={() => setHoverLink(line.id)}
+                    onPointerLeave={() => setHoverLink((current) => (current === line.id ? null : current))}
+                    onFocus={() => setHoverLink(line.id)}
+                    onBlur={() => setHoverLink((current) => (current === line.id ? null : current))}
+                    onClick={() => removeFree(line.fromId, line.toId)}
+                    onContextMenu={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " " || event.key === "Delete" || event.key === "Backspace") {
+                        event.preventDefault()
+                        removeFree(line.fromId, line.toId)
+                      }
+                    }}
+                  >
+                    <title>Click to remove this free line</title>
+                    <line
+                      x1={line.from.x}
+                      y1={line.from.y}
+                      x2={line.to.x}
+                      y2={line.to.y}
+                      stroke="transparent"
+                      strokeWidth={Math.max(14, 18 / view.zoom)}
+                      strokeLinecap="round"
+                      pointerEvents="stroke"
+                    />
+                    <line
+                      x1={line.from.x}
+                      y1={line.from.y}
+                      x2={line.to.x}
+                      y2={line.to.y}
+                      stroke="var(--color-tie)"
+                      strokeOpacity={hot ? 1 : 0.8}
+                      strokeWidth={(hot ? 4.5 : 2.5) * Math.min(k, 1.6)}
+                      strokeDasharray={hot ? `${8 * Math.min(k, 1.6)} ${6 * Math.min(k, 1.6)}` : undefined}
+                      strokeLinecap="round"
+                      pointerEvents="none"
+                    />
+                  </g>
+                )
+              })}
               {links.map((link) => {
                 const hot = hoverLink === link.id
                 const toMission = link.toId === GRAPH_MISSION
@@ -687,7 +757,7 @@ export function GraphCanvas({
             {linking && linkSource ? (
               <g aria-hidden="true" pointerEvents="none">
                 {shownVertices
-                  .filter((v) => v.id !== linking.from && !linkIssue(linking.from, v.id))
+                  .filter((v) => v.id !== linking.from && !linkIssue(linking.kind, linking.from, v.id))
                   .map((v) => (
                     <circle
                       key={v.id}
@@ -695,19 +765,19 @@ export function GraphCanvas({
                       cy={v.y}
                       r={radius * 1.6}
                       fill="none"
-                      stroke="var(--color-accent)"
+                      stroke={linking.kind === "free" ? "var(--color-tie)" : "var(--color-accent)"}
                       strokeWidth={3}
                       strokeDasharray="6 5"
                       strokeOpacity={linkTarget === v.id ? 1 : 0.45}
                     />
                   ))}
-                {!linkIssue(linking.from, GRAPH_MISSION) ? (
+                {!linkIssue(linking.kind, linking.from, GRAPH_MISSION) ? (
                   <circle
                     cx={mission.x}
                     cy={mission.y}
                     r={GRAPH_MISSION_R * 1.35}
                     fill="none"
-                    stroke="var(--color-accent)"
+                    stroke={linking.kind === "free" ? "var(--color-tie)" : "var(--color-accent)"}
                     strokeWidth={3}
                     strokeDasharray="8 6"
                     strokeOpacity={linkTarget === GRAPH_MISSION ? 1 : 0.45}
@@ -718,7 +788,7 @@ export function GraphCanvas({
                   y1={linkSource.y}
                   x2={linkEnd ? linkEnd.x : linking.x}
                   y2={linkEnd ? linkEnd.y : linking.y}
-                  stroke="var(--color-accent)"
+                  stroke={linking.kind === "free" ? "var(--color-tie)" : "var(--color-accent)"}
                   strokeWidth={3 * Math.min(k, 1.6)}
                   strokeDasharray={`${8 * Math.min(k, 1.6)} ${6 * Math.min(k, 1.6)}`}
                   strokeLinecap="round"
@@ -726,35 +796,49 @@ export function GraphCanvas({
               </g>
             ) : null}
 
-            {handleVertex ? (
-              <g
-                data-graph-handle={handleVertex.id}
-                aria-hidden="true"
-                className="pointer-events-auto cursor-crosshair"
-                onPointerDown={(event) => handleHandleDown(event, handleVertex.id)}
-                onPointerMove={handleHandleMove}
-                onPointerUp={(event) => handleHandleUp(event, handleVertex.id)}
-                onPointerCancel={() => {
-                  linkPress.current = null
-                  setLinking(null)
-                }}
-                onContextMenu={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                }}
-              >
-                <title>Drag onto a card or the Mission to add a goal above</title>
-                <circle cx={handleVertex.x + (radius * 1.5 + 10) * 0.7071} cy={handleVertex.y - (radius * 1.5 + 10) * 0.7071} r={16} fill="transparent" />
-                <circle
-                  cx={handleVertex.x + (radius * 1.5 + 10) * 0.7071}
-                  cy={handleVertex.y - (radius * 1.5 + 10) * 0.7071}
-                  r={linking ? 9 : 7}
-                  fill="var(--color-accent)"
-                  stroke="var(--color-card)"
-                  strokeWidth={2.5}
-                />
-              </g>
-            ) : null}
+            {handleVertex
+              ? (["goal", "free"] as const).map((kind) => {
+                  const side = kind === "goal" ? 1 : -1
+                  const hx = handleVertex.x + side * (radius * 1.5 + 10) * 0.7071
+                  const hy = handleVertex.y - (radius * 1.5 + 10) * 0.7071
+                  const active = linking?.kind === kind
+                  return (
+                    <g
+                      key={kind}
+                      data-graph-handle={kind === "goal" ? handleVertex.id : undefined}
+                      data-graph-free-handle={kind === "free" ? handleVertex.id : undefined}
+                      aria-hidden="true"
+                      className="pointer-events-auto cursor-crosshair"
+                      onPointerDown={(event) => handleHandleDown(event, handleVertex.id, kind)}
+                      onPointerMove={handleHandleMove}
+                      onPointerUp={(event) => handleHandleUp(event, handleVertex.id, kind)}
+                      onPointerCancel={() => {
+                        linkPress.current = null
+                        setLinking(null)
+                      }}
+                      onContextMenu={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                      }}
+                    >
+                      <title>
+                        {kind === "goal"
+                          ? "Drag onto a card or the Mission to add a goal above"
+                          : "Drag onto any card or the Mission to join them with a free line"}
+                      </title>
+                      <circle cx={hx} cy={hy} r={16} fill="transparent" />
+                      <circle
+                        cx={hx}
+                        cy={hy}
+                        r={active ? 9 : 7}
+                        fill={kind === "goal" ? "var(--color-accent)" : "var(--color-tie)"}
+                        stroke="var(--color-card)"
+                        strokeWidth={2.5}
+                      />
+                    </g>
+                  )
+                })
+              : null}
 
             {shownVertices.map((vertex) => {
               const note = byId.get(vertex.id)

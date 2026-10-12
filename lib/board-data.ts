@@ -66,6 +66,8 @@ export type Note = {
   details?: CardDetails | null
   /** The goals above this card on the Map, in the order chosen: card ids and "mission". Empty means none. */
   parentIds?: string[]
+  /** Free lines: other cards, or "mission", this card is joined to. No ring is needed, and the Map and the shortest path ignore them. */
+  freeIds?: string[]
   /** Where the point sits on its Map ring, in radians. Empty means the Map places it. */
   mapAngle?: number | null
   /** The answers saved in the side panel of a Life goals or Project goals card. */
@@ -921,6 +923,26 @@ export function goalLinks(note: Note, byId: Map<string, Note>, rings: GoalRing[]
     const parent = byId.get(id)
     const parentRing = parent ? goalRingOf(parent, rings) : -1
     if (parent && parentRing >= 0 && parentRing < ring) found.push(id)
+  }
+  return found
+}
+
+/** One free line. `fromId` is the card that stores it; `toId` is another card or "mission". */
+export type FreeEdge = { id: string; fromId: string; toId: string }
+
+/** Every free line between existing cards or the mission, each pair once. It never reads rings. */
+export function freeEdges(notes: Note[]): FreeEdge[] {
+  const ids = new Set(notes.map((note) => note.id))
+  const seen = new Set<string>()
+  const found: FreeEdge[] = []
+  for (const note of notes) {
+    for (const toId of note.freeIds ?? []) {
+      if (toId === note.id || (toId !== "mission" && !ids.has(toId))) continue
+      const key = [note.id, toId].sort().join("~")
+      if (seen.has(key)) continue
+      seen.add(key)
+      found.push({ id: `${note.id}~${toId}`, fromId: note.id, toId })
+    }
   }
   return found
 }

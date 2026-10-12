@@ -2,8 +2,8 @@
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react"
 import clsx from "clsx"
-import { goalLinks, type GoalRing, type Note } from "@/lib/board-data"
-import { cardLinkIssue, MISSION_LINK } from "@/lib/card-links"
+import { freeEdges, goalLinks, type GoalRing, type Note } from "@/lib/board-data"
+import { linkIssueFor, MISSION_LINK, type LinkKind } from "@/lib/card-links"
 
 export type BoardLinkState = {
   rings: GoalRing[]
@@ -14,6 +14,7 @@ export type BoardLinkState = {
   missionText: string
   toWorld: (clientX: number, clientY: number) => { x: number; y: number }
   onLinks: (id: string, parentIds: string[]) => void
+  onFree: (a: string, b: string, on: boolean) => void
   onNotice: (message: string | null) => void
 }
 
@@ -57,11 +58,11 @@ const centerOf = (box: Box): Point => ({ x: box.x + box.w / 2, y: box.y + box.h 
  * it lives in the card's parentIds, so the Graph, the Map and the card window all change together.
  */
 export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: BoardLinkState; zoom: number }) {
-  const { rings, selectedId, all, missionText, toWorld, onLinks, onNotice } = links
+  const { rings, selectedId, all, missionText, toWorld, onLinks, onFree, onNotice } = links
   const rootRef = useRef<HTMLDivElement>(null)
   const press = useRef<number | null>(null)
   const [boxes, setBoxes] = useState<Map<string, Box>>(() => new Map())
-  const [linking, setLinking] = useState<{ from: string; x: number; y: number; target: string | null } | null>(null)
+  const [linking, setLinking] = useState<{ from: string; kind: LinkKind; x: number; y: number; target: string | null } | null>(null)
 
   const byId = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes])
 
@@ -108,6 +109,15 @@ export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: Board
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes, byId, rings, all, selectedId, boxes, mission])
 
+  const freeLines = useMemo(
+    () =>
+      freeEdges(notes)
+        .filter((edge) => all || (selectedId !== null && (edge.fromId === selectedId || edge.toId === selectedId)))
+        .filter((edge) => boxOf(edge.fromId) && boxOf(edge.toId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [notes, all, selectedId, boxes, mission],
+  )
+
   const showMission = all || selectedId !== null || linking !== null
   const handleBox = selectedId ? boxes.get(selectedId) : undefined
   const scale = Math.max(1, Math.min(1.8, 1 / zoom))
@@ -131,13 +141,18 @@ export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: Board
     onNotice(`Removed the link from ${nameOf(fromId)} to ${nameOf(toId)}.`)
   }
 
-  function handleDown(event: React.PointerEvent<HTMLDivElement>) {
+  function removeFree(a: string, b: string) {
+    onFree(a, b, false)
+    onNotice(`Removed the free line between ${nameOf(a)} and ${nameOf(b)}.`)
+  }
+
+  function handleDown(event: React.PointerEvent<HTMLDivElement>, kind: LinkKind) {
     if (event.button !== 0 || !selectedId) return
     event.stopPropagation()
     event.currentTarget.setPointerCapture(event.pointerId)
     press.current = event.pointerId
     onNotice(null)
-    setLinking({ from: selectedId, ...toWorld(event.clientX, event.clientY), target: null })
+    setLinking({ from: selectedId, kind, ...toWorld(event.clientX, event.clientY), target: null })
   }
 
   function handleMove(event: React.PointerEvent<HTMLDivElement>) {
@@ -153,13 +168,19 @@ export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: Board
     press.current = null
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     const from = linking?.from
+    const kind = linking?.kind ?? "goal"
     setLinking(null)
     if (!from) return
     const target = targetAt(event.clientX, event.clientY, from)
     if (!target) return
-    const issue = cardLinkIssue(from, target, byId, rings)
+    const issue = linkIssueFor(kind, from, target, byId, rings)
     if (issue) {
       onNotice(issue)
+      return
+    }
+    if (kind === "free") {
+      onFree(from, target, true)
+      onNotice(`Joined ${nameOf(from)} and ${nameOf(target)} with a free line.`)
       return
     }
     const note = byId.get(from)
@@ -180,6 +201,52 @@ export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: Board
             <path d="M0 0 L10 5 L0 10 z" fill="var(--color-accent)" />
           </marker>
         </defs>
+        {freeLines.map((line) => {
+          const from = boxOf(line.fromId)!
+          const to = boxOf(line.toId)!
+          const a = edgePoint(from, centerOf(to))
+          const b = edgePoint(to, centerOf(from))
+          const label = `Free line between ${nameOf(line.fromId)} and ${nameOf(line.toId)}. Click to remove.`
+          return (
+            <g
+              key={line.id}
+              data-board-control=""
+              data-board-free={line.id}
+              role="button"
+              tabIndex={0}
+              aria-label={label}
+              className="group pointer-events-none cursor-pointer outline-none"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  removeFree(line.fromId, line.toId)
+                }
+              }}
+            >
+              <line
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                strokeWidth={2.5 * scale}
+                stroke="var(--color-tie)"
+                strokeLinecap="round"
+                className="group-hover:stroke-release group-focus-visible:stroke-release"
+              />
+              <line
+                x1={a.x}
+                y1={a.y}
+                x2={b.x}
+                y2={b.y}
+                stroke="transparent"
+                strokeWidth={16 * scale}
+                strokeLinecap="round"
+                pointerEvents="stroke"
+                onClick={() => removeFree(line.fromId, line.toId)}
+              />
+            </g>
+          )
+        })}
         {lines.map((line) => {
           const from = boxOf(line.fromId)!
           const to = boxOf(line.toId)!
@@ -235,7 +302,7 @@ export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: Board
             strokeWidth={2.5 * scale}
             strokeDasharray={`${8 * scale} ${6 * scale}`}
             strokeLinecap="round"
-            className="stroke-accent"
+            stroke={linking?.kind === "free" ? "var(--color-tie)" : "var(--color-accent)"}
           />
         ) : null}
       </svg>
@@ -266,30 +333,41 @@ export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: Board
         </div>
       ) : null}
 
-      {handleBox && selectedId ? (
-        <div
-          data-board-control=""
-          data-link-handle={selectedId}
-          role="button"
-          tabIndex={-1}
-          aria-label="Link handle. Drag it onto another card or the Mission to make that a goal above this card."
-          title="Drag onto another card or the Mission"
-          onPointerDown={handleDown}
-          onPointerMove={handleMove}
-          onPointerUp={handleUp}
-          onPointerCancel={handleUp}
-          className="pointer-events-auto absolute flex cursor-crosshair touch-none items-center justify-center rounded-full border-2 border-board bg-accent shadow-md"
-          style={{
-            width: HANDLE,
-            height: HANDLE,
-            left: handleBox.x + handleBox.w,
-            top: handleBox.y + handleBox.h / 2,
-            transform: `translate(-50%, -50%) scale(${scale})`,
-          }}
-        >
-          <span aria-hidden="true" className="size-1.5 rounded-full bg-board" />
-        </div>
-      ) : null}
+      {handleBox && selectedId
+        ? (["goal", "free"] as const).map((kind) => (
+            <div
+              key={kind}
+              data-board-control=""
+              data-link-handle={kind === "goal" ? selectedId : undefined}
+              data-free-handle={kind === "free" ? selectedId : undefined}
+              role="button"
+              tabIndex={-1}
+              aria-label={
+                kind === "goal"
+                  ? "Link handle. Drag it onto another card or the Mission to make that a goal above this card."
+                  : "Free line handle. Drag it onto any card or the Mission to join them with a free line."
+              }
+              title={kind === "goal" ? "Drag onto another card or the Mission" : "Drag onto any card for a free line"}
+              onPointerDown={(event) => handleDown(event, kind)}
+              onPointerMove={handleMove}
+              onPointerUp={handleUp}
+              onPointerCancel={handleUp}
+              className={clsx(
+                "pointer-events-auto absolute flex cursor-crosshair touch-none items-center justify-center rounded-full border-2 border-board shadow-md",
+                kind === "goal" ? "bg-accent" : "bg-tie",
+              )}
+              style={{
+                width: HANDLE,
+                height: HANDLE,
+                left: handleBox.x + handleBox.w,
+                top: kind === "goal" ? handleBox.y + handleBox.h / 2 - HANDLE * scale * 0.7 : handleBox.y + handleBox.h / 2 + HANDLE * scale * 0.7,
+                transform: `translate(-50%, -50%) scale(${scale})`,
+              }}
+            >
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-board" />
+            </div>
+          ))
+        : null}
     </div>
   )
 }

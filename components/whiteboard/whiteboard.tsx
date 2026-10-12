@@ -480,6 +480,22 @@ export function Whiteboard() {
     setNotes((prev) => prev.map((note) => (note.id === id ? change(note) : note)))
   }, [])
 
+  const setFreeLine = useCallback((a: string, b: string, on: boolean) => {
+    setNotes((prev) =>
+      prev.map((note) => {
+        const ids = note.freeIds ?? []
+        if (on) {
+          if (note.id !== a || ids.includes(b)) return note
+          return { ...note, freeIds: [...ids, b] }
+        }
+        if ((note.id === a && ids.includes(b)) || (note.id === b && ids.includes(a))) {
+          return { ...note, freeIds: ids.filter((id) => id !== a && id !== b) }
+        }
+        return note
+      }),
+    )
+  }, [])
+
   const createCardAt = useCallback(
     (worldX: number, worldY: number, color: CardColorId) => {
       idCounter.current += 1
@@ -1187,6 +1203,7 @@ export function Whiteboard() {
   missionText,
   toWorld: screenToWorld,
   onLinks: (id, parentIds) => updateNote(id, (note) => ({ ...note, parentIds })),
+  onFree: setFreeLine,
   onNotice: setLinkNotice,
   }
   : null
@@ -1415,6 +1432,7 @@ export function Whiteboard() {
           missionText={missionText}
           onMission={openGraphMission}
           onLinks={(id, parentIds) => updateNote(id, (note) => ({ ...note, parentIds }))}
+          onFree={setFreeLine}
           onSelect={selectGraphVertex}
           onSpot={saveGraphSpot}
           onMenu={openCardMenu}
