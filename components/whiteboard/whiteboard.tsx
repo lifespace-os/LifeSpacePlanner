@@ -5,6 +5,10 @@ import clsx from "clsx"
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
 import {
   BUDGET_TAGS,
+  BUILT_IN_RINGS,
+  insertRing,
+  stripRingTags,
+  type GoalRing,
   LABEL_SET_IDS,
   labelSetLists,
   writeLabelSet,
@@ -162,6 +166,9 @@ export function Whiteboard() {
   const [mapSelected, setMapSelected] = useState<string | null>(null)
   const [mapFocus, setMapFocus] = useState<number | null>(null)
   const [mapScale, setMapScale] = useState(GOAL_RING_SCALE.initial)
+  const [rings, setRings] = useState<GoalRing[]>(BUILT_IN_RINGS)
+  const ringsRef = useRef(rings)
+  ringsRef.current = rings
   const [mapAllThreads, setMapAllThreads] = useState(false)
   const [mapPointSize, setMapPointSize] = useState(GOAL_POINT_SIZE.initial)
   const [mapNames, setMapNames] = useState<GoalNameMode>("pointer")
@@ -186,6 +193,7 @@ export function Whiteboard() {
   const goalsOn = mode === "goals"
   const goalsDropOn = goalsOn
   const mapOn = goalsOn && goalView === "map"
+  const graphOn = goalsOn && goalView === "graph"
   const goalFormOn = goalsOn && (goalView === "life" || goalView === "project")
   const notesRef = useRef(notes)
   notesRef.current = notes
@@ -286,7 +294,7 @@ export function Whiteboard() {
       const viewport = viewportRef.current
       const center = goalMapCenterRef.current
       if (!viewport || !center) return
-      const edges = goalMapEdges(mapScaleRef.current)
+      const edges = goalMapEdges(mapScaleRef.current, ringsRef.current)
       const radius = ring === null ? edges[edges.length - 1] : edges[ring + 1]
       const availW = Math.max(200, viewport.clientWidth - MAP_FIT_PADDING.left - MAP_FIT_PADDING.right)
       const availH = Math.max(200, viewport.clientHeight - MAP_FIT_PADDING.top - MAP_FIT_PADDING.bottom)
@@ -355,8 +363,8 @@ export function Whiteboard() {
       setGoalMapCenter({ x: Math.round(open.x), y: Math.round(open.y) })
       return
     }
-    const rings = goalMapEdges(mapScaleRef.current)
-    setGoalMapCenter({ x: Math.round(right + IKIGAI_GAP + rings[rings.length - 1]), y: Math.round((top + bottom) / 2) })
+    const edges = goalMapEdges(mapScaleRef.current, ringsRef.current)
+    setGoalMapCenter({ x: Math.round(right + IKIGAI_GAP + edges[edges.length - 1]), y: Math.round((top + bottom) / 2) })
   }, [mapOn, goalMapCenter, ikigaiCenter, screenToWorld])
 
   useLayoutEffect(() => {
@@ -399,6 +407,12 @@ export function Whiteboard() {
     const frame = requestAnimationFrame(() => (visibleLayer === "map" ? fitMap(mapFocusRef.current) : fitAll()))
     return () => cancelAnimationFrame(frame)
   }, [visibleLayer, fitAll, fitMap])
+
+  useEffect(() => {
+    if (!mapOn || !goalMapCenter) return
+    const frame = requestAnimationFrame(() => fitMap(mapFocusRef.current))
+    return () => cancelAnimationFrame(frame)
+  }, [rings, mapOn, goalMapCenter, fitMap])
 
   useEffect(() => {
     if (mapOn) return
@@ -451,7 +465,7 @@ export function Whiteboard() {
           labels: {},
           task: null,
         }
-        if (levelTag) return [...prev, setGoalLevel(card, levelTag)]
+        if (levelTag) return [...prev, setGoalLevel(card, levelTag, ringsRef.current)]
         return [...prev, layer ? retag(card, layer.tags, area) : card]
       })
       if (levelTag) {
@@ -730,7 +744,7 @@ export function Whiteboard() {
   const saveCard = useCallback(
     (id: string, plan: CardPlan) =>
       updateNote(id, (note) => {
-        const base = plan.setLevel ? setGoalLevel(note, "task") : note
+        const base = plan.setLevel ? setGoalLevel(note, "task", ringsRef.current) : note
         let hashtags = base.hashtags
         for (const setId of LABEL_SET_IDS) {
           const chosen = plan.sets?.[setId]
@@ -780,7 +794,7 @@ export function Whiteboard() {
   const commitMapPoint = useCallback(
     (id: string, change: GoalMapCommit) =>
       updateNote(id, (note) => ({
-        ...(change.level ? setGoalLevel(note, change.level) : note),
+        ...(change.level ? setGoalLevel(note, change.level, ringsRef.current) : note),
         mapAngle: change.angle,
       })),
     [updateNote],
@@ -792,12 +806,27 @@ export function Whiteboard() {
       setMapSelected((current) => {
         if (ring === null || !current) return current
         const note = notes.find((n) => n.id === current)
-        return note && goalRingOf(note) === ring ? current : null
+        return note && goalRingOf(note, ringsRef.current) === ring ? current : null
       })
       fitMap(ring)
     },
     [fitMap, notes],
   )
+
+  const addMapRing = useCallback((name: string, afterId: string) => {
+    setRings((prev) => insertRing(prev, name, afterId) ?? prev)
+    setMapFocus(null)
+  }, [])
+
+  /** Removing an added ring takes its hashtag off the cards. The main rings never come here. */
+  const removeMapRing = useCallback((id: string) => {
+    const ring = ringsRef.current.find((r) => r.id === id)
+    if (!ring || !ring.custom) return
+    setNotes((prev) => stripRingTags(prev, ring))
+    setRings((prev) => prev.filter((r) => r.id !== id))
+    setMapFocus(null)
+    setMapSelected(null)
+  }, [])
 
   /** What sits under the pointer while a card is dragged: the side panel, a step or move, or a diagram region. */
   const ikigaiTargetAt = useCallback(
@@ -839,7 +868,7 @@ export function Whiteboard() {
       if (goalsDropOn) {
         const level = getGoalLevel(target)
         if (!level) return false
-        setNotes((prev) => prev.map((note) => (ids.includes(note.id) ? setGoalLevel(note, level.tag) : note)))
+        setNotes((prev) => prev.map((note) => (ids.includes(note.id) ? setGoalLevel(note, level.tag, ringsRef.current) : note)))
         return true
       }
       if (markersOn) {
@@ -972,8 +1001,8 @@ export function Whiteboard() {
   }, [missionText, openMissionView])
 
   const spaceMapPoints = useCallback(
-    () => setNotes((prev) => spaceGoalPoints(prev, mapScale, mapPointSize)),
-    [mapScale, mapPointSize],
+    () => setNotes((prev) => spaceGoalPoints(prev, mapScale, mapPointSize, rings)),
+    [mapScale, mapPointSize, rings],
   )
 
   const closeMenu = useCallback(() => setMenu(null), [])
@@ -1046,6 +1075,7 @@ export function Whiteboard() {
           mapOn && goalMapCenter
             ? {
                 center: goalMapCenter,
+                rings,
                 scale: mapScale,
                 pointSize: mapPointSize,
                 names: mapNames,
@@ -1289,7 +1319,16 @@ export function Whiteboard() {
         </>
       ) : null}
 
-      {goalsOn ? (
+      {graphOn ? (
+        <section
+          aria-label="Graph"
+          className="absolute inset-x-0 top-[11rem] bottom-0 flex items-center justify-center bg-board"
+        >
+          <h2 className="font-serif text-5xl text-ink-soft">Graph</h2>
+        </section>
+      ) : null}
+
+      {goalsOn && !graphOn ? (
         <>
           <div className="pointer-events-none absolute top-[11.5rem] bottom-24 left-4 flex min-h-0 flex-col items-start gap-3">
             {goalFormNote && goalCard ? (
@@ -1353,12 +1392,15 @@ export function Whiteboard() {
             <GoalsPanel
               view={goalView}
               notes={notes}
+              rings={rings}
               missionText={missionText}
               hoverId={dropHover}
               focusRing={mapFocus}
               selectedId={mapSelected}
               onFocusRing={focusMapRing}
               onSelectPoint={setMapSelected}
+              onAddRing={addMapRing}
+              onRemoveRing={removeMapRing}
               onClose={() => setGoalsPanelOpen(false)}
               onRemoveLevel={untagCard}
             />
@@ -1451,7 +1493,7 @@ export function Whiteboard() {
           onReset={() => zoomAtCenter(1 / view.zoom)}
           onFit={() => (mapOn && goalMapCenter ? fitMap(mapFocus) : fitAll())}
         />
-        {mapOn ? null : (
+        {mapOn || graphOn ? null : (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
             <CardDock color={dockColor} onColorChange={setDockColor} onDrop={dropFromDock} onPlaceCenter={placeAtCenter} />
           </div>
@@ -1500,14 +1542,14 @@ export function Whiteboard() {
             updateNote(menuNote.id, (note) => ({ ...note, hashtags: note.hashtags.filter((t) => t !== tag) }))
           }
           goalAbove={
-  goalRingOf(menuNote) < 0
+  goalRingOf(menuNote, rings) < 0
   ? undefined
   : {
-  value: goalLink(menuNote, new Map(notes.map((n) => [n.id, n]))) ?? "",
+  value: goalLink(menuNote, new Map(notes.map((n) => [n.id, n])), rings) ?? "",
   options: [
   { id: "mission", label: "The mission" },
   ...notes
-  .filter((n) => goalRingOf(n) >= 0 && goalRingOf(n) === goalRingOf(menuNote) - 1)
+  .filter((n) => goalRingOf(n, rings) >= 0 && goalRingOf(n, rings) === goalRingOf(menuNote, rings) - 1)
   .map((n) => ({ id: n.id, label: n.text.trim().slice(0, 48) || "Untitled card" })),
   ],
   onChange: (value) => updateNote(menuNote.id, (note) => ({ ...note, parentId: value || null })),
@@ -1516,9 +1558,9 @@ export function Whiteboard() {
   fields={{
             text: menuNote.text,
             onText: (text) => updateNote(menuNote.id, (note) => ({ ...note, text })),
-            level: goalLevelOf(menuNote) ?? "",
+            level: goalLevelOf(menuNote, rings) ?? "",
             levels: GOAL_LEVELS.map((level) => ({ tag: level.tag, name: level.name })),
-            onLevel: (tag) => updateNote(menuNote.id, (note) => setGoalLevel(note, tag)),
+            onLevel: (tag) => updateNote(menuNote.id, (note) => setGoalLevel(note, tag, rings)),
           }}
           showEditWords={!mapOn}
           onEdit={() => startEdit(menuNote.id)}

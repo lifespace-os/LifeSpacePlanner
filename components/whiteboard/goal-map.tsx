@@ -2,7 +2,6 @@
 
 import { useRef, useState, type CSSProperties } from "react"
 import {
-  GOAL_RING_NAMES,
   GOAL_RING_TAGS,
   clampGoalAngle,
   getCardColor,
@@ -14,6 +13,7 @@ import {
   goalThreadsFor,
   layoutGoalMap,
   type GoalNameMode,
+  type GoalRing,
   type IkigaiCenter,
   type Note,
 } from "@/lib/board-data"
@@ -63,12 +63,13 @@ type Press = { id: string; pointerId: number; startX: number; startY: number; mo
 type DragState = { id: string; angle: number; level: string | null }
 
 /**
- * The Map: a small Mission circle at the center, four rings around it, and a point for every card that has a level.
+ * The Map: a small Mission circle at the center, the rings around it, and a point for every card that has a level.
  * It replaces the whiteboard cards while Map is open, and it moves with pan and zoom.
  */
 export function GoalMapLayer({
   center,
   notes,
+  rings,
   scale,
   pointSize,
   names,
@@ -84,6 +85,7 @@ export function GoalMapLayer({
 }: {
   center: IkigaiCenter
   notes: Note[]
+  rings: GoalRing[]
   scale: number
   pointSize: number
   names: GoalNameMode
@@ -102,23 +104,24 @@ export function GoalMapLayer({
   const press = useRef<Press | null>(null)
   const dragRef = useRef<DragState | null>(null)
 
-  const edges = goalMapEdges(scale)
+  const edges = goalMapEdges(scale, rings)
   const half = edges[edges.length - 1]
   const size = half * 2
   const { points, threads } = layoutGoalMap(notes, { x: half, y: half }, {
     scale,
     pointSize,
+    rings,
     drag: drag ? { id: drag.id, angle: drag.angle } : null,
   })
   const byId = new Map(notes.map((note) => [note.id, note]))
   const shown = new Set(points.filter((p) => focusRing === null || p.ring === focusRing).map((p) => p.id))
-  const chain = selectedId ? goalThreadsFor(notes, selectedId) : null
+  const chain = selectedId ? goalThreadsFor(notes, selectedId, rings) : null
   const k = Math.max(1, Math.min(2.2, 0.75 / zoom))
   const base = pointSize / 2
 
   const dragged = drag ? byId.get(drag.id) : null
-  const hoverTag = drag && dragged && drag.level && drag.level !== goalLevelOf(dragged) ? drag.level : null
-  const hoverRing = hoverTag ? GOAL_RING_TAGS.findIndex((tags) => tags.includes(hoverTag)) : -1
+  const hoverTag = drag && dragged && drag.level && drag.level !== goalLevelOf(dragged, rings) ? drag.level : null
+  const hoverRing = hoverTag ? rings.findIndex((ring) => ring.tags.includes(hoverTag)) : -1
 
   function hoverPath() {
     const inner = edges[hoverRing]
@@ -138,7 +141,7 @@ export function GoalMapLayer({
   function moveTo(id: string, level: string, event: React.PointerEvent<SVGGElement>) {
     const world = toWorld(event.clientX, event.clientY)
     const raw = Math.atan2(world.y - center.y, world.x - center.x)
-    const next = { id, angle: clampGoalAngle(level, raw), level: goalMapTagAt(world.x, world.y, center, scale) }
+    const next = { id, angle: clampGoalAngle(level, raw), level: goalMapTagAt(world.x, world.y, center, scale, rings) }
     dragRef.current = next
     setDrag(next)
   }
@@ -191,12 +194,12 @@ export function GoalMapLayer({
         width={size}
         height={size}
         role="group"
-        aria-label="Goal map. The Mission circle is in the center, with rings for needs, dreams, and wants, life goals, project goals, and tasks."
+        aria-label={`Goal map. The Mission circle is in the center, with rings for ${rings.map((ring) => ring.name.toLowerCase()).join(", ")}.`}
         className="absolute inset-0 overflow-visible"
       >
-        {GOAL_RING_NAMES.map((name, ring) => (
+        {rings.map(({ id }, ring) => (
           <path
-            key={name}
+            key={id}
             d={annulus(half, edges[ring], edges[ring + 1])}
             fillRule="evenodd"
             fill="var(--color-accent)"
@@ -268,9 +271,9 @@ export function GoalMapLayer({
           </text>
         </g>
 
-        {GOAL_RING_NAMES.map((name, ring) => (
+        {rings.map(({ id, name }, ring) => (
           <text
-            key={name}
+            key={id}
             x={half}
             y={half - (edges[ring] + edges[ring + 1]) / 2 + 6}
             textAnchor="middle"
@@ -329,7 +332,8 @@ export function GoalMapLayer({
         {points.map((point) => {
           const note = byId.get(point.id)
           if (!note || !shown.has(point.id)) return null
-          const level = goalLevelOf(note) ?? ""
+          const level = goalLevelOf(note, rings) ?? ""
+          const ringName = rings[point.ring]?.name ?? "no level"
           const color = getCardColor(note.color)
           const selected = selectedId === point.id
           const active = selected || hoverId === point.id || drag?.id === point.id
@@ -341,7 +345,7 @@ export function GoalMapLayer({
               role="button"
               tabIndex={0}
               aria-pressed={selected}
-              aria-label={`${shorten(note.text)}, ${getGoalLevel(level)?.name ?? "no level"}`}
+              aria-label={`${shorten(note.text)}, ${getGoalLevel(level)?.name ?? ringName}`}
               className="group/point pointer-events-auto cursor-grab outline-none active:cursor-grabbing"
               onPointerEnter={() => setHoverId(point.id)}
               onPointerLeave={() => setHoverId((current) => (current === point.id ? null : current))}

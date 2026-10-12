@@ -6,7 +6,7 @@ export type LabelView = "spheres" | "happiness" | "budget"
 
 export type MissionView = "sentence" | "ikigai" | "markers"
 
-export type GoalView = "needs" | "life" | "project" | "tasks" | "map"
+export type GoalView = "needs" | "life" | "project" | "tasks" | "map" | "graph"
 
 export type ZoneId = "want" | "must"
 
@@ -739,7 +739,7 @@ export const GOAL_LEVELS: GoalLevel[] = [
 export const GOAL_TAGS = GOAL_LEVELS.map((level) => level.tag)
 
 /** The levels that each view takes drops for. Map takes none. */
-export const GOAL_VIEW_LEVELS: Record<Exclude<GoalView, "map">, string[]> = {
+export const GOAL_VIEW_LEVELS: Record<Exclude<GoalView, "map" | "graph">, string[]> = {
   needs: ["need", "dream", "want"],
   life: ["life-goal"],
   project: ["project-goal"],
@@ -750,36 +750,90 @@ export function getGoalLevel(tag: string | null | undefined) {
   return GOAL_LEVELS.find((level) => level.tag === tag) ?? null
 }
 
+/**
+ * A ring of the Map. The main rings are fixed. A ring the person adds carries one hashtag, made from its name,
+ * and lives only on the Map.
+ */
+export type GoalRing = { id: string; name: string; tags: string[]; width: number; custom: boolean }
+
+/** The main rings, counted from the mission outward: 0 needs, dreams, wants; 1 life; 2 project; 3 tasks. */
+export const BUILT_IN_RINGS: GoalRing[] = [
+  { id: "needs", name: "Needs, dreams, and wants", tags: ["need", "dream", "want"], width: 120, custom: false },
+  { id: "life", name: "Life goals", tags: ["life-goal"], width: 150, custom: false },
+  { id: "project", name: "Project goals", tags: ["project-goal"], width: 200, custom: false },
+  { id: "tasks", name: "Tasks", tags: ["task"], width: 260, custom: false },
+]
+
+export const GOAL_RING_TAGS: string[][] = BUILT_IN_RINGS.map((ring) => ring.tags)
+
+export const GOAL_RING_NAMES = BUILT_IN_RINGS.map((ring) => ring.name)
+
+/** Width of an added ring before the thickness factor. */
+export const NEW_RING_WIDTH = 150
+
+export function ringTags(rings: GoalRing[]) {
+  return rings.flatMap((ring) => ring.tags)
+}
+
 /** The goal level a card carries, or null when it has none. */
-export function goalLevelOf(note: Note): string | null {
-  const found = note.hashtags.find((t) => GOAL_TAGS.includes(t.toLowerCase()))
+export function goalLevelOf(note: Note, rings: GoalRing[] = BUILT_IN_RINGS): string | null {
+  const tags = ringTags(rings)
+  const found = note.hashtags.find((t) => tags.includes(t.toLowerCase()))
   return found ? found.toLowerCase() : null
 }
 
-/** Map ring of a level, counted from the mission outward: 0 needs, dreams, wants; 1 life; 2 project; 3 tasks. */
-export const GOAL_RING_TAGS: string[][] = [["need", "dream", "want"], ["life-goal"], ["project-goal"], ["task"]]
+export function goalRingOf(note: Note, rings: GoalRing[] = BUILT_IN_RINGS): number {
+  const level = goalLevelOf(note, rings)
+  return level ? rings.findIndex((ring) => ring.tags.includes(level)) : -1
+}
 
-export const GOAL_RING_NAMES = ["Needs, dreams, and wants", "Life goals", "Project goals", "Tasks"]
+/** The hashtag a new ring would carry, or null when the name leaves nothing to write. A taken tag gets a number. */
+export function newRingTag(name: string, rings: GoalRing[]): string | null {
+  const base = groupTag(name)
+  if (!base) return null
+  const taken = new Set([...ringTags(rings), ...ringTags(BUILT_IN_RINGS)])
+  let tag = base
+  for (let n = 2; taken.has(tag); n++) tag = `${base.slice(0, 28)}-${n}`
+  return tag
+}
 
-export function goalRingOf(note: Note): number {
-  const level = goalLevelOf(note)
-  return level ? GOAL_RING_TAGS.findIndex((tags) => tags.includes(level)) : -1
+/** Adds a ring right after the ring with `afterId`, or at the end when that ring is not found. */
+export function insertRing(rings: GoalRing[], name: string, afterId: string): GoalRing[] | null {
+  const tag = newRingTag(name, rings)
+  if (!tag) return null
+  const ring: GoalRing = { id: `ring-${tag}`, name: name.trim().replace(/\s+/g, " "), tags: [tag], width: NEW_RING_WIDTH, custom: true }
+  const at = rings.findIndex((r) => r.id === afterId)
+  const index = at < 0 ? rings.length : at + 1
+  return [...rings.slice(0, index), ring, ...rings.slice(index)]
+}
+
+/** Takes a removed ring's hashtag off every card that carries it. Those cards lose their place on the ring and their link. */
+export function stripRingTags(notes: Note[], ring: GoalRing): Note[] {
+  const tags = ring.tags.map((t) => t.toLowerCase())
+  return notes.map((note) =>
+    note.hashtags.some((t) => tags.includes(t.toLowerCase()))
+      ? {
+          ...note,
+          hashtags: note.hashtags.filter((t) => !tags.includes(t.toLowerCase())),
+          mapAngle: null,
+          parentId: null,
+        }
+      : note,
+  )
 }
 
 /** Sets a card's level. A new level replaces the previous one; other hashtags stay. A link survives only on the same ring. */
-export function setGoalLevel(note: Note, tag: string): Note {
-  const ring = goalRingOf(note)
-  const level = goalLevelOf(note)
-  const next = retag(note, GOAL_TAGS, tag)
-  const nextRing = GOAL_RING_TAGS.findIndex((tags) => tags.includes(tag))
+export function setGoalLevel(note: Note, tag: string, rings: GoalRing[] = BUILT_IN_RINGS): Note {
+  const ring = goalRingOf(note, rings)
+  const level = goalLevelOf(note, rings)
+  const next = retag(note, ringTags(rings), tag)
+  const nextRing = rings.findIndex((r) => r.tags.includes(tag))
   const kept = level === tag ? next : { ...next, mapAngle: null }
   return ring !== nextRing && kept.parentId ? { ...kept, parentId: null } : kept
 }
 
 /** Radius of the small mission circle in canvas pixels. It does not change with ring thickness. */
 export const GOAL_MAP_MISSION_RADIUS = 110
-
-const GOAL_RING_WIDTHS = [120, 150, 200, 260]
 
 /** The thickness field: a factor on every ring width, typed as a percent. The top is a guard against a typo, not a design limit. */
 export const GOAL_RING_SCALE = { min: 0.2, max: 10, step: 0.1, initial: 1 }
@@ -795,10 +849,10 @@ export const GOAL_NAME_MODES: { id: GoalNameMode; label: string }[] = [
   { id: "always", label: "Always" },
 ]
 
-/** Radii of the Map: the mission circle, then four rings that widen toward the outside. */
-export function goalMapEdges(scale = GOAL_RING_SCALE.initial): number[] {
+/** Radii of the Map: the mission circle, then one edge for every ring, outward. */
+export function goalMapEdges(scale = GOAL_RING_SCALE.initial, rings: GoalRing[] = BUILT_IN_RINGS): number[] {
   const edges = [GOAL_MAP_MISSION_RADIUS]
-  for (const width of GOAL_RING_WIDTHS) edges.push(edges[edges.length - 1] + width * scale)
+  for (const ring of rings) edges.push(edges[edges.length - 1] + ring.width * scale)
   return edges
 }
 
@@ -815,14 +869,20 @@ export function goalSectorStart(index: number) {
 }
 
 /** The level a canvas point stands for on the Map, or null over the mission or outside the rings. */
-export function goalMapTagAt(x: number, y: number, center: IkigaiCenter, scale = GOAL_RING_SCALE.initial): string | null {
-  const edges = goalMapEdges(scale)
+export function goalMapTagAt(
+  x: number,
+  y: number,
+  center: IkigaiCenter,
+  scale = GOAL_RING_SCALE.initial,
+  rings: GoalRing[] = BUILT_IN_RINGS,
+): string | null {
+  const edges = goalMapEdges(scale, rings)
   const dx = x - center.x
   const dy = y - center.y
   const distance = Math.hypot(dx, dy)
   if (distance < edges[0] || distance > edges[edges.length - 1]) return null
   const ring = edges.findIndex((edge, i) => i > 0 && distance <= edge) - 1
-  if (ring !== 0) return GOAL_RING_TAGS[ring][0]
+  if (ring !== 0) return rings[ring].tags[0]
   const turn = (((Math.atan2(dy, dx) + Math.PI / 2) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
   return GOAL_RING_TAGS[0][Math.min(2, Math.floor(turn / SECTOR))]
 }
@@ -845,21 +905,22 @@ export function clampGoalAngle(tag: string, angle: number) {
 }
 
 /** What a card is linked to on the Map: a card id, "mission", or null. A link counts only when it is valid now. */
-export function goalLink(note: Note, byId: Map<string, Note>): string | null {
-  const ring = goalRingOf(note)
+export function goalLink(note: Note, byId: Map<string, Note>, rings: GoalRing[] = BUILT_IN_RINGS): string | null {
+  const ring = goalRingOf(note, rings)
   if (ring < 0 || !note.parentId) return null
   if (note.parentId === "mission") return "mission"
   const parent = byId.get(note.parentId)
-  return parent && ring > 0 && goalRingOf(parent) === ring - 1 ? parent.id : null
+  const parentRing = parent ? goalRingOf(parent, rings) : -1
+  return parent && ring > 0 && parentRing >= 0 && parentRing < ring ? parent.id : null
 }
 
 /** The threads of a point: inward through the goals above it to the mission, and outward to everything below it. */
-export function goalThreadsFor(notes: Note[], id: string): Set<string> {
+export function goalThreadsFor(notes: Note[], id: string, rings: GoalRing[] = BUILT_IN_RINGS): Set<string> {
   const byId = new Map(notes.map((note) => [note.id, note]))
   const found = new Set<string>()
   let current = byId.get(id)
   while (current) {
-    const link = goalLink(current, byId)
+    const link = goalLink(current, byId, rings)
     if (!link) break
     found.add(current.id)
     current = link === "mission" ? undefined : byId.get(link)
@@ -868,7 +929,7 @@ export function goalThreadsFor(notes: Note[], id: string): Set<string> {
   while (queue.length > 0) {
     const parent = queue.shift()
     for (const note of notes) {
-      if (goalLink(note, byId) === parent && !found.has(note.id)) {
+      if (goalLink(note, byId, rings) === parent && !found.has(note.id)) {
         found.add(note.id)
         queue.push(note.id)
       }
@@ -886,14 +947,14 @@ export type GoalChain = {
   broken: boolean
 }
 
-export function goalChainFor(notes: Note[], id: string): GoalChain | null {
+export function goalChainFor(notes: Note[], id: string, rings: GoalRing[] = BUILT_IN_RINGS): GoalChain | null {
   const byId = new Map(notes.map((note) => [note.id, note]))
   let current = byId.get(id)
-  if (!current || goalRingOf(current) < 0) return null
+  if (!current || goalRingOf(current, rings) < 0) return null
   const steps: Note[] = []
   while (current) {
     steps.push(current)
-    const link: string | null = goalLink(current, byId)
+    const link: string | null = goalLink(current, byId, rings)
     if (!link) return { steps, reachesMission: false, broken: true }
     if (link === "mission") return { steps, reachesMission: true, broken: false }
     current = byId.get(link)
@@ -960,20 +1021,21 @@ const POINT_GAP = 78
 export function layoutGoalMap(
   notes: Note[],
   center: IkigaiCenter,
-  options: { scale?: number; pointSize?: number; drag?: { id: string; angle: number } | null } = {},
+  options: { scale?: number; pointSize?: number; rings?: GoalRing[]; drag?: { id: string; angle: number } | null } = {},
 ): { points: GoalMapPoint[]; threads: GoalMapThread[] } {
-  const edges = goalMapEdges(options.scale)
+  const rings = options.rings ?? BUILT_IN_RINGS
+  const edges = goalMapEdges(options.scale, rings)
   const drag = options.drag ?? null
   const pointGap = Math.max(POINT_GAP, (options.pointSize ?? GOAL_POINT_SIZE.initial) * 2.4)
   const byId = new Map(notes.map((note) => [note.id, note]))
   const angles = new Map<string, number>()
 
-  for (let ring = 0; ring < GOAL_RING_TAGS.length; ring++) {
-    const inRing = notes.filter((note) => goalRingOf(note) === ring)
+  for (let ring = 0; ring < rings.length; ring++) {
+    const inRing = notes.filter((note) => goalRingOf(note, rings) === ring)
     const radius = goalRingRadius(edges, ring)
     if (ring === 0) {
       GOAL_RING_TAGS[0].forEach((tag, sector) => {
-        const cards = inRing.filter((note) => goalLevelOf(note) === tag)
+        const cards = inRing.filter((note) => goalLevelOf(note, rings) === tag)
         cards.forEach((note, k) => {
           const slot = goalSectorStart(sector) + ((k + 1) / (cards.length + 1)) * SECTOR
           const wanted = drag?.id === note.id ? drag.angle : (note.mapAngle ?? slot)
@@ -982,9 +1044,9 @@ export function layoutGoalMap(
       })
       continue
     }
-    const loose = inRing.filter((note) => !angles.has(goalLink(note, byId) ?? ""))
+    const loose = inRing.filter((note) => !angles.has(goalLink(note, byId, rings) ?? ""))
     const wanted = inRing.map((note) => {
-      const link = goalLink(note, byId)
+      const link = goalLink(note, byId, rings)
       const above = link && link !== "mission" ? angles.get(link) : undefined
       const slot = loose.indexOf(note)
       const fallback = above ?? -Math.PI / 2 + (2 * Math.PI * (slot + 0.5)) / Math.max(1, loose.length)
@@ -1005,7 +1067,7 @@ export function layoutGoalMap(
   const points: GoalMapPoint[] = []
   const at = new Map<string, GoalMapPoint>()
   for (const note of notes) {
-    const ring = goalRingOf(note)
+    const ring = goalRingOf(note, rings)
     const angle = angles.get(note.id)
     if (ring < 0 || angle === undefined) continue
     const radius = goalRingRadius(edges, ring)
@@ -1017,7 +1079,7 @@ export function layoutGoalMap(
   const threads: GoalMapThread[] = []
   for (const note of notes) {
     const from = at.get(note.id)
-    const link = goalLink(note, byId)
+    const link = goalLink(note, byId, rings)
     if (!from || !link) continue
     if (link === "mission") {
       const dx = from.x - center.x
@@ -1036,17 +1098,22 @@ export function layoutGoalMap(
  * Spaces the points of every ring evenly along that ring, keeping their order.
  * The first ring spaces each level inside its own sector. Only the saved angle changes.
  */
-export function spaceGoalPoints(notes: Note[], scale: number, pointSize?: number): Note[] {
-  const { points } = layoutGoalMap(notes, { x: 0, y: 0 }, { scale, pointSize })
+export function spaceGoalPoints(
+  notes: Note[],
+  scale: number,
+  pointSize?: number,
+  rings: GoalRing[] = BUILT_IN_RINGS,
+): Note[] {
+  const { points } = layoutGoalMap(notes, { x: 0, y: 0 }, { scale, pointSize, rings })
   const angles = new Map<string, number>()
-  for (let ring = 1; ring < GOAL_RING_TAGS.length; ring++) {
+  for (let ring = 1; ring < rings.length; ring++) {
     const onRing = points.filter((point) => point.ring === ring).sort((a, b) => a.angle - b.angle)
     onRing.forEach((point, i) => {
       angles.set(point.id, goalAngle(onRing[0].angle + (2 * Math.PI * i) / onRing.length))
     })
   }
   return notes.map((note) => {
-    const ring = goalRingOf(note)
+    const ring = goalRingOf(note, rings)
     if (ring < 0) return note
     if (ring === 0) return note.mapAngle == null ? note : { ...note, mapAngle: null }
     const angle = angles.get(note.id)

@@ -1,4 +1,5 @@
 import clsx from "clsx"
+import type { ReactNode } from "react"
 import { MODES, type ClusterView, type GoalView, type LabelView, type Mode, type MissionView } from "@/lib/board-data"
 
 const LABEL_CONTROLS: { id: LabelView; name: string }[] = [
@@ -12,7 +13,12 @@ const GOAL_CONTROLS: { id: GoalView; name: string }[] = [
   { id: "life", name: "Life goals" },
   { id: "project", name: "Project goals" },
   { id: "tasks", name: "Tasks" },
+  { id: "map", name: "View" },
+]
+
+const VIEW_CONTROLS: { id: GoalView; name: string }[] = [
   { id: "map", name: "Map" },
+  { id: "graph", name: "Graph" },
 ]
 
 const CLUSTER_CONTROLS: { id: ClusterView; name: string }[] = [
@@ -111,11 +117,54 @@ export function ModeSwitcher({
         <ViewControls
           label="Goals view"
           items={GOAL_CONTROLS}
-          current={goalView}
-          onPick={onGoalView}
+          current={goalView === "graph" ? "map" : goalView}
+          onPick={(id) => onGoalView(id === "map" && goalView === "graph" ? "graph" : id)}
           align="right"
+          below={
+            goalView === "map" || goalView === "graph" ? (
+              <ButtonGroup label="Map or graph" items={VIEW_CONTROLS} current={goalView} onPick={onGoalView} />
+            ) : null
+          }
         />
       ) : null}
+    </div>
+  )
+}
+
+function ButtonGroup<T extends string>({
+  label,
+  items,
+  current,
+  onPick,
+}: {
+  label: string
+  items: { id: T; name: string }[]
+  current: T
+  onPick: (id: T) => void
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="flex w-max items-center gap-1 rounded-xl border border-line bg-board p-1 shadow-sm"
+    >
+      {items.map((item) => {
+        const active = item.id === current
+        return (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onPick(item.id)}
+            className={clsx(
+              "rounded-lg px-3.5 py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+              active ? "bg-ink text-board shadow" : "text-ink-soft hover:bg-desk hover:text-ink",
+            )}
+          >
+            {item.name}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -126,38 +175,19 @@ function ViewControls<T extends string>({
   current,
   onPick,
   align = "left",
+  below,
 }: {
   label: string
   items: { id: T; name: string }[]
   current: T
   onPick: (id: T) => void
   align?: "left" | "right"
+  below?: ReactNode
 }) {
   return (
-    <div className={clsx("absolute top-full z-10 mt-2 flex w-max flex-col", align === "right" ? "right-0 items-end" : "left-0 items-start")}>
-      <div
-        role="group"
-        aria-label={label}
-        className="flex w-max items-center gap-1 rounded-xl border border-line bg-board p-1 shadow-sm"
-      >
-        {items.map((item) => {
-          const active = item.id === current
-          return (
-            <button
-              key={item.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => onPick(item.id)}
-              className={clsx(
-                "rounded-lg px-3.5 py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                active ? "bg-ink text-board shadow" : "text-ink-soft hover:bg-desk hover:text-ink",
-              )}
-            >
-              {item.name}
-            </button>
-          )
-        })}
-      </div>
+    <div className={clsx("absolute top-full z-10 mt-2 flex w-max flex-col gap-2", align === "right" ? "right-0 items-end" : "left-0 items-start")}>
+      <ButtonGroup label={label} items={items} current={current} onPick={onPick} />
+      {below}
     </div>
   )
 }

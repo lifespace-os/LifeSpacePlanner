@@ -1,14 +1,15 @@
 import clsx from "clsx"
-import { Plus, X } from "lucide-react"
+import { Plus, Trash2, X } from "lucide-react"
+import { useState } from "react"
 import {
-  GOAL_RING_NAMES,
-  GOAL_RING_TAGS,
   GOAL_VIEW_LEVELS,
   getCardColor,
   getGoalLevel,
   goalChainFor,
   goalRingOf,
+  newRingTag,
   type GoalChain,
+  type GoalRing,
   hasHashtag,
   type GoalView,
   type Note,
@@ -30,10 +31,74 @@ const VIEW_TITLES: Record<GoalView, string> = {
   project: "Project goals",
   tasks: "Tasks",
   map: "Map",
+  graph: "Graph",
+}
+
+const FIELD_CLASS =
+  "w-full rounded-lg border border-line bg-board px-3 py-2 text-sm text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-accent"
+
+/** Adds a ring with a name and a place: the ring it sits after. */
+function AddRingForm({ rings, onAdd }: { rings: GoalRing[]; onAdd: (name: string, afterId: string) => void }) {
+  const [name, setName] = useState("")
+  const [afterId, setAfterId] = useState("")
+  const place = rings.some((ring) => ring.id === afterId) ? afterId : rings[rings.length - 1].id
+  const tag = name.trim() ? newRingTag(name, rings) : null
+
+  return (
+    <form
+      aria-label="Add a ring"
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (!tag) return
+        onAdd(name, place)
+        setName("")
+      }}
+      className="mx-1 mt-3 flex flex-col gap-2 border-t border-line px-2 pt-4 pb-2"
+    >
+      <h3 className="text-xs font-medium tracking-[0.16em] text-ink-soft uppercase">Add a ring</h3>
+      <label className="flex flex-col gap-1">
+        <span className="text-xs text-ink-soft">Name</span>
+        <input
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          maxLength={40}
+          placeholder="For example, Habits"
+          className={FIELD_CLASS}
+        />
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-xs text-ink-soft">Place: after this ring</span>
+        <select value={place} onChange={(event) => setAfterId(event.target.value)} className={FIELD_CLASS}>
+          {rings.map((ring) => (
+            <option key={ring.id} value={ring.id}>
+              {ring.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="min-h-4 text-xs text-ink-soft">{tag ? `Cards on it carry #${tag}` : "\u00A0"}</p>
+      <button
+        type="submit"
+        disabled={!tag}
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-sm font-medium text-board transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <Plus className="size-4" aria-hidden="true" />
+        Add ring
+      </button>
+    </form>
+  )
 }
 
 /** The selected point, each goal above it, then the mission. It stops, and says so, where a link is missing. */
-function GoalChainList({ chain, missionText }: { chain: GoalChain; missionText: string }) {
+function GoalChainList({
+  chain,
+  missionText,
+  rings,
+}: {
+  chain: GoalChain
+  missionText: string
+  rings: GoalRing[]
+}) {
   const saved = missionText.length > 0
   return (
     <section aria-label="Chain to the mission" className="mb-2 border-b border-line px-3 pt-1 pb-3">
@@ -53,7 +118,7 @@ function GoalChainList({ chain, missionText }: { chain: GoalChain; missionText: 
             </div>
             <div className="min-w-0 flex-1 pb-3">
               <p className="text-[11px] tracking-wide text-ink-soft uppercase">
-                {index === 0 ? "Selected" : "Goal above"} · {GOAL_RING_NAMES[goalRingOf(note)]}
+                {index === 0 ? "Selected" : "Goal above"} · {rings[goalRingOf(note, rings)]?.name}
               </p>
               <p className="text-sm text-ink break-words">{note.text.trim() || "Empty card"}</p>
             </div>
@@ -92,17 +157,21 @@ function GoalChainList({ chain, missionText }: { chain: GoalChain; missionText: 
 export function GoalsPanel({
   view,
   notes,
+  rings,
   missionText,
   hoverId,
   focusRing,
   selectedId,
   onFocusRing,
   onSelectPoint,
+  onAddRing,
+  onRemoveRing,
   onClose,
   onRemoveLevel,
 }: {
   view: GoalView
   notes: Note[]
+  rings: GoalRing[]
   missionText: string
   hoverId: string | null
   /** Map only: the ring the view is zoomed to, or null for the whole map. */
@@ -110,11 +179,14 @@ export function GoalsPanel({
   selectedId: string | null
   onFocusRing: (ring: number | null) => void
   onSelectPoint: (id: string) => void
+  onAddRing: (name: string, afterId: string) => void
+  onRemoveRing: (id: string) => void
   onClose: () => void
   onRemoveLevel: (id: string, tag: string) => void
 }) {
-  const levelTags = view === "map" ? [] : GOAL_VIEW_LEVELS[view]
-  const chain = view === "map" && selectedId ? goalChainFor(notes, selectedId) : null
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+  const levelTags = view === "map" || view === "graph" ? [] : GOAL_VIEW_LEVELS[view]
+  const chain = view === "map" && selectedId ? goalChainFor(notes, selectedId, rings) : null
 
   return (
     <aside aria-label={`${VIEW_TITLES[view]} panel`} className={WINDOW_CLASS}>
@@ -130,7 +202,7 @@ export function GoalsPanel({
 
       {view === "map" ? (
         <div className="mt-3 min-h-0 flex-1 overflow-y-auto border-t border-line px-2 py-2">
-          {chain ? <GoalChainList chain={chain} missionText={missionText} /> : null}
+          {chain ? <GoalChainList chain={chain} missionText={missionText} rings={rings} /> : null}
           <p className="px-3 pt-1 pb-2 text-xs text-ink-soft text-pretty">
             Pick a ring to zoom to it and show only its points. Right-click a point to edit it.
           </p>
@@ -144,33 +216,76 @@ export function GoalsPanel({
               >
                 <span className="min-w-0 flex-1 text-sm font-medium text-ink">Whole map</span>
                 <span className="shrink-0 text-sm text-ink-soft tabular-nums">
-                  {notes.filter((note) => goalRingOf(note) >= 0).length}
+                  {notes.filter((note) => goalRingOf(note, rings) >= 0).length}
                   <span className="sr-only"> cards</span>
                 </span>
               </button>
             </li>
-            {GOAL_RING_NAMES.map((name, ring) => {
-              const onRing = notes.filter((note) => goalRingOf(note) === ring)
+            {rings.map((ringInfo, ring) => {
+              const name = ringInfo.name
+              const onRing = notes.filter((note) => goalRingOf(note, rings) === ring)
               const focused = focusRing === ring
+              const confirming = confirmId === ringInfo.id
               return (
-                <li key={name}>
-                  <button
-                    type="button"
-                    aria-pressed={focused}
-                    onClick={() => onFocusRing(focused ? null : ring)}
-                    className={clsx(ROW_CLASS, focused && "bg-accent-soft")}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium text-ink">{name}</span>
-                      <span className="block text-xs text-ink-soft">
-                        {GOAL_RING_TAGS[ring].map((tag) => `#${tag}`).join(" ")}
+                <li key={ringInfo.id}>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      aria-pressed={focused}
+                      onClick={() => onFocusRing(focused ? null : ring)}
+                      className={clsx(ROW_CLASS, "min-w-0 flex-1", focused && "bg-accent-soft")}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium text-ink">{name}</span>
+                        <span className="block text-xs text-ink-soft">
+                          {ringInfo.tags.map((tag) => `#${tag}`).join(" ")}
+                        </span>
                       </span>
-                    </span>
-                    <span className="shrink-0 text-sm text-ink-soft tabular-nums">
-                      {onRing.length}
-                      <span className="sr-only"> {onRing.length === 1 ? "card" : "cards"}</span>
-                    </span>
-                  </button>
+                      <span className="shrink-0 text-sm text-ink-soft tabular-nums">
+                        {onRing.length}
+                        <span className="sr-only"> {onRing.length === 1 ? "card" : "cards"}</span>
+                      </span>
+                    </button>
+                    {ringInfo.custom ? (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmId(confirming ? null : ringInfo.id)}
+                        aria-label={`Remove the ring ${name}`}
+                        title="Remove this ring"
+                        className={CLOSE_CLASS}
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </button>
+                    ) : null}
+                  </div>
+                  {confirming ? (
+                    <div role="alertdialog" aria-label={`Remove ${name}?`} className="mx-3 mt-1 mb-2 rounded-lg border border-line bg-desk p-3">
+                      <p className="text-sm text-ink text-pretty">
+                        {onRing.length === 0
+                          ? `Remove the ring ${name}?`
+                          : `Remove the ring ${name}? ${onRing.length === 1 ? "1 card loses" : `${onRing.length} cards lose`} #${ringInfo.tags[0]} and its place on the Map.`}
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfirmId(null)
+                            onRemoveRing(ringInfo.id)
+                          }}
+                          className="rounded-lg bg-ink px-3 py-1.5 text-sm font-medium text-board focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        >
+                          Remove ring
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmId(null)}
+                          className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-soft transition-colors hover:bg-card hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+                        >
+                          Keep it
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                   {focused ? (
                     <ul aria-label={`Points on ${name}`} className="mt-0.5 mb-1.5 ml-3 flex flex-col border-l border-line">
                       {onRing.length === 0 ? (
@@ -203,6 +318,7 @@ export function GoalsPanel({
               )
             })}
           </ul>
+          <AddRingForm rings={rings} onAdd={onAddRing} />
         </div>
       ) : (
         <div className="mt-3 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto border-t border-line px-5 py-4">

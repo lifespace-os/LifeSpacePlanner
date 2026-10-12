@@ -9,6 +9,7 @@ import {
   type GoalNameMode,
   type IkigaiCenter,
   type Group,
+  type GoalRing,
   type LabelSetLists,
   type MissionChoice,
   type Mode,
@@ -54,6 +55,8 @@ export type IkigaiBoardState = {
 
 export type GoalMapBoardState = {
   center: IkigaiCenter
+  /** The rings in order from the mission outward: the main rings and any the person added. */
+  rings: GoalRing[]
   /** Factor on the ring widths, set by the thickness control. */
   scale: number
   /** Point diameter in world units, typed in the left window. */
@@ -345,6 +348,7 @@ export function Board({
           <GoalMapLayer
             center={goalMap.center}
               notes={notes}
+              rings={goalMap.rings}
               scale={goalMap.scale}
               pointSize={goalMap.pointSize}
               names={goalMap.names}

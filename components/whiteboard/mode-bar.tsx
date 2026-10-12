@@ -35,7 +35,8 @@ const GOAL_HINTS: Record<GoalView, string> = {
   project:
     "Drop a card in the window to make it a project goal. A new level replaces the previous one. Cards stay where they are.",
   tasks: "Drop a card in the window to make it a task. A new level replaces the previous one. Cards stay where they are.",
-  map: "The six levels and how many cards sit on each. A card does not need a parent.",
+  map: "The rings and how many cards sit on each. A card does not need a parent.",
+  graph: "An empty canvas for the Graph. It does not copy the rings.",
 }
 
 export function ModeBar({
@@ -80,7 +81,7 @@ export function ModeBar({
       name={mode.name}
       tone={isMission ? "mission" : "plain"}
       action={
-        mode.id === "goals" && goalView !== "map" ? (
+        mode.id === "goals" && goalView !== "map" && goalView !== "graph" ? (
           <button
             type="button"
             onClick={onMissionButton}
