@@ -32,21 +32,17 @@ export function ModeSwitcher({
   missionView,
   goalView,
   labelView,
-  wheelOnly,
   onChange,
   onClusterView,
   onMissionView,
   onGoalView,
   onLabelView,
-  onWheelOnly,
 }: {
   mode: Mode
   clusterView: ClusterView
   missionView: MissionView
   goalView: GoalView
   labelView: LabelView
-  wheelOnly: boolean
-  onWheelOnly: (on: boolean) => void
   onChange: (mode: Mode) => void
   onClusterView: (view: ClusterView) => void
   onMissionView: (view: MissionView) => void
@@ -98,7 +94,6 @@ export function ModeSwitcher({
                 current={labelView}
                 onPick={onLabelView}
                 align="right"
-                toggle={labelView === "budget" ? undefined : { name: "Wheel view", pressed: wheelOnly, onToggle: onWheelOnly }}
               />
             ) : null}
             {active && m.id === "mission" ? (
@@ -131,23 +126,15 @@ function ViewControls<T extends string>({
   current,
   onPick,
   align = "left",
-  toggle,
 }: {
   label: string
   items: { id: T; name: string }[]
   current: T
   onPick: (id: T) => void
   align?: "left" | "right"
-  /** An extra on/off view shown as its own control below the row; it does not replace the chosen item. */
-  toggle?: { name: string; pressed: boolean; onToggle: (on: boolean) => void }
 }) {
   return (
-    <div
-      className={clsx(
-        "absolute top-full z-10 mt-2 flex w-max flex-col gap-2",
-        align === "right" ? "right-0 items-end" : "left-0 items-start",
-      )}
-    >
+    <div className={clsx("absolute top-full z-10 mt-2 flex w-max flex-col", align === "right" ? "right-0 items-end" : "left-0 items-start")}>
       <div
         role="group"
         aria-label={label}
@@ -171,19 +158,6 @@ function ViewControls<T extends string>({
           )
         })}
       </div>
-      {toggle ? (
-        <button
-          type="button"
-          aria-pressed={toggle.pressed}
-          onClick={() => toggle.onToggle(!toggle.pressed)}
-          className={clsx(
-            "rounded-xl border border-line px-3.5 py-2 text-sm whitespace-nowrap shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-            toggle.pressed ? "bg-ink text-board" : "bg-board text-ink-soft hover:bg-desk hover:text-ink",
-          )}
-        >
-          {toggle.name}
-        </button>
-      ) : null}
     </div>
   )
 }

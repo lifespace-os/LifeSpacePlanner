@@ -1063,8 +1063,6 @@ export function Whiteboard() {
             missionView={missionView}
             goalView={goalView}
             labelView={labelView}
-            wheelOnly={sectorState.wheelOnly}
-            onWheelOnly={sectorState.setWheelOnly}
             onChange={(next) => (next === "goals" ? openGoalView(goalView) : changeMode(next))}
             onClusterView={openClusterView}
             onMissionView={openMissionView}
@@ -1348,8 +1346,10 @@ export function Whiteboard() {
               selectedIds={selectedIds}
               usedByOtherView={sectorState.usedByOtherView}
               openSector={sectorState.openSector}
-              dropOver={dropHover === "panel"}
-              onOpenSector={(id) => (id ? openSectorWindow(id) : sectorState.closeSector())}
+  dropOver={dropHover === "panel"}
+  wheelOnly={sectorState.wheelOnly}
+  onWheelOnly={sectorState.setWheelOnly}
+  onOpenSector={(id) => (id ? openSectorWindow(id) : sectorState.closeSector())}
               onSetId={sectorState.setSetId}
               onAdd={sectorState.addSector}
               onRename={sectorState.renameSector}

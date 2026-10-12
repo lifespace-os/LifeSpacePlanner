@@ -40,6 +40,8 @@ export function LabelsPanel({
   usedByOtherView,
   openSector,
   dropOver,
+  wheelOnly,
+  onWheelOnly,
   onOpenSector,
   onSetId,
   onAdd,
@@ -58,6 +60,8 @@ export function LabelsPanel({
   /** The sector whose cards are listed, or null. Its drop area is the second drop target of the window. */
   openSector: Sector | null
   dropOver: boolean
+  wheelOnly: boolean
+  onWheelOnly: (on: boolean) => void
   onOpenSector: (id: string | null) => void
   onSetId: (id: SphereSetId) => void
   onAdd: (name: string) => string | null
@@ -72,6 +76,7 @@ export function LabelsPanel({
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const inputId = useId()
   const errorId = useId()
+  const switchId = useId()
   const copy = COPY[view]
   const selected = notes.filter((note) => selectedIds.includes(note.id))
   const activeSet = LIFE_SPHERE_SETS.find((set) => set.id === setId)
@@ -101,6 +106,31 @@ export function LabelsPanel({
         </button>
       </div>
       <p className="mt-1.5 px-5 text-sm text-ink-soft text-pretty">{copy.hint}</p>
+
+      <div className="mt-3 flex items-center justify-between gap-3 px-5">
+        <span id={switchId} className="text-sm font-medium">
+          Wheel view
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={wheelOnly}
+          aria-labelledby={switchId}
+          onClick={() => onWheelOnly(!wheelOnly)}
+          className={clsx(
+            "relative h-6 w-11 shrink-0 rounded-full border border-line transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            wheelOnly ? "bg-ink" : "bg-board",
+          )}
+        >
+          <span
+            aria-hidden="true"
+            className={clsx(
+              "absolute top-0.5 left-0.5 size-4.5 rounded-full transition-transform",
+              wheelOnly ? "translate-x-5 bg-board" : "translate-x-0 bg-ink-soft",
+            )}
+          />
+        </button>
+      </div>
 
       {view === "spheres" ? (
         <div className="px-5 pt-3">
