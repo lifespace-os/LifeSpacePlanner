@@ -10,6 +10,8 @@ import {
   writeLabelSet,
   BUDGET_ZONE_GAP,
   BUDGET_ZONE_SIZE,
+  arrangeCards,
+  type CardSpot,
   budgetAreas,
   type BudgetZoneId,
   type BudgetZones,
@@ -411,6 +413,19 @@ export function Whiteboard() {
     return { areas: groupAreas(groups), tags: groups.map((g) => g.tag) }
   }, [budgetOn, budgetZones, mode, clusterView, zones, groups])
 
+  const layoutKey = mode === "clusters" ? `clusters:${clusterView}` : budgetOn ? "labels:budget" : null
+  const [layout, setLayout] = useState<{ key: string | null; spots: Record<string, CardSpot> }>({ key: null, spots: {} })
+  if (layout.key !== layoutKey) {
+    setLayout({ key: layoutKey, spots: layoutKey && layer ? arrangeCards(notes, layer.areas) : {} })
+  }
+  const layoutOn = layoutKey !== null && layout.key === layoutKey
+  const layoutRef = useRef<Record<string, CardSpot> | null>(null)
+  layoutRef.current = layoutOn ? layout.spots : null
+  const displayNotes = useMemo(
+    () => (layoutOn ? notes.map((note) => (layout.spots[note.id] ? { ...note, ...layout.spots[note.id] } : note)) : notes),
+    [layoutOn, layout.spots, notes],
+  )
+
   const updateNote = useCallback((id: string, change: (note: Note) => Note) => {
     setNotes((prev) => prev.map((note) => (note.id === id ? change(note) : note)))
   }, [])
@@ -518,27 +533,40 @@ export function Whiteboard() {
   }, [createCardAt, dockColor, screenToWorld])
 
   const moveNote = useCallback(
-    (id: string, x: number, y: number, centerX: number, centerY: number) =>
+    (id: string, x: number, y: number, centerX: number, centerY: number) => {
+      const spots = layoutRef.current
+      if (spots) setLayout((prev) => ({ ...prev, spots: { ...prev.spots, [id]: { x, y } } }))
       updateNote(id, (note) => {
-        const moved = { ...note, x, y }
+        const before = spots?.[id] ?? note
+        const moved = spots ? note : { ...note, x, y }
         if (!layer) return moved
-        const from = areaTagAt(layer.areas, centerX - (x - note.x), centerY - (y - note.y))
+        const from = areaTagAt(layer.areas, centerX - (x - before.x), centerY - (y - before.y))
         const to = areaTagAt(layer.areas, centerX, centerY)
         return reconcile(moved, layer.tags, from, to)
-      }),
+      })
+    },
     [layer, updateNote],
   )
 
   const moveNotes = useCallback(
     (moves: GroupMove[]) => {
       const byId = new Map(moves.map((move) => [move.id, move]))
+      const spots = layoutRef.current
+      if (spots) {
+        setLayout((prev) => {
+          const next = { ...prev.spots }
+          for (const move of moves) next[move.id] = { x: move.x, y: move.y }
+          return { ...prev, spots: next }
+        })
+      }
       setNotes((prev) =>
         prev.map((note) => {
           const move = byId.get(note.id)
           if (!move) return note
-          const moved = { ...note, x: move.x, y: move.y }
+          const before = spots?.[note.id] ?? note
+          const moved = spots ? note : { ...note, x: move.x, y: move.y }
           if (!layer) return moved
-          const from = areaTagAt(layer.areas, move.centerX - (move.x - note.x), move.centerY - (move.y - note.y))
+          const from = areaTagAt(layer.areas, move.centerX - (move.x - before.x), move.centerY - (move.y - before.y))
           const to = areaTagAt(layer.areas, move.centerX, move.centerY)
           return reconcile(moved, layer.tags, from, to)
         }),
@@ -559,13 +587,26 @@ export function Whiteboard() {
   const reshapeAreas = useCallback(
     (tags: string[], prevAreas: TaggedArea[], nextAreas: TaggedArea[], carryTag: string | null, dx: number, dy: number) => {
       const centers = cardCenters()
+      const spots = layoutRef.current
+      if (spots && carryTag !== null) {
+        setLayout((prev) => {
+          const next = { ...prev.spots }
+          for (const note of notesRef.current) {
+            const center = centers.get(note.id)
+            if (!center || areaTagAt(prevAreas, center.x, center.y) !== carryTag) continue
+            const at = prev.spots[note.id] ?? note
+            next[note.id] = { x: at.x + dx, y: at.y + dy }
+          }
+          return { ...prev, spots: next }
+        })
+      }
       setNotes((prev) =>
         prev.map((note) => {
           const center = centers.get(note.id)
           if (!center) return note
           const from = areaTagAt(prevAreas, center.x, center.y)
           const carried = carryTag !== null && from === carryTag
-          const shifted = carried ? { ...note, x: note.x + dx, y: note.y + dy } : note
+          const shifted = carried && !spots ? { ...note, x: note.x + dx, y: note.y + dy } : note
           const to = areaTagAt(nextAreas, center.x + (carried ? dx : 0), center.y + (carried ? dy : 0))
           return reconcile(shifted, tags, from, to)
         }),
@@ -977,7 +1018,7 @@ export function Whiteboard() {
       )}
     >
       <Board
-        notes={notes}
+        notes={displayNotes}
         zones={zones}
         groups={groups}
         clusterView={clusterView}

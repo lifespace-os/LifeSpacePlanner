@@ -372,6 +372,59 @@ export function hasHashtag(note: Note, tag: string) {
   return note.hashtags.some((t) => t.toLowerCase() === tag.toLowerCase())
 }
 
+export type CardSpot = { x: number; y: number }
+
+const ARRANGE_GAP = 24
+const ARRANGE_PAD = 20
+const ARRANGE_HEADER = 56
+
+/**
+ * The temporary layout of Want / Must, Groups, and Investment or expense. Cards go into the first area
+ * whose hashtag they carry, in rows from the top left. Cards with no area go in rows below every area.
+ * Nothing here is saved on a card.
+ */
+export function arrangeCards(notes: Note[], areas: TaggedArea[]): Record<string, CardSpot> {
+  const stepX = CARD_WIDTH + ARRANGE_GAP
+  const stepY = CARD_MIN_HEIGHT + ARRANGE_GAP
+  const spots: Record<string, CardSpot> = {}
+  const inArea = new Map<string, Note[]>()
+  const outside: Note[] = []
+  for (const note of notes) {
+    const area = areas.find((a) => hasHashtag(note, a.tag))
+    if (!area) outside.push(note)
+    else inArea.set(area.tag, [...(inArea.get(area.tag) ?? []), note])
+  }
+  for (const area of areas) {
+    const list = inArea.get(area.tag) ?? []
+    if (list.length === 0) continue
+    const cols = Math.max(1, Math.floor((area.width - ARRANGE_PAD * 2 + ARRANGE_GAP) / stepX))
+    const rows = Math.ceil(list.length / cols)
+    const room = area.height - ARRANGE_HEADER - ARRANGE_PAD - CARD_MIN_HEIGHT
+    const rowStep = rows > 1 ? Math.min(stepY, Math.max(28, room / (rows - 1))) : stepY
+    const used = Math.min(cols, list.length)
+    const startX = area.left + (area.width - (used * stepX - ARRANGE_GAP)) / 2
+    list.forEach((note, i) => {
+      spots[note.id] = {
+        x: Math.round(startX + (i % cols) * stepX),
+        y: Math.round(area.top + ARRANGE_HEADER + Math.floor(i / cols) * rowStep),
+      }
+    })
+  }
+  if (outside.length > 0) {
+    const left = areas.length > 0 ? Math.min(...areas.map((a) => a.left)) : 0
+    const right = areas.length > 0 ? Math.max(...areas.map((a) => a.left + a.width)) : stepX * 4
+    const bottom = areas.length > 0 ? Math.max(...areas.map((a) => a.top + a.height)) : 0
+    const cols = Math.max(1, Math.floor((right - left + ARRANGE_GAP) / stepX))
+    outside.forEach((note, i) => {
+      spots[note.id] = {
+        x: left + (i % cols) * stepX,
+        y: bottom + 60 + Math.floor(i / cols) * (stepY + 40),
+      }
+    })
+  }
+  return spots
+}
+
 /** The three Labels sets. Each draws one shape on the face of a card. */
 export type LabelSetId = "spheres" | "happiness" | "budget"
 
