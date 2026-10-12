@@ -110,7 +110,7 @@ export const MODES: { id: Mode; name: string; hint: string }[] = [
     name: "Goals",
     hint: "Give each card a level, from a need or dream down to a task. A card does not need a parent.",
   },
-  { id: "labels", name: "Labels", hint: "Two views, open either first. Neither is required." },
+  { id: "labels", name: "Labels", hint: "Three views, open them in any order. None is required." },
   { id: "task", name: "Make a task", hint: "Select a card and turn it into a task. One card, one task." },
 ]
 

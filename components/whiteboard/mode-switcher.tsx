@@ -4,7 +4,7 @@ import { MODES, type ClusterView, type GoalView, type LabelView, type Mode, type
 const LABEL_CONTROLS: { id: LabelView; name: string }[] = [
   { id: "spheres", name: "Life spheres" },
   { id: "happiness", name: "Happiness components" },
-  { id: "budget", name: "Investment and Expense" },
+  { id: "budget", name: "Investment or expense" },
 ]
 
 const GOAL_CONTROLS: { id: GoalView; name: string }[] = [
@@ -97,6 +97,7 @@ export function ModeSwitcher({
                 items={LABEL_CONTROLS}
                 current={labelView}
                 onPick={onLabelView}
+                align="right"
                 toggle={labelView === "budget" ? undefined : { name: "Wheel view", pressed: wheelOnly, onToggle: onWheelOnly }}
               />
             ) : null}
@@ -137,50 +138,51 @@ function ViewControls<T extends string>({
   current: T
   onPick: (id: T) => void
   align?: "left" | "right"
-  /** An extra on/off view that sits after a divider and does not replace the chosen item. */
+  /** An extra on/off view shown as its own control below the row; it does not replace the chosen item. */
   toggle?: { name: string; pressed: boolean; onToggle: (on: boolean) => void }
 }) {
   return (
     <div
-      role="group"
-      aria-label={label}
       className={clsx(
-        "absolute top-full z-10 mt-2 flex w-max items-center gap-1 rounded-xl border border-line bg-board p-1 shadow-sm",
-        align === "right" ? "right-0" : "left-0",
+        "absolute top-full z-10 mt-2 flex w-max flex-col gap-2",
+        align === "right" ? "right-0 items-end" : "left-0 items-start",
       )}
     >
-      {items.map((item) => {
-        const active = item.id === current
-        return (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onPick(item.id)}
-            className={clsx(
-              "rounded-lg px-3.5 py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-              active ? "bg-ink text-board shadow" : "text-ink-soft hover:bg-desk hover:text-ink",
-            )}
-          >
-            {item.name}
-          </button>
-        )
-      })}
+      <div
+        role="group"
+        aria-label={label}
+        className="flex w-max items-center gap-1 rounded-xl border border-line bg-board p-1 shadow-sm"
+      >
+        {items.map((item) => {
+          const active = item.id === current
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onPick(item.id)}
+              className={clsx(
+                "rounded-lg px-3.5 py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                active ? "bg-ink text-board shadow" : "text-ink-soft hover:bg-desk hover:text-ink",
+              )}
+            >
+              {item.name}
+            </button>
+          )
+        })}
+      </div>
       {toggle ? (
-        <>
-          <span aria-hidden="true" className="mx-0.5 h-6 w-px bg-line" />
-          <button
-            type="button"
-            aria-pressed={toggle.pressed}
-            onClick={() => toggle.onToggle(!toggle.pressed)}
-            className={clsx(
-              "rounded-lg px-3.5 py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-              toggle.pressed ? "bg-ink text-board shadow" : "text-ink-soft hover:bg-desk hover:text-ink",
-            )}
-          >
-            {toggle.name}
-          </button>
-        </>
+        <button
+          type="button"
+          aria-pressed={toggle.pressed}
+          onClick={() => toggle.onToggle(!toggle.pressed)}
+          className={clsx(
+            "rounded-xl border border-line px-3.5 py-2 text-sm whitespace-nowrap shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            toggle.pressed ? "bg-ink text-board" : "bg-board text-ink-soft hover:bg-desk hover:text-ink",
+          )}
+        >
+          {toggle.name}
+        </button>
       ) : null}
     </div>
   )
