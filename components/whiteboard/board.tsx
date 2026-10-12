@@ -30,6 +30,7 @@ import { GroupAreas } from "./group-areas"
 import { IkigaiCircles, IkigaiLabels } from "./ikigai-diagram"
 import { GoalMapLayer, type GoalMapCommit } from "./goal-map"
 import { SectorWheel, type SectorWheelBoardState } from "./sector-wheel"
+import { BoardLinks, type BoardLinkState } from "./board-links"
 
 type PanState = {
   pointerId: number
@@ -94,6 +95,7 @@ export function Board({
   goalMap,
   wheel,
   budget,
+  links,
   tagOnly,
   onZoneMove,
   onZoneResize,
@@ -139,6 +141,8 @@ export function Board({
     onMove: (id: BudgetZoneId, dx: number, dy: number) => void
     onResize: (id: BudgetZoneId, zone: Zone) => void
   } | null
+  /** Set only on the free boards: the link handle on the selected card and the goal-above lines. */
+  links: BoardLinkState | null
   /** Markers view: cards move freely, and a drop on the marker area tags them and sends them back. */
   tagOnly: boolean
   onZoneMove: (id: ZoneId, dx: number, dy: number) => void
@@ -403,6 +407,8 @@ export function Board({
                 />
               )
             })}
+
+            {links ? <BoardLinks notes={notes} links={links} zoom={view.zoom} /> : null}
           </>
         )}
 

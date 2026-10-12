@@ -171,6 +171,8 @@ export function Whiteboard() {
   const [graphSpots, setGraphSpots] = useState<Record<string, GraphSpot>>({})
   const [graphSelected, setGraphSelected] = useState<string | null>(null)
   const [graphMissionOpen, setGraphMissionOpen] = useState(false)
+  const [allBoardLinks, setAllBoardLinks] = useState(false)
+  const [linkNotice, setLinkNotice] = useState<string | null>(null)
   const [graphShowText, setGraphShowText] = useState(true)
   const [graphSmall, setGraphSmall] = useState(false)
   const [graphFilter, setGraphFilter] = useState<GraphFilter>(NO_GRAPH_FILTER)
@@ -205,6 +207,11 @@ export function Whiteboard() {
   const mapOn = goalsOn && goalView === "map"
   const graphOn = goalsOn && goalView === "graph"
   const goalFormOn = goalsOn && (goalView === "life" || goalView === "project")
+  const boardLinksOn =
+    mode === "unload" ||
+    mode === "task" ||
+    mode === "mission" ||
+    (goalsOn && (goalView === "needs" || goalView === "life" || goalView === "project" || goalView === "tasks"))
   const notesRef = useRef(notes)
   notesRef.current = notes
   const ikigaiOnRef = useRef(ikigaiOn)
@@ -1171,6 +1178,19 @@ export function Whiteboard() {
             : null
         }
         budget={budgetOn ? { zones: budgetZones, onMove: moveBudgetZone, onResize: resizeBudgetZone } : null}
+  links={
+  boardLinksOn
+  ? {
+  rings,
+  selectedId: selectedIds.length === 1 && editingId !== selectedIds[0] ? selectedIds[0] : null,
+  all: allBoardLinks,
+  missionText,
+  toWorld: screenToWorld,
+  onLinks: (id, parentIds) => updateNote(id, (note) => ({ ...note, parentIds })),
+  onNotice: setLinkNotice,
+  }
+  : null
+  }
         tagOnly={markersOn || goalsDropOn || (mode === "labels" && !budgetOn)}
         onZoneMove={moveZone}
         onZoneResize={resizeZone}
@@ -1604,7 +1624,31 @@ export function Whiteboard() {
             <CardDock color={dockColor} onColorChange={setDockColor} onDrop={dropFromDock} onPlaceCenter={placeAtCenter} />
           </div>
         )}
-        <span aria-hidden="true" />
+        {boardLinksOn ? (
+          <div className="pointer-events-none flex max-w-72 flex-col items-end gap-2">
+            {linkNotice ? (
+              <p
+                role="status"
+                className="pointer-events-auto rounded-lg border border-line bg-board/95 px-3 py-2 text-xs leading-relaxed text-ink shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] backdrop-blur"
+              >
+                {linkNotice}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              aria-pressed={allBoardLinks}
+              onClick={() => setAllBoardLinks((on) => !on)}
+              className={clsx(
+                "pointer-events-auto rounded-xl border px-3 py-2 text-xs font-medium shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] backdrop-blur transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                allBoardLinks ? "border-accent bg-accent text-board" : "border-line bg-board/95 text-ink-soft hover:bg-desk hover:text-ink",
+              )}
+            >
+              Show every line
+            </button>
+          </div>
+        ) : (
+          <span aria-hidden="true" />
+        )}
       </div>
 
       {missionOpen && mode === "mission" ? (

@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { getCardColor, goalLinks, goalRingOf, MAX_ZOOM, MIN_ZOOM, type GoalRing, type Note } from "@/lib/board-data"
+import { getCardColor, goalLinks, MAX_ZOOM, MIN_ZOOM, type GoalRing, type Note } from "@/lib/board-data"
+import { cardLinkIssue } from "@/lib/card-links"
 import {
   GRAPH_LONE,
   GRAPH_MISSION,
@@ -365,17 +366,7 @@ export function GraphCanvas({
   }
 
   function linkIssue(fromId: string, toId: string): string | null {
-    const from = byId.get(fromId)
-    if (!from) return "That card is gone."
-    const fromRing = goalRingOf(from, rings)
-    if (fromRing < 0) return "Give this card a ring hashtag first. Only a card on a ring has goals above."
-    if (goalLinks(from, byId, rings).includes(toId)) return "That is already a goal above this card."
-    if (toId === GRAPH_MISSION) return null
-    const to = byId.get(toId)
-    const toRing = to ? goalRingOf(to, rings) : -1
-    if (toRing < 0) return "That card has no ring hashtag, so it cannot be a goal above."
-    if (toRing >= fromRing) return "A goal above must sit on a ring closer to the center."
-    return null
+    return cardLinkIssue(fromId, toId, byId, rings)
   }
 
   function targetAt(point: { x: number; y: number }, fromId: string): string | null {
