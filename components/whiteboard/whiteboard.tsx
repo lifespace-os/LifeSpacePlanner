@@ -54,14 +54,12 @@ import {
   type GoalView,
   type Group,
   type IkigaiCenter,
-  type LabelGroupId,
   type LabelView,
   type MissionChoice,
   type MissionView,
   type Mode,
   type Note,
   type TaggedArea,
-  type TaskDetails,
   type View,
   type Zone,
   type ZoneId,
@@ -71,7 +69,7 @@ import type { GroupMove } from "@/lib/group-drag"
 import { ModeSwitcher } from "./mode-switcher"
 import { ModeBar } from "./mode-bar"
 import { Board } from "./board"
-import { Inspector } from "./inspector"
+import { TaskPanel, type TaskPlan } from "./task-panel"
 import { ClustersPanel } from "./clusters-panel"
 import { LabelsPanel } from "./labels-panel"
 import { BudgetPanel } from "./budget-panel"
@@ -677,19 +675,21 @@ export function Whiteboard() {
     [updateNote],
   )
 
-  const toggleLabel = useCallback(
-    (id: string, group: LabelGroupId, optionId: string) =>
-      updateNote(id, (note) => {
-        const labels = { ...note.labels }
-        if (labels[group] === optionId) delete labels[group]
-        else labels[group] = optionId
-        return { ...note, labels }
-      }),
-    [updateNote],
-  )
-
+  /** Makes a task from a card. The card stays where it is; Investment and Expense replace each other. */
   const saveTask = useCallback(
-    (id: string, task: TaskDetails | null) => updateNote(id, (note) => ({ ...note, task })),
+    (id: string, plan: TaskPlan) =>
+      updateNote(id, (note) => {
+        const base = plan.setLevel ? setGoalLevel(note, "task") : note
+        let hashtags = base.hashtags
+        let color = base.color
+        for (const pick of plan.tags) {
+          const tag = pick.tag.toLowerCase()
+          if (BUDGET_TAGS.includes(tag)) hashtags = [...hashtags.filter((t) => !BUDGET_TAGS.includes(t.toLowerCase())), tag]
+          else if (!hashtags.some((t) => t.toLowerCase() === tag)) hashtags = [...hashtags, tag]
+          if (pick.color) color = pick.color
+        }
+        return { ...base, hashtags, color, task: plan.task }
+      }),
     [updateNote],
   )
 
@@ -1376,7 +1376,14 @@ export function Whiteboard() {
 
       {showInspector ? (
         <div className="pointer-events-none absolute top-[11.5rem] right-4 bottom-24 flex">
-          <Inspector mode={mode} note={selectedNote} onToggleLabel={toggleLabel} onSaveTask={saveTask} />
+          <TaskPanel
+            note={selectedNote}
+            notes={notes}
+            missionText={missionText}
+            spheres={sectorState.sphereSectors}
+            happiness={sectorState.happinessSectors}
+            onSave={saveTask}
+          />
         </div>
       ) : null}
 

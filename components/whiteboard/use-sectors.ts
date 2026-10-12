@@ -169,6 +169,9 @@ export function useSectors(setNotes: Dispatch<SetStateAction<Note[]>>) {
 
   return {
     tagColors,
+    /** Both lists the task window offers, whichever Labels view is open. */
+    sphereSectors: lists[setId],
+    happinessSectors: lists.happiness,
     view,
     setView,
     wheelOnly,
