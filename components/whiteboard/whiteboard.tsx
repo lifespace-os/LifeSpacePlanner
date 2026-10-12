@@ -29,7 +29,7 @@ import {
   GOAL_RING_SCALE,
   IKIGAI_GAP,
   goalLevelOf,
-  goalLink,
+  goalLinks,
   goalMapEdges,
   goalRingOf,
   IKIGAI_SIZE,
@@ -492,7 +492,7 @@ export function Whiteboard() {
 
   const saveGoalCard = useCallback(
     (id: string, draft: GoalDraft) => {
-      updateNote(id, (note) => ({ ...note, text: draft.text, parentId: draft.parentId, goalPlan: draft.plan }))
+      updateNote(id, (note) => ({ ...note, text: draft.text, parentIds: draft.parentIds, goalPlan: draft.plan }))
       setGoalCard((prev) => (prev?.id === id ? { id, fresh: false } : prev))
     },
     [updateNote],
@@ -516,11 +516,11 @@ export function Whiteboard() {
           labels: {},
           task: null,
           mapAngle: null,
-          parentId: draft.parentId,
+          parentIds: draft.parentIds,
           goalPlan: { ...DEFAULT_GOAL_PLAN, ground: draft.plan.ground, ownChoice: draft.plan.ownChoice, oneResult: true, split: true },
         }
         const updated = prev.map((note) =>
-          note.id === id ? { ...note, text: draft.text, parentId: draft.parentId, goalPlan: draft.plan } : note,
+          note.id === id ? { ...note, text: draft.text, parentIds: draft.parentIds, goalPlan: draft.plan } : note,
         )
         return [...updated, sibling]
       })
@@ -1333,9 +1333,10 @@ export function Whiteboard() {
           <div className="pointer-events-none absolute top-[11.5rem] bottom-24 left-4 flex min-h-0 flex-col items-start gap-3">
             {goalFormNote && goalCard ? (
               <GoalCardPanel
-                key={`${goalFormNote.id}:${goalFormNote.text}:${goalFormNote.parentId ?? ""}:${goalCard.fresh}`}
+                key={`${goalFormNote.id}:${goalFormNote.text}:${(goalFormNote.parentIds ?? []).join(",")}:${goalCard.fresh}`}
                 note={goalFormNote}
                 notes={notes}
+                rings={rings}
                 missionText={missionText}
                 fresh={goalCard.fresh}
                 tagColors={sectorState.tagColors}
@@ -1545,14 +1546,14 @@ export function Whiteboard() {
   goalRingOf(menuNote, rings) < 0
   ? undefined
   : {
-  value: goalLink(menuNote, new Map(notes.map((n) => [n.id, n])), rings) ?? "",
+  values: goalLinks(menuNote, new Map(notes.map((n) => [n.id, n])), rings),
   options: [
   { id: "mission", label: "The mission" },
   ...notes
-  .filter((n) => goalRingOf(n, rings) >= 0 && goalRingOf(n, rings) === goalRingOf(menuNote, rings) - 1)
+  .filter((n) => n.id !== menuNote.id && goalRingOf(n, rings) >= 0 && goalRingOf(n, rings) < goalRingOf(menuNote, rings))
   .map((n) => ({ id: n.id, label: n.text.trim().slice(0, 48) || "Untitled card" })),
   ],
-  onChange: (value) => updateNote(menuNote.id, (note) => ({ ...note, parentId: value || null })),
+  onChange: (values) => updateNote(menuNote.id, (note) => ({ ...note, parentIds: values })),
   }
   }
   fields={{

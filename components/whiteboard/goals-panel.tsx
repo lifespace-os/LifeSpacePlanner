@@ -89,7 +89,7 @@ function AddRingForm({ rings, onAdd }: { rings: GoalRing[]; onAdd: (name: string
   )
 }
 
-/** The selected point, each goal above it, then the mission. It stops, and says so, where a link is missing. */
+/** The shortest path from the selected point to the mission. It says so when the mission is not reached. */
 function GoalChainList({
   chain,
   missionText,
@@ -118,7 +118,7 @@ function GoalChainList({
             </div>
             <div className="min-w-0 flex-1 pb-3">
               <p className="text-[11px] tracking-wide text-ink-soft uppercase">
-                {index === 0 ? "Selected" : "Goal above"} · {rings[goalRingOf(note, rings)]?.name}
+                {index === 0 ? "Selected" : "On the way"} · {rings[goalRingOf(note, rings)]?.name}
               </p>
               <p className="text-sm text-ink break-words">{note.text.trim() || "Empty card"}</p>
             </div>
@@ -144,7 +144,8 @@ function GoalChainList({
               <span aria-hidden="true" className="mt-1.5 size-3 shrink-0 rounded-full border border-dashed border-ink-soft" />
             </div>
             <p className="min-w-0 flex-1 text-sm text-ink-soft">
-              The goal above is not chosen. Right-click the point to choose it.
+              The mission is not reached. No chain of goals above this point leads to it. Right-click the point to
+              choose its goals.
             </p>
           </li>
         )}

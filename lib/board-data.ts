@@ -64,8 +64,8 @@ export type Note = {
   task: TaskDetails | null
   /** Title, since date, due date and owner saved in the Make a task window. */
   details?: CardDetails | null
-  /** The goal above this card on the Map: a card id, "mission", or empty. */
-  parentId?: string | null
+  /** The goals above this card on the Map, in the order chosen: card ids and "mission". Empty means none. */
+  parentIds?: string[]
   /** Where the point sits on its Map ring, in radians. Empty means the Map places it. */
   mapAngle?: number | null
   /** The answers saved in the side panel of a Life goals or Project goals card. */
@@ -816,7 +816,7 @@ export function stripRingTags(notes: Note[], ring: GoalRing): Note[] {
           ...note,
           hashtags: note.hashtags.filter((t) => !tags.includes(t.toLowerCase())),
           mapAngle: null,
-          parentId: null,
+          parentIds: [],
         }
       : note,
   )
@@ -829,7 +829,7 @@ export function setGoalLevel(note: Note, tag: string, rings: GoalRing[] = BUILT_
   const next = retag(note, ringTags(rings), tag)
   const nextRing = rings.findIndex((r) => r.tags.includes(tag))
   const kept = level === tag ? next : { ...next, mapAngle: null }
-  return ring !== nextRing && kept.parentId ? { ...kept, parentId: null } : kept
+  return ring !== nextRing && kept.parentIds?.length ? { ...kept, parentIds: [] } : kept
 }
 
 /** Radius of the small mission circle in canvas pixels. It does not change with ring thickness. */
@@ -904,62 +904,102 @@ export function clampGoalAngle(tag: string, angle: number) {
   return Math.min(start + SECTOR - SECTOR_MARGIN, Math.max(start + SECTOR_MARGIN, wrapped))
 }
 
-/** What a card is linked to on the Map: a card id, "mission", or null. A link counts only when it is valid now. */
-export function goalLink(note: Note, byId: Map<string, Note>, rings: GoalRing[] = BUILT_IN_RINGS): string | null {
+/**
+ * Everything a card is linked to on the Map, in the order chosen: card ids and "mission".
+ * A link may run to any card on a ring closer to the center, or to the mission. A link counts only when it is valid now.
+ */
+export function goalLinks(note: Note, byId: Map<string, Note>, rings: GoalRing[] = BUILT_IN_RINGS): string[] {
   const ring = goalRingOf(note, rings)
-  if (ring < 0 || !note.parentId) return null
-  if (note.parentId === "mission") return "mission"
-  const parent = byId.get(note.parentId)
-  const parentRing = parent ? goalRingOf(parent, rings) : -1
-  return parent && ring > 0 && parentRing >= 0 && parentRing < ring ? parent.id : null
+  if (ring < 0) return []
+  const found: string[] = []
+  for (const id of note.parentIds ?? []) {
+    if (found.includes(id)) continue
+    if (id === "mission") {
+      found.push(id)
+      continue
+    }
+    const parent = byId.get(id)
+    const parentRing = parent ? goalRingOf(parent, rings) : -1
+    if (parent && parentRing >= 0 && parentRing < ring) found.push(id)
+  }
+  return found
 }
 
-/** The threads of a point: inward through the goals above it to the mission, and outward to everything below it. */
+/** The id of the thread that runs from a card to one goal above it. */
+export function goalThreadId(from: string, to: string) {
+  return `${from}>${to}`
+}
+
+/** The threads of a point: every link inward through the goals above it, and outward to everything below it. */
 export function goalThreadsFor(notes: Note[], id: string, rings: GoalRing[] = BUILT_IN_RINGS): Set<string> {
   const byId = new Map(notes.map((note) => [note.id, note]))
   const found = new Set<string>()
-  let current = byId.get(id)
-  while (current) {
-    const link = goalLink(current, byId, rings)
-    if (!link) break
-    found.add(current.id)
-    current = link === "mission" ? undefined : byId.get(link)
+
+  const seenUp = new Set([id])
+  const up = [id]
+  while (up.length > 0) {
+    const current = byId.get(up.shift()!)
+    if (!current) continue
+    for (const link of goalLinks(current, byId, rings)) {
+      found.add(goalThreadId(current.id, link))
+      if (link !== "mission" && !seenUp.has(link)) {
+        seenUp.add(link)
+        up.push(link)
+      }
+    }
   }
-  const queue = [id]
-  while (queue.length > 0) {
-    const parent = queue.shift()
+
+  const seenDown = new Set([id])
+  const down = [id]
+  while (down.length > 0) {
+    const parent = down.shift()!
     for (const note of notes) {
-      if (goalLink(note, byId, rings) === parent && !found.has(note.id)) {
-        found.add(note.id)
-        queue.push(note.id)
+      if (!goalLinks(note, byId, rings).includes(parent)) continue
+      found.add(goalThreadId(note.id, parent))
+      if (!seenDown.has(note.id)) {
+        seenDown.add(note.id)
+        down.push(note.id)
       }
     }
   }
   return found
 }
 
-/** The chain from a point inward: the card, each goal above it, then the mission. It stops where a link is missing. */
+/** The shortest chain from a point to the mission: the card, each goal on the way, then the mission. */
 export type GoalChain = {
+  /** The cards of the shortest path, starting with the selected point. Only the point itself when no path exists. */
   steps: Note[]
-  /** True when the last step links to the mission. */
+  /** True when a path to the mission exists. */
   reachesMission: boolean
-  /** True when the last step has no goal above chosen. */
-  broken: boolean
 }
 
 export function goalChainFor(notes: Note[], id: string, rings: GoalRing[] = BUILT_IN_RINGS): GoalChain | null {
   const byId = new Map(notes.map((note) => [note.id, note]))
-  let current = byId.get(id)
-  if (!current || goalRingOf(current, rings) < 0) return null
-  const steps: Note[] = []
-  while (current) {
-    steps.push(current)
-    const link: string | null = goalLink(current, byId, rings)
-    if (!link) return { steps, reachesMission: false, broken: true }
-    if (link === "mission") return { steps, reachesMission: true, broken: false }
-    current = byId.get(link)
+  const start = byId.get(id)
+  if (!start || goalRingOf(start, rings) < 0) return null
+
+  const cameFrom = new Map<string, string>()
+  const seen = new Set([id])
+  const queue = [id]
+  while (queue.length > 0) {
+    const current = byId.get(queue.shift()!)
+    if (!current) continue
+    for (const link of goalLinks(current, byId, rings)) {
+      if (link === "mission") {
+        const steps: Note[] = []
+        for (let at: string | undefined = current.id; at !== undefined; at = cameFrom.get(at)) {
+          const note = byId.get(at)
+          if (note) steps.unshift(note)
+        }
+        return { steps, reachesMission: true }
+      }
+      if (seen.has(link)) continue
+      seen.add(link)
+      cameFrom.set(link, current.id)
+      queue.push(link)
+    }
   }
-  return { steps, reachesMission: false, broken: true }
+  return { steps: [start], reachesMission: false }
 }
 
 export const DEFAULT_GOAL_PLAN: GoalPlan = {
@@ -1009,8 +1049,8 @@ export function goalChecks(text: string, plan: GoalPlan): GoalCheck[] {
 
 export type GoalMapPoint = { id: string; ring: number; angle: number; x: number; y: number }
 
-/** A thread runs from a card to the goal above it. `to` is that card's id, or "mission". */
-export type GoalMapThread = { id: string; to: string; x1: number; y1: number; x2: number; y2: number }
+/** A thread runs from a card (`from`) to one goal above it. `to` is that card's id, or "mission". */
+export type GoalMapThread = { id: string; from: string; to: string; x1: number; y1: number; x2: number; y2: number }
 
 const POINT_GAP = 78
 
@@ -1044,10 +1084,20 @@ export function layoutGoalMap(
       })
       continue
     }
-    const loose = inRing.filter((note) => !angles.has(goalLink(note, byId, rings) ?? ""))
+    const aboveAngles = (note: Note) =>
+      goalLinks(note, byId, rings)
+        .map((link) => angles.get(link))
+        .filter((angle): angle is number => angle !== undefined)
+    const loose = inRing.filter((note) => aboveAngles(note).length === 0)
     const wanted = inRing.map((note) => {
-      const link = goalLink(note, byId, rings)
-      const above = link && link !== "mission" ? angles.get(link) : undefined
+      const linked = aboveAngles(note)
+      const above =
+        linked.length > 0
+          ? Math.atan2(
+              linked.reduce((sum, angle) => sum + Math.sin(angle), 0),
+              linked.reduce((sum, angle) => sum + Math.cos(angle), 0),
+            )
+          : undefined
       const slot = loose.indexOf(note)
       const fallback = above ?? -Math.PI / 2 + (2 * Math.PI * (slot + 0.5)) / Math.max(1, loose.length)
       return { note, angle: drag?.id === note.id ? drag.angle : (note.mapAngle ?? fallback) }
@@ -1079,17 +1129,19 @@ export function layoutGoalMap(
   const threads: GoalMapThread[] = []
   for (const note of notes) {
     const from = at.get(note.id)
-    const link = goalLink(note, byId, rings)
-    if (!from || !link) continue
-    if (link === "mission") {
-      const dx = from.x - center.x
-      const dy = from.y - center.y
-      const scale = edges[0] / Math.hypot(dx, dy)
-      threads.push({ id: note.id, to: link, x1: from.x, y1: from.y, x2: center.x + dx * scale, y2: center.y + dy * scale })
-      continue
+    if (!from) continue
+    for (const link of goalLinks(note, byId, rings)) {
+      const id = goalThreadId(note.id, link)
+      if (link === "mission") {
+        const dx = from.x - center.x
+        const dy = from.y - center.y
+        const scale = edges[0] / Math.hypot(dx, dy)
+        threads.push({ id, from: note.id, to: link, x1: from.x, y1: from.y, x2: center.x + dx * scale, y2: center.y + dy * scale })
+        continue
+      }
+      const to = at.get(link)
+      if (to) threads.push({ id, from: note.id, to: link, x1: from.x, y1: from.y, x2: to.x, y2: to.y })
     }
-    const to = at.get(link)
-    if (to) threads.push({ id: note.id, to: link, x1: from.x, y1: from.y, x2: to.x, y2: to.y })
   }
   return { points, threads }
 }

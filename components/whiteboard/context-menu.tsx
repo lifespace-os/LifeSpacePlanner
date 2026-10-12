@@ -120,7 +120,7 @@ export function CardMenu({
   onAddHashtag: (tag: string) => void
   onRemoveHashtag: (tag: string) => void
   /** Present only for a card that has a goal level. An empty value means no link. */
-  goalAbove?: { value: string; options: { id: string; label: string }[]; onChange: (value: string) => void }
+  goalAbove?: { values: string[]; options: { id: string; label: string }[]; onChange: (values: string[]) => void }
   /** The words and the level of the card, edited in the window. An empty level means no level. */
   fields: {
     text: string
@@ -227,27 +227,31 @@ export function CardMenu({
         </div>
 
         {goalAbove ? (
-          <div className="mt-4">
-            <label
-              htmlFor="card-menu-goal-above"
-              className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft"
-            >
-              Goal above
-            </label>
-            <select
-              id="card-menu-goal-above"
-              value={goalAbove.value}
-              onChange={(e) => goalAbove.onChange(e.target.value)}
-              className="mt-2 h-8 w-full rounded-md border border-line bg-board px-2 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
-            >
-              <option value="">No goal above</option>
+          <fieldset className="mt-4">
+            <legend className="text-[10px] font-medium uppercase tracking-[0.16em] text-ink-soft">Goals above</legend>
+            <div className="mt-2 flex max-h-40 flex-col overflow-y-auto">
               {goalAbove.options.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
+                <label
+                  key={option.id}
+                  className="flex cursor-pointer items-start gap-2 rounded-md px-1.5 py-1 text-sm text-ink transition-colors hover:bg-desk has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
+                >
+                  <input
+                    type="checkbox"
+                    checked={goalAbove.values.includes(option.id)}
+                    onChange={() =>
+                      goalAbove.onChange(
+                        goalAbove.values.includes(option.id)
+                          ? goalAbove.values.filter((v) => v !== option.id)
+                          : [...goalAbove.values, option.id],
+                      )
+                    }
+                    className="mt-0.5 size-4 shrink-0 accent-accent"
+                  />
+                  <span className="min-w-0 break-words">{option.label}</span>
+                </label>
               ))}
-            </select>
-          </div>
+            </div>
+          </fieldset>
         ) : null}
 
         <form onSubmit={submitTag} className="mt-4">

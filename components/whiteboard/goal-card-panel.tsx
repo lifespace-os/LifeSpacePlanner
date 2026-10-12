@@ -2,21 +2,23 @@ import { useId, useRef, useState, type ReactNode } from "react"
 import clsx from "clsx"
 import { Check, X } from "lucide-react"
 import {
+  BUILT_IN_RINGS,
   DEFAULT_GOAL_PLAN,
   getGoalLevel,
   goalChecks,
   goalLevelOf,
-  goalLink,
+  goalLinks,
   goalRingOf,
   hasHashtag,
   looksLikeTwoResults,
   splitGoalSentence,
   type GoalGround,
   type GoalPlan,
+  type GoalRing,
   type Note,
 } from "@/lib/board-data"
 
-export type GoalDraft = { text: string; parentId: string | null; plan: GoalPlan }
+export type GoalDraft = { text: string; parentIds: string[]; plan: GoalPlan }
 
 const PANEL_CLASS =
   "pointer-events-auto flex min-h-0 w-96 max-w-[calc(100vw-2rem)] flex-col rounded-2xl border border-line bg-card shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)]"
@@ -120,6 +122,7 @@ function SplitForm({
 export function GoalCardPanel({
   note,
   notes,
+  rings = BUILT_IN_RINGS,
   missionText,
   fresh,
   onSave,
@@ -129,6 +132,7 @@ export function GoalCardPanel({
 }: {
   note: Note
   notes: Note[]
+  rings?: GoalRing[]
   /** Labels hashtags show in the color of their sector or zone. */
   tagColors?: Record<string, string>
   missionText: string
@@ -141,19 +145,19 @@ export function GoalCardPanel({
   const uid = useId()
   const focusedOnce = useRef(false)
   const byId = new Map(notes.map((n) => [n.id, n]))
-  const storedLink = goalLink(note, byId) ?? ""
+  const storedLinks = goalLinks(note, byId, rings)
   const storedPlan: GoalPlan = { ...DEFAULT_GOAL_PLAN, ...note.goalPlan }
 
   const [text, setText] = useState(note.text)
-  const [parentId, setParentId] = useState(storedLink)
+  const [parentIds, setParentIds] = useState<string[]>(storedLinks)
   const [plan, setPlan] = useState<GoalPlan>(storedPlan)
   const [splitAt, setSplitAt] = useState<"result" | "scale" | null>(null)
   const [first, setFirst] = useState("")
   const [second, setSecond] = useState("")
 
-  const level = getGoalLevel(goalLevelOf(note))
-  const ring = goalRingOf(note)
-  const above = notes.filter((n) => goalRingOf(n) >= 0 && goalRingOf(n) === ring - 1)
+  const level = getGoalLevel(goalLevelOf(note, rings))
+  const ring = goalRingOf(note, rings)
+  const above = notes.filter((n) => n.id !== note.id && goalRingOf(n, rings) >= 0 && goalRingOf(n, rings) < ring)
   const missionSaved = missionText.length > 0
   const hasMust = hasHashtag(note, "must")
   const flagged = looksLikeTwoResults(text)
@@ -161,10 +165,12 @@ export function GoalCardPanel({
   const written = text.trim().length > 0
 
   const saved =
-    JSON.stringify([text.trim(), parentId, plan]) === JSON.stringify([note.text.trim(), storedLink, storedPlan])
+    JSON.stringify([text.trim(), parentIds, plan]) === JSON.stringify([note.text.trim(), storedLinks, storedPlan])
 
   const patch = (change: Partial<GoalPlan>) => setPlan((prev) => ({ ...prev, ...change }))
-  const draft = (): GoalDraft => ({ text: text.trim(), parentId: parentId || null, plan })
+  const draft = (): GoalDraft => ({ text: text.trim(), parentIds, plan })
+  const toggleParent = (id: string) =>
+    setParentIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
 
   function openSplit(where: "result" | "scale") {
     const parts = splitGoalSentence(text)
@@ -174,7 +180,7 @@ export function GoalCardPanel({
   }
 
   function confirmSplit() {
-    onSplit(note.id, { text: first.trim(), parentId: parentId || null, plan: { ...plan, split: true, oneResult: true } }, second.trim())
+    onSplit(note.id, { text: first.trim(), parentIds, plan: { ...plan, split: true, oneResult: true } }, second.trim())
   }
 
   const splitForm = (
@@ -230,25 +236,30 @@ export function GoalCardPanel({
           </section>
         ) : null}
 
-        <div>
-          <label htmlFor={`${uid}-above`}>
-            <Question>The goal above it</Question>
-          </label>
-          <select
-            id={`${uid}-above`}
-            value={parentId}
-            onChange={(e) => setParentId(e.target.value)}
-            className="mt-1.5 h-9 w-full rounded-md border border-line bg-board px-2 text-sm text-ink focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
-          >
-            <option value="mission">The mission</option>
-            {above.map((n) => (
-              <option key={n.id} value={n.id}>
-                {n.text.trim().slice(0, 48) || "Untitled card"}
-              </option>
-            ))}
-            <option value="">Not linked yet</option>
-          </select>
-        </div>
+        <fieldset>
+          <legend>
+            <Question>The goals above it</Question>
+          </legend>
+          <Hint>Choose one or more. A goal may be on any ring closer to the center, or be the mission.</Hint>
+          <div className="mt-1 flex max-h-48 flex-col overflow-y-auto">
+            {[{ id: "mission", label: "The mission" }, ...above.map((n) => ({ id: n.id, label: n.text.trim().slice(0, 48) || "Untitled card" }))].map(
+              (option) => (
+                <label
+                  key={option.id}
+                  className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 text-sm text-ink transition-colors hover:bg-desk has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent"
+                >
+                  <input
+                    type="checkbox"
+                    checked={parentIds.includes(option.id)}
+                    onChange={() => toggleParent(option.id)}
+                    className="mt-0.5 size-4 shrink-0 accent-accent"
+                  />
+                  <span className="min-w-0 break-words text-pretty">{option.label}</span>
+                </label>
+              ),
+            )}
+          </div>
+        </fieldset>
 
         <fieldset>
           <legend>

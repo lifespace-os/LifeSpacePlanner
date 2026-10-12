@@ -306,7 +306,7 @@ export function GoalMapLayer({
         })}
 
         {threads.map((thread) => {
-          const from = shown.has(thread.id)
+          const from = shown.has(thread.from)
           const to = thread.to === "mission" || shown.has(thread.to)
           if (!from || !to) return null
           const lit = chain?.has(thread.id) ?? false
