@@ -28,6 +28,16 @@ export type LabelGroupId = "area" | "happiness" | "budget"
 export type TaskDetails = {
   title: string
   labelId: string | null
+  /** The day work starts, as yyyy-mm-dd. Empty when unset. */
+  since?: string
+  due: string
+  owner: string
+}
+
+/** The fields the Make a task window writes onto any card, whether or not it is a task yet. */
+export type CardDetails = {
+  title: string
+  since: string
   due: string
   owner: string
 }
@@ -52,6 +62,8 @@ export type Note = {
   mission: MissionChoice
   labels: Partial<Record<LabelGroupId, string>>
   task: TaskDetails | null
+  /** Title, since date, due date and owner saved in the Make a task window. */
+  details?: CardDetails | null
   /** The goal above this card on the Map: a card id, "mission", or empty. */
   parentId?: string | null
   /** Where the point sits on its Map ring, in radians. Empty means the Map places it. */
@@ -358,6 +370,88 @@ export function areaTagAt(areas: TaggedArea[], cx: number, cy: number): string |
 
 export function hasHashtag(note: Note, tag: string) {
   return note.hashtags.some((t) => t.toLowerCase() === tag.toLowerCase())
+}
+
+/** The three Labels sets. Each draws one shape on the face of a card. */
+export type LabelSetId = "spheres" | "happiness" | "budget"
+
+export const LABEL_SET_IDS: LabelSetId[] = ["spheres", "happiness", "budget"]
+
+export const LABEL_SET_NAMES: Record<LabelSetId, string> = {
+  spheres: "Life spheres",
+  happiness: "Happiness components",
+  budget: "Investment or expense",
+}
+
+export const LABEL_SET_SHAPES: Record<LabelSetId, LabelGroup["shape"]> = {
+  spheres: "dot",
+  happiness: "diamond",
+  budget: "square",
+}
+
+/** One label a card can carry: its hashtag, its name for the window, and the color of its sector or zone. */
+export type LabelSetOption = { tag: string; name: string; color: `#${string}` }
+
+export type LabelSetLists = Record<LabelSetId, LabelSetOption[]>
+
+export function labelSetLists(spheres: Sector[], happiness: Sector[]): LabelSetLists {
+  const fromSectors = (sectors: Sector[]): LabelSetOption[] =>
+    sectors.map((sector) => ({ tag: sectorTag(sector.name), name: sector.name, color: sector.color }))
+  return {
+    spheres: fromSectors(spheres),
+    happiness: fromSectors(happiness),
+    budget: BUDGET_ZONE_IDS.map((id) => ({
+      tag: id,
+      name: id === "investment" ? "Investment" : "Expense",
+      color: BUDGET_COLORS[id],
+    })),
+  }
+}
+
+/** The hashtags a card carries in one set, in the order they were added. */
+export function labelSetTags(note: Note, options: LabelSetOption[]): string[] {
+  const known = new Set(options.map((option) => option.tag.toLowerCase()))
+  return note.hashtags.filter((tag) => known.has(tag.toLowerCase()))
+}
+
+/** What the face of a card draws for one set: a shape in the color of the latest label, and every hashtag of the set. */
+export type CardLabelSet = {
+  id: LabelSetId
+  shape: LabelGroup["shape"]
+  color: string
+  tags: string[]
+}
+
+/** The sets that have at least one label. An empty set is left out, so it draws no shape. */
+export function labelSetsOf(note: Note, lists: LabelSetLists): CardLabelSet[] {
+  return LABEL_SET_IDS.flatMap((id) => {
+    const tags = labelSetTags(note, lists[id])
+    if (tags.length === 0) return []
+    const latest = tags[tags.length - 1].toLowerCase()
+    const option = lists[id].find((o) => o.tag.toLowerCase() === latest)
+    return option ? [{ id, shape: LABEL_SET_SHAPES[id], color: option.color, tags }] : []
+  })
+}
+
+/**
+ * Writes one set onto a card: labels still chosen keep their place, new ones are appended, and the
+ * rest of the set is removed. Hashtags outside the set are never touched.
+ */
+export function writeLabelSet(
+  hashtags: string[],
+  options: LabelSetOption[],
+  chosen: string[],
+): { hashtags: string[]; added: LabelSetOption | null } {
+  const owned = new Set(options.map((option) => option.tag.toLowerCase()))
+  const wanted = new Set(chosen.map((tag) => tag.toLowerCase()))
+  const kept = hashtags.filter((tag) => !owned.has(tag.toLowerCase()) || wanted.has(tag.toLowerCase()))
+  const present = new Set(kept.map((tag) => tag.toLowerCase()))
+  const fresh = chosen.filter((tag) => !present.has(tag.toLowerCase()))
+  const last = fresh[fresh.length - 1]
+  return {
+    hashtags: [...kept, ...fresh],
+    added: last ? options.find((option) => option.tag.toLowerCase() === last.toLowerCase()) ?? null : null,
+  }
 }
 
 /**

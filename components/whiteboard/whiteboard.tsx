@@ -5,6 +5,9 @@ import clsx from "clsx"
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
 import {
   BUDGET_TAGS,
+  LABEL_SET_IDS,
+  labelSetLists,
+  writeLabelSet,
   BUDGET_ZONE_GAP,
   BUDGET_ZONE_SIZE,
   budgetAreas,
@@ -69,7 +72,7 @@ import type { GroupMove } from "@/lib/group-drag"
 import { ModeSwitcher } from "./mode-switcher"
 import { ModeBar } from "./mode-bar"
 import { Board } from "./board"
-import { TaskPanel, type TaskPlan } from "./task-panel"
+import { TaskPanel, type CardPlan } from "./task-panel"
 import { ClustersPanel } from "./clusters-panel"
 import { LabelsPanel } from "./labels-panel"
 import { BudgetPanel } from "./budget-panel"
@@ -111,6 +114,10 @@ export function Whiteboard() {
   const [labelsOpen, setLabelsOpen] = useState(true)
   const sectorState = useSectors(setNotes)
   const labelView = sectorState.view
+  const labelLists = useMemo(
+    () => labelSetLists(sectorState.sphereSectors, sectorState.happinessSectors),
+    [sectorState.sphereSectors, sectorState.happinessSectors],
+  )
   const { dropOnSector, setOpenSectorId } = sectorState
   const { sectorCounts, sectorPoints } = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -675,22 +682,28 @@ export function Whiteboard() {
     [updateNote],
   )
 
-  /** Makes a task from a card. The card stays where it is; Investment and Expense replace each other. */
-  const saveTask = useCallback(
-    (id: string, plan: TaskPlan) =>
+  /**
+   * Writes what the Make a task window saved. Each part is optional, so saving the fields leaves the
+   * sets alone and the other way round. The card keeps its place.
+   */
+  const saveCard = useCallback(
+    (id: string, plan: CardPlan) =>
       updateNote(id, (note) => {
         const base = plan.setLevel ? setGoalLevel(note, "task") : note
         let hashtags = base.hashtags
-        let color = base.color
-        for (const pick of plan.tags) {
-          const tag = pick.tag.toLowerCase()
-          if (BUDGET_TAGS.includes(tag)) hashtags = [...hashtags.filter((t) => !BUDGET_TAGS.includes(t.toLowerCase())), tag]
-          else if (!hashtags.some((t) => t.toLowerCase() === tag)) hashtags = [...hashtags, tag]
-          if (pick.color) color = pick.color
+        for (const setId of LABEL_SET_IDS) {
+          const chosen = plan.sets?.[setId]
+          if (!chosen) continue
+          hashtags = writeLabelSet(hashtags, labelLists[setId], chosen).hashtags
         }
-        return { ...base, hashtags, color, task: plan.task }
+        let task = base.task
+        const details = plan.details ?? base.details ?? null
+        if (plan.details && task) task = { ...task, ...plan.details }
+        if (plan.task === "make" && plan.details) task = { ...plan.details, labelId: task?.labelId ?? null }
+        if (plan.task === "remove") task = null
+        return { ...base, hashtags, details, task }
       }),
-    [updateNote],
+    [updateNote, labelLists],
   )
 
   const selectCard = useCallback((id: string, additive: boolean) => {
@@ -970,6 +983,7 @@ export function Whiteboard() {
         clusterView={clusterView}
         mode={mode}
         missionSaved={missionText.length > 0}
+        labelLists={labelLists}
         view={view}
         viewRef={viewRef}
         viewportRef={viewportRef}
@@ -1380,9 +1394,8 @@ export function Whiteboard() {
             note={selectedNote}
             notes={notes}
             missionText={missionText}
-            spheres={sectorState.sphereSectors}
-            happiness={sectorState.happinessSectors}
-            onSave={saveTask}
+            labelLists={labelLists}
+            onSave={saveCard}
           />
         </div>
       ) : null}

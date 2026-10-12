@@ -9,6 +9,7 @@ import {
   type GoalNameMode,
   type IkigaiCenter,
   type Group,
+  type LabelSetLists,
   type MissionChoice,
   type Mode,
   type Note,
@@ -79,6 +80,7 @@ export function Board({
   clusterView,
   mode,
   missionSaved,
+  labelLists,
   view,
   viewRef,
   viewportRef,
@@ -116,6 +118,7 @@ export function Board({
   clusterView: ClusterView
   mode: Mode
   missionSaved: boolean
+  labelLists: LabelSetLists
   view: View
   viewRef: RefObject<View>
   viewportRef: RefObject<HTMLDivElement | null>
@@ -375,6 +378,7 @@ export function Board({
                   note={note}
                   mode={mode}
                   missionSaved={missionSaved}
+                  labelLists={labelLists}
                   selected={inSelection}
                   editing={note.id === editingId}
                   viewRef={viewRef}

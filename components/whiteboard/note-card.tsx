@@ -6,21 +6,23 @@ import { CalendarDays, Check, ListChecks, User, X } from "lucide-react"
 import {
   CARD_MIN_HEIGHT,
   CARD_WIDTH,
-  LABEL_GROUPS,
   getCardColor,
-  getLabel,
+  labelSetsOf,
+  type LabelSetLists,
   type MissionChoice,
   type Mode,
   type Note,
   type View,
 } from "@/lib/board-data"
 import { beginGroupDrag, type GroupDrag, type GroupMove } from "@/lib/group-drag"
-import { LabelChip } from "./label-chip"
+import { CardLabelSets } from "./card-label-sets"
 
 type Props = {
   note: Note
   mode: Mode
   missionSaved: boolean
+  /** The labels of each Labels set, used to draw one shape per set on the face. */
+  labelLists: LabelSetLists
   selected: boolean
   editing: boolean
   viewRef: RefObject<View>
@@ -73,6 +75,7 @@ export const NoteCard = memo(function NoteCard({
   note,
   mode,
   missionSaved,
+  labelLists,
   selected,
   editing,
   viewRef,
@@ -201,12 +204,8 @@ export const NoteCard = memo(function NoteCard({
 
   const isTask = note.task !== null
   const released = note.mission === "release" && mode !== "unload" && mode !== "clusters"
-  const showLabels = mode === "task"
   const color = getCardColor(note.color)
-  const appliedLabels = LABEL_GROUPS.flatMap((group) => {
-    const option = group.options.find((o) => o.id === note.labels[group.id])
-    return option ? [{ ...option, shape: group.shape }] : []
-  })
+  const labelSets = labelSetsOf(note, labelLists)
   const summary = isTask ? `Task: ${note.task?.title}` : note.text.trim() ? `Card: ${note.text}` : "Blank card"
 
   return (
@@ -270,13 +269,7 @@ export const NoteCard = memo(function NoteCard({
         </p>
       )}
 
-      {showLabels && appliedLabels.length > 0 ? (
-        <div className="flex flex-wrap gap-1 px-4 pb-3">
-          {appliedLabels.map((label) => (
-            <LabelChip key={label.id} name={label.name} color={label.color} shape={label.shape} />
-          ))}
-        </div>
-      ) : null}
+      <CardLabelSets sets={labelSets} />
 
       <div className="mt-auto flex px-3 pb-2.5">
         <button
@@ -344,7 +337,9 @@ function CardEditor({ note, onDone }: { note: Note; onDone: (text: string) => vo
 
 function TaskFace({ note, released }: { note: Note; released: boolean }) {
   const task = note.task!
-  const label = getLabel(task.labelId)
+  const dates = task.since
+    ? `Since ${formatDue(task.since)} · Due ${task.due ? formatDue(task.due) : "not set"}`
+    : formatDue(task.due)
 
   return (
     <div className="relative px-4 pt-3 pb-3">
@@ -365,19 +360,11 @@ function TaskFace({ note, released }: { note: Note; released: boolean }) {
         {task.title}
       </p>
       <dl className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-xs text-ink">
-        <dt className="sr-only">Label</dt>
-        <dd className="col-span-2">
-          {label ? (
-            <LabelChip name={label.name} color={label.color} shape={label.group.shape} />
-          ) : (
-            <span className="text-ink-soft">No label</span>
-          )}
-        </dd>
         <dt>
           <CalendarDays className="size-3.5 text-ink-soft" aria-hidden="true" />
-          <span className="sr-only">Due</span>
+          <span className="sr-only">Dates</span>
         </dt>
-        <dd className="tabular-nums">{formatDue(task.due)}</dd>
+        <dd className="tabular-nums">{dates}</dd>
         <dt>
           <User className="size-3.5 text-ink-soft" aria-hidden="true" />
           <span className="sr-only">Owner</span>
