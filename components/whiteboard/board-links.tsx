@@ -66,7 +66,7 @@ export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: Board
 
   const byId = useMemo(() => new Map(notes.map((note) => [note.id, note])), [notes])
 
-  useLayoutEffect(() => {
+  function measure() {
     const world = rootRef.current?.parentElement
     if (!world) return
     const next = new Map<string, Box>()
@@ -74,7 +74,29 @@ export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: Board
       next.set(el.dataset.noteId ?? "", { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight })
     })
     setBoxes((prev) => (sameBoxes(prev, next) ? prev : next))
-  })
+  }
+
+  useLayoutEffect(measure)
+
+  // A card drag writes left/top straight to the element without a React render, so follow it here.
+  useLayoutEffect(() => {
+    const world = rootRef.current?.parentElement
+    if (!world) return
+    let frame = 0
+    const schedule = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(measure)
+    }
+    world.addEventListener("pointermove", schedule)
+    world.addEventListener("pointerup", schedule)
+    world.addEventListener("pointercancel", schedule)
+    return () => {
+      cancelAnimationFrame(frame)
+      world.removeEventListener("pointermove", schedule)
+      world.removeEventListener("pointerup", schedule)
+      world.removeEventListener("pointercancel", schedule)
+    }
+  }, [])
 
   const mission = useMemo<Box>(() => {
     let minX = Infinity
