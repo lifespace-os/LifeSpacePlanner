@@ -5,8 +5,10 @@ import { getCardColor, MAX_ZOOM, MIN_ZOOM, type GoalRing, type Note } from "@/li
 import {
   GRAPH_LONE,
   GRAPH_VERTEX_R,
+  graphVertexShown,
   layoutGraph,
   spotOf,
+  type GraphFilter,
   type GraphSpot,
   type GraphVertex,
 } from "@/lib/graph-layout"
@@ -98,9 +100,15 @@ export function GraphCanvas({
   onMenu,
   onRename,
   onAddCard,
+  filter,
+  showText,
+  small,
 }: {
   notes: Note[]
   rings: GoalRing[]
+  filter: GraphFilter
+  showText: boolean
+  small: boolean
   spots: Record<string, GraphSpot>
   selectedId: string | null
   onSelect: (id: string | null) => void
@@ -294,7 +302,13 @@ export function GraphCanvas({
   }
 
   const k = Math.max(1, Math.min(1.8, 0.8 / view.zoom))
-  const editing = editingId ? layout.vertices.find((v) => v.id === editingId) : null
+  const radius = GRAPH_VERTEX_R * (small ? 0.55 : 1)
+  const shownVertices = layout.vertices.filter((v) => {
+    const note = byId.get(v.id)
+    return note ? graphVertexShown(note, v.home, filter) : false
+  })
+  const shownClusters = layout.clusters.filter((c) => filter.ringId === null || c.id === filter.ringId)
+  const editing = editingId ? shownVertices.find((v) => v.id === editingId) : null
 
   return (
     <section
@@ -322,7 +336,7 @@ export function GraphCanvas({
           }}
         >
           <g transform={`translate(${view.x} ${view.y}) scale(${view.zoom})`}>
-            {layout.clusters.map((cluster) => (
+            {shownClusters.map((cluster) => (
               <g key={cluster.id} data-graph-cluster={cluster.id}>
                 <rect
                   x={cluster.x}
@@ -359,18 +373,20 @@ export function GraphCanvas({
               </g>
             ))}
 
-            <text
-              x={layout.loneOrigin.x}
-              y={layout.loneOrigin.y - 22}
-              fontSize={17 * Math.min(k, 1.4)}
-              fill="var(--color-ink-soft)"
-              pointerEvents="none"
-              style={halo}
-            >
-              Cards with no ring hashtag
-            </text>
+            {filter.ringId === null ? (
+              <text
+                x={layout.loneOrigin.x}
+                y={layout.loneOrigin.y - 22}
+                fontSize={17 * Math.min(k, 1.4)}
+                fill="var(--color-ink-soft)"
+                pointerEvents="none"
+                style={halo}
+              >
+                Cards with no ring hashtag
+              </text>
+            ) : null}
 
-            {layout.vertices.map((vertex) => {
+            {shownVertices.map((vertex) => {
               const note = byId.get(vertex.id)
               if (!note) return null
               const selected = selectedId === vertex.id
@@ -406,11 +422,12 @@ export function GraphCanvas({
                   }}
                   onKeyDown={(event) => handleVertexKey(event, vertex.id)}
                 >
-                  <circle cx={vertex.x} cy={vertex.y} r={GRAPH_VERTEX_R * 1.7} fill="transparent" />
+                  <title>{shorten(note.text)}</title>
+                  <circle cx={vertex.x} cy={vertex.y} r={radius * 1.7} fill="transparent" />
                   <circle
                     cx={vertex.x}
                     cy={vertex.y}
-                    r={GRAPH_VERTEX_R * (active ? 1.5 : 1.2)}
+                    r={radius * (active ? 1.5 : 1.2)}
                     fill="none"
                     stroke="var(--color-accent)"
                     strokeWidth={selected ? 4 : 3}
@@ -419,7 +436,7 @@ export function GraphCanvas({
                   <circle
                     cx={vertex.x}
                     cy={vertex.y}
-                    r={GRAPH_VERTEX_R}
+                    r={radius}
                     fill={color.fill}
                     stroke="var(--color-ink)"
                     strokeWidth={2.5}
@@ -428,15 +445,15 @@ export function GraphCanvas({
               )
             })}
 
-            {layout.vertices.map((vertex) => {
+            {shownVertices.map((vertex) => {
               const note = byId.get(vertex.id)
-              if (!note || editingId === vertex.id) return null
+              if (!note || editingId === vertex.id || !showText) return null
               return (
                 <text
                   key={vertex.id}
                   data-graph-label={vertex.id}
                   x={vertex.x}
-                  y={vertex.y + GRAPH_VERTEX_R + 20}
+                  y={vertex.y + radius + 20}
                   textAnchor="middle"
                   fontSize={15}
                   fill="var(--color-ink)"

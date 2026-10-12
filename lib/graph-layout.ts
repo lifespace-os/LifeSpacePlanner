@@ -1,4 +1,20 @@
-import { goalRingOf, type GoalRing, type Note } from "@/lib/board-data"
+import { goalRingOf, hasHashtag, type GoalRing, type Note } from "@/lib/board-data"
+
+/** The two Graph filters. A null field filters nothing. A vertex must pass both to be shown. */
+export type GraphFilter = { ringId: string | null; tag: string | null }
+
+export const NO_GRAPH_FILTER: GraphFilter = { ringId: null, tag: null }
+
+export function graphFilterActive(filter: GraphFilter) {
+  return filter.ringId !== null || filter.tag !== null
+}
+
+/** Whether a vertex shows under the filters. `home` is its cluster id, or "lone". */
+export function graphVertexShown(note: Note, home: string, filter: GraphFilter) {
+  if (filter.ringId !== null && home !== filter.ringId) return false
+  if (filter.tag !== null && !hasHashtag(note, filter.tag)) return false
+  return true
+}
 
 /** Where a vertex was dropped. A cluster member keeps an offset from its cluster's corner; a lone vertex keeps world coordinates. */
 export type GraphSpot = { home: string; x: number; y: number }

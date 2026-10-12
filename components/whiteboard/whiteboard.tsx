@@ -91,7 +91,9 @@ import { GoalsPanel } from "./goals-panel"
 import type { GoalMapCommit } from "./goal-map"
 import { GoalMapWindow } from "./goal-map-window"
 import { GraphCanvas } from "./graph-canvas"
-import type { GraphSpot } from "@/lib/graph-layout"
+import { GraphSettingsWindow } from "./graph-settings-window"
+import { GraphVertexWindow } from "./graph-vertex-window"
+import { GRAPH_LONE, NO_GRAPH_FILTER, graphVertexShown, type GraphFilter, type GraphSpot } from "@/lib/graph-layout"
 import { GoalCardPanel, type GoalDraft } from "./goal-card-panel"
 import { IkigaiStepsWindow } from "./ikigai-guide"
 import { CardDock } from "./card-dock"
@@ -168,6 +170,9 @@ export function Whiteboard() {
   const [mapSelected, setMapSelected] = useState<string | null>(null)
   const [graphSpots, setGraphSpots] = useState<Record<string, GraphSpot>>({})
   const [graphSelected, setGraphSelected] = useState<string | null>(null)
+  const [graphShowText, setGraphShowText] = useState(true)
+  const [graphSmall, setGraphSmall] = useState(false)
+  const [graphFilter, setGraphFilter] = useState<GraphFilter>(NO_GRAPH_FILTER)
   const [mapFocus, setMapFocus] = useState<number | null>(null)
   const [mapScale, setMapScale] = useState(GOAL_RING_SCALE.initial)
   const [rings, setRings] = useState<GoalRing[]>(BUILT_IN_RINGS)
@@ -443,6 +448,25 @@ export function Whiteboard() {
     () => (layoutOn ? notes.map((note) => (layout.spots[note.id] ? { ...note, ...layout.spots[note.id] } : note)) : notes),
     [layoutOn, layout.spots, notes],
   )
+
+  const graphTags = useMemo(
+    () => [...new Set(notes.flatMap((note) => note.hashtags.map((t) => t.toLowerCase())))].sort((a, b) => a.localeCompare(b)),
+    [notes],
+  )
+  const graphShown = useMemo(
+    () =>
+      notes.filter((note) => {
+        const ring = goalRingOf(note, rings)
+        return graphVertexShown(note, ring >= 0 ? rings[ring].id : GRAPH_LONE, graphFilter)
+      }).length,
+    [notes, rings, graphFilter],
+  )
+  const graphNote = graphSelected ? (notes.find((note) => note.id === graphSelected) ?? null) : null
+
+  const selectGraphVertex = useCallback((id: string | null) => {
+    setGraphSelected(id)
+    if (id) setMapWindowOpen(true)
+  }, [])
 
   const updateNote = useCallback((id: string, change: (note: Note) => Note) => {
     setNotes((prev) => prev.map((note) => (note.id === id ? change(note) : note)))
@@ -1358,7 +1382,10 @@ export function Whiteboard() {
           rings={rings}
           spots={graphSpots}
           selectedId={graphSelected}
-          onSelect={setGraphSelected}
+          filter={graphFilter}
+          showText={graphShowText}
+          small={graphSmall}
+          onSelect={selectGraphVertex}
           onSpot={saveGraphSpot}
           onMenu={openCardMenu}
           onRename={(id, text) => updateNote(id, (note) => ({ ...note, text }))}
@@ -1366,7 +1393,7 @@ export function Whiteboard() {
         />
       ) : null}
 
-      {goalsOn && !graphOn ? (
+      {goalsOn ? (
         <>
           <div className="pointer-events-none absolute top-[11.5rem] bottom-24 left-4 flex min-h-0 flex-col items-start gap-3">
             {goalFormNote && goalCard ? (
@@ -1384,7 +1411,7 @@ export function Whiteboard() {
               />
             ) : null}
           </div>
-          {mapOn ? (
+          {mapOn || graphOn ? (
             <>
               <div
                 inert={!mapWindowOpen}
@@ -1393,6 +1420,17 @@ export function Whiteboard() {
                   mapWindowOpen ? "translate-x-0" : "-translate-x-[calc(100%+1.5rem)]"
                 }`}
               >
+                {graphOn && graphNote ? (
+                  <GraphVertexWindow
+                    key={graphNote.id}
+                    note={graphNote}
+                    notes={notes}
+                    rings={rings}
+                    tagColors={sectorState.tagColors}
+                    onUpdate={updateNote}
+                    onClose={() => setGraphSelected(null)}
+                  />
+                ) : (
                 <GoalMapWindow
                   missionText={missionText}
                   scale={mapScale}
@@ -1407,6 +1445,7 @@ export function Whiteboard() {
                   onSpace={spaceMapPoints}
                   onClose={() => setMapWindowOpen(false)}
                 />
+                )}
               </div>
               {mapWindowOpen ? null : (
                 <button
@@ -1428,6 +1467,21 @@ export function Whiteboard() {
               goalsPanelOpen ? "translate-x-0" : "translate-x-[calc(100%+1.5rem)]"
             }`}
           >
+            {graphOn ? (
+              <GraphSettingsWindow
+                rings={rings}
+                tags={graphTags}
+                filter={graphFilter}
+                showText={graphShowText}
+                small={graphSmall}
+                shown={graphShown}
+                total={notes.length}
+                onFilter={setGraphFilter}
+                onShowText={setGraphShowText}
+                onSmall={setGraphSmall}
+                onClose={() => setGoalsPanelOpen(false)}
+              />
+            ) : (
             <GoalsPanel
               view={goalView}
               notes={notes}
@@ -1443,6 +1497,7 @@ export function Whiteboard() {
               onClose={() => setGoalsPanelOpen(false)}
               onRemoveLevel={untagCard}
             />
+            )}
           </div>
           {goalsPanelOpen ? null : (
             <button
