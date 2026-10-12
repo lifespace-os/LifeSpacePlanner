@@ -170,6 +170,7 @@ export function Whiteboard() {
   const [mapSelected, setMapSelected] = useState<string | null>(null)
   const [graphSpots, setGraphSpots] = useState<Record<string, GraphSpot>>({})
   const [graphSelected, setGraphSelected] = useState<string | null>(null)
+  const [graphMissionOpen, setGraphMissionOpen] = useState(false)
   const [graphShowText, setGraphShowText] = useState(true)
   const [graphSmall, setGraphSmall] = useState(false)
   const [graphFilter, setGraphFilter] = useState<GraphFilter>(NO_GRAPH_FILTER)
@@ -1043,6 +1044,12 @@ export function Whiteboard() {
   }, [])
 
   const closeMission = useCallback(() => setMissionOpen(false), [])
+  const openGraphMission = useCallback(() => setGraphMissionOpen(true), [])
+  const closeGraphMission = useCallback(() => setGraphMissionOpen(false), [])
+  const saveGraphMission = useCallback((text: string) => {
+    setMissionText(text)
+    setGraphMissionOpen(false)
+  }, [])
   const closeMissionRead = useCallback(() => setMissionReadOpen(false), [])
 
   const pressMissionButton = useCallback(() => {
@@ -1385,6 +1392,8 @@ export function Whiteboard() {
           filter={graphFilter}
           showText={graphShowText}
           small={graphSmall}
+          missionText={missionText}
+          onMission={openGraphMission}
           onSelect={selectGraphVertex}
           onSpot={saveGraphSpot}
           onMenu={openCardMenu}
@@ -1601,7 +1610,11 @@ export function Whiteboard() {
         <MissionWindow initialText={missionText} onSave={saveMission} onCancel={closeMission} />
       ) : null}
 
-      {missionReadOpen && goalsOn && missionText.length > 0 ? (
+      {graphMissionOpen && graphOn ? (
+  <MissionWindow initialText={missionText} onSave={saveGraphMission} onCancel={closeGraphMission} />
+  ) : null}
+  
+  {missionReadOpen && goalsOn && missionText.length > 0 ? (
         <MissionReadWindow text={missionText} onClose={closeMissionRead} />
       ) : null}
 

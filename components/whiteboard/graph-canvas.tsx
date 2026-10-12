@@ -1,9 +1,11 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { getCardColor, MAX_ZOOM, MIN_ZOOM, type GoalRing, type Note } from "@/lib/board-data"
+import { getCardColor, goalLinks, MAX_ZOOM, MIN_ZOOM, type GoalRing, type Note } from "@/lib/board-data"
 import {
   GRAPH_LONE,
+  GRAPH_MISSION,
+  GRAPH_MISSION_R,
   GRAPH_VERTEX_R,
   graphVertexShown,
   layoutGraph,
@@ -29,6 +31,12 @@ const halo: CSSProperties = {
 function shorten(text: string) {
   const line = text.replace(/\s+/g, " ").trim()
   return line.length > 17 ? `${line.slice(0, 16)}\u2026` : line || "Empty card"
+}
+
+function missionLabel(text: string) {
+  const line = text.replace(/\s+/g, " ").trim()
+  if (!line) return "Mission"
+  return line.length > 30 ? `${line.slice(0, 29)}\u2026` : line
 }
 
 function clampZoom(zoom: number) {
@@ -100,12 +108,16 @@ export function GraphCanvas({
   onMenu,
   onRename,
   onAddCard,
+  onMission,
+  missionText,
   filter,
   showText,
   small,
 }: {
   notes: Note[]
   rings: GoalRing[]
+  missionText: string
+  onMission: () => void
   filter: GraphFilter
   showText: boolean
   small: boolean
@@ -260,8 +272,8 @@ export function GraphCanvas({
       dragResolved.current = null
       return
     }
-    dragResolved.current = layout.vertices.find((v) => v.id === drag.id) ?? null
-  }, [drag, layout.vertices])
+    dragResolved.current = drag.id === GRAPH_MISSION ? layout.mission : (layout.vertices.find((v) => v.id === drag.id) ?? null)
+  }, [drag, layout.vertices, layout.mission])
 
   function handleVertexUp(event: React.PointerEvent<SVGGElement>, id: string) {
     const press = vertexPress.current
@@ -272,13 +284,26 @@ export function GraphCanvas({
     dragResolved.current = null
     setDrag(null)
     if (!press.moved || !resolved) {
-      onSelect(id)
+      if (id === GRAPH_MISSION) {
+        onSelect(null)
+        onMission()
+      } else {
+        onSelect(id)
+      }
       return
     }
     onSpot(id, spotOf(layoutRef.current, resolved))
   }
 
   function handleVertexKey(event: React.KeyboardEvent<SVGGElement>, id: string) {
+    if (id === GRAPH_MISSION) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault()
+        onSelect(null)
+        onMission()
+      }
+      return
+    }
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault()
       onSelect(id)
@@ -309,6 +334,13 @@ export function GraphCanvas({
   })
   const shownClusters = layout.clusters.filter((c) => filter.ringId === null || c.id === filter.ringId)
   const editing = editingId ? shownVertices.find((v) => v.id === editingId) : null
+  const missionLines = shownVertices.filter((v) => {
+    const note = byId.get(v.id)
+    return note ? goalLinks(note, byId, rings).includes(GRAPH_MISSION) : false
+  })
+  const mission = layout.mission
+  const missionActive = hoverId === GRAPH_MISSION || drag?.id === GRAPH_MISSION
+  const missionWritten = missionText.trim().length > 0
 
   return (
     <section
@@ -385,6 +417,80 @@ export function GraphCanvas({
                 Cards with no ring hashtag
               </text>
             ) : null}
+
+            <g aria-hidden="true" pointerEvents="none">
+              {missionLines.map((vertex) => (
+                <line
+                  key={vertex.id}
+                  data-graph-mission-line={vertex.id}
+                  x1={vertex.x}
+                  y1={vertex.y}
+                  x2={mission.x}
+                  y2={mission.y}
+                  stroke="var(--color-accent)"
+                  strokeOpacity={0.8}
+                  strokeWidth={2.5 * Math.min(k, 1.6)}
+                  strokeLinecap="round"
+                />
+              ))}
+            </g>
+
+            <g
+              data-graph-mission={mission.id}
+              role="button"
+              tabIndex={0}
+              aria-label={missionWritten ? `Mission: ${missionText}. Open the mission field.` : "Mission, not written yet. Open the mission field."}
+              className="pointer-events-auto cursor-grab outline-none active:cursor-grabbing"
+              onPointerEnter={() => setHoverId(GRAPH_MISSION)}
+              onPointerLeave={() => setHoverId((current) => (current === GRAPH_MISSION ? null : current))}
+              onFocus={() => setHoverId(GRAPH_MISSION)}
+              onBlur={() => setHoverId((current) => (current === GRAPH_MISSION ? null : current))}
+              onPointerDown={(event) => handleVertexDown(event, mission)}
+              onPointerMove={(event) => handleVertexMove(event, GRAPH_MISSION)}
+              onPointerUp={(event) => handleVertexUp(event, GRAPH_MISSION)}
+              onPointerCancel={() => {
+                vertexPress.current = null
+                setDrag(null)
+              }}
+              onContextMenu={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+              }}
+              onKeyDown={(event) => handleVertexKey(event, GRAPH_MISSION)}
+            >
+              <title>{missionWritten ? missionText : "Mission"}</title>
+              <circle cx={mission.x} cy={mission.y} r={GRAPH_MISSION_R * 1.5} fill="transparent" />
+              <circle
+                cx={mission.x}
+                cy={mission.y}
+                r={GRAPH_MISSION_R * (missionActive ? 1.25 : 1.12)}
+                fill="none"
+                stroke="var(--color-accent)"
+                strokeWidth={3}
+                strokeOpacity={missionActive ? 0.7 : 0.35}
+              />
+              <circle
+                cx={mission.x}
+                cy={mission.y}
+                r={GRAPH_MISSION_R}
+                fill="var(--color-card)"
+                stroke="var(--color-accent)"
+                strokeWidth={4}
+              />
+              <circle cx={mission.x} cy={mission.y} r={GRAPH_MISSION_R * 0.4} fill="var(--color-accent)" />
+              <text
+                x={mission.x}
+                y={mission.y + GRAPH_MISSION_R + 28}
+                textAnchor="middle"
+                fontSize={18}
+                fontWeight={600}
+                fill="var(--color-ink)"
+                pointerEvents="none"
+                style={halo}
+              >
+                {missionLabel(missionText)}
+              </text>
+            </g>
 
             {shownVertices.map((vertex) => {
               const note = byId.get(vertex.id)

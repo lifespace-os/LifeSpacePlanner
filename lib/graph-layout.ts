@@ -33,9 +33,15 @@ export type GraphCluster = {
 
 export type GraphVertex = { id: string; x: number; y: number; home: string }
 
+/** The id of the mission vertex. It is the same mission as the Map center, never a card in the list of notes. */
+export const GRAPH_MISSION = "mission"
+export const GRAPH_MISSION_R = 40
+
 export type GraphLayout = {
   clusters: GraphCluster[]
   vertices: GraphVertex[]
+  /** The mission vertex. It always exists and sits outside every cluster. */
+  mission: GraphVertex
   /** Top-left corner of the area where cards without a ring hashtag are placed. */
   loneOrigin: { x: number; y: number }
   bounds: { left: number; top: number; right: number; bottom: number }
@@ -179,14 +185,31 @@ export function layoutGraph(
     vertices.push({ id, home: GRAPH_LONE, x: free.x, y: free.y })
   })
 
-  let left = 0
-  let top = 0
-  let right = 0
+  let clustersRight = 0
+  for (const c of clusters) clustersRight = Math.max(clustersRight, c.x + c.width)
+  const missionSpot = spots[GRAPH_MISSION]
+  let mx = clustersRight / 2
+  let my = -(GAP + GRAPH_MISSION_R + 40)
+  if (missionSpot && missionSpot.home === GRAPH_LONE) {
+    mx = missionSpot.x
+    my = missionSpot.y
+  }
+  if (drag?.id === GRAPH_MISSION) {
+    mx = drag.x
+    my = drag.y
+  }
+  const missionFree = pushOut(mx, my, clusters)
+  const mission: GraphVertex = { id: GRAPH_MISSION, home: GRAPH_LONE, x: missionFree.x, y: missionFree.y }
+
+  let left = Math.min(0, mission.x - GRAPH_MISSION_R)
+  let top = Math.min(0, mission.y - GRAPH_MISSION_R)
+  let right = Math.max(0, mission.x + GRAPH_MISSION_R)
   let bottom = 0
   for (const c of clusters) {
     right = Math.max(right, c.x + c.width)
     bottom = Math.max(bottom, c.y + c.height)
   }
+  bottom = Math.max(bottom, mission.y + GRAPH_MISSION_R + LABEL_ROOM)
   for (const v of vertices) {
     left = Math.min(left, v.x - GRAPH_VERTEX_R)
     top = Math.min(top, v.y - GRAPH_VERTEX_R)
@@ -195,7 +218,7 @@ export function layoutGraph(
   }
   if (lone.length === 0) bottom = Math.max(bottom, loneOrigin.y + CELL_H)
 
-  return { clusters, vertices, loneOrigin, bounds: { left, top, right, bottom } }
+  return { clusters, vertices, mission, loneOrigin, bounds: { left, top, right, bottom } }
 }
 
 /** The spot to save for a vertex that was released at its resolved place in the layout. */
