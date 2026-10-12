@@ -2,7 +2,7 @@
 
 import { memo, useRef, useState, type RefObject } from "react"
 import clsx from "clsx"
-import { CalendarDays, Check, ListChecks, User, X } from "lucide-react"
+import { Check, X } from "lucide-react"
 import {
   CARD_MIN_HEIGHT,
   CARD_WIDTH,
@@ -245,7 +245,7 @@ export const NoteCard = memo(function NoteCard({
         "transition-[transform,box-shadow,opacity] duration-150",
         "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-board",
         editing ? "cursor-text" : dragging ? "cursor-grabbing" : "cursor-grab",
-        isTask ? "task-ruled rounded-md border border-line bg-card" : "rounded-sm border-b-2",
+        isTask ? "rounded-md border border-line border-t-4 border-t-accent bg-card" : "rounded-sm border-b-2",
         !isTask && (color.dark ? "text-board" : "text-ink"),
         dragging || editing
           ? "shadow-[0_18px_30px_-12px_rgba(35,39,43,0.45)]"
@@ -337,45 +337,40 @@ function CardEditor({ note, onDone }: { note: Note; onDone: (text: string) => vo
 
 function TaskFace({ note, released }: { note: Note; released: boolean }) {
   const task = note.task!
-  const dates = task.since
-    ? `Since ${formatDue(task.since)} · Due ${task.due ? formatDue(task.due) : "not set"}`
-    : formatDue(task.due)
+  const owner = task.owner.trim()
 
   return (
-    <div className="relative px-4 pt-3 pb-3">
-      <span aria-hidden="true" className="absolute top-0 bottom-0 left-2 w-px bg-release/30" />
-      <div className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-1 rounded-sm bg-accent px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-board">
-          <ListChecks className="size-3" aria-hidden="true" />
-          Task
-        </span>
-        <span className="text-[10px] uppercase tracking-[0.14em] text-ink-soft">1 card = 1 task</span>
-      </div>
+    <div className="flex flex-col gap-2.5 px-3.5 pt-3 pb-2">
       <p
         className={clsx(
-          "mt-2 font-serif text-lg leading-snug font-medium text-ink text-pretty",
+          "font-sans text-[15px] leading-snug font-semibold text-ink text-pretty break-words",
           released && "line-through decoration-release/60",
         )}
       >
         {task.title}
       </p>
-      <dl className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-xs text-ink">
-        <dt>
-          <CalendarDays className="size-3.5 text-ink-soft" aria-hidden="true" />
-          <span className="sr-only">Dates</span>
-        </dt>
-        <dd className="tabular-nums">{dates}</dd>
-        <dt>
-          <User className="size-3.5 text-ink-soft" aria-hidden="true" />
-          <span className="sr-only">Owner</span>
-        </dt>
-        <dd>{task.owner || "Unassigned"}</dd>
+      <dl className="flex gap-4 text-xs">
+        <div className="flex flex-col gap-0.5">
+          <dt className="text-[10px] font-medium uppercase tracking-[0.12em] text-ink-soft">Since</dt>
+          <dd className="font-medium text-ink tabular-nums">{task.since ? formatDue(task.since) : "Not set"}</dd>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <dt className="text-[10px] font-medium uppercase tracking-[0.12em] text-ink-soft">Due</dt>
+          <dd className="font-medium text-ink tabular-nums">{task.due ? formatDue(task.due) : "Not set"}</dd>
+        </div>
+        <div className="ml-auto flex min-w-0 flex-col items-end gap-0.5">
+          <dt className="text-[10px] font-medium uppercase tracking-[0.12em] text-ink-soft">Owner</dt>
+          <dd className="flex min-w-0 items-center gap-1.5 font-medium text-ink">
+            <span
+              aria-hidden="true"
+              className="flex size-5 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-semibold text-board"
+            >
+              {owner ? owner.charAt(0).toUpperCase() : "?"}
+            </span>
+            <span className="truncate">{owner || "Unassigned"}</span>
+          </dd>
+        </div>
       </dl>
-      {note.text.trim() ? (
-        <p className="mt-2 border-t border-dashed border-line pt-1.5 text-[11px] leading-4 text-ink-soft">
-          <span className="font-medium">From card:</span> <span className="italic">{note.text}</span>
-        </p>
-      ) : null}
     </div>
   )
 }
