@@ -251,7 +251,8 @@ export function GraphVertexWindow({
           ) : (
             <>
               <p className="text-xs text-ink-soft text-pretty">
-                Choose one or more. A goal may be on any ring closer to the center, or be the mission.
+                Choose one or more here, or drag the handle of the vertex onto another vertex or the Mission. A goal may be on any
+                ring closer to the center, or be the mission. Click a line to remove it.
               </p>
               <div className="mt-1 flex max-h-48 flex-col overflow-y-auto">
                 {[{ id: "mission", label: "The mission" }, ...above.map((n) => ({ id: n.id, label: n.text.trim().slice(0, 48) || "Untitled card" }))].map(

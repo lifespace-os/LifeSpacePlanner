@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react"
-import { getCardColor, goalLinks, MAX_ZOOM, MIN_ZOOM, type GoalRing, type Note } from "@/lib/board-data"
+import { getCardColor, goalLinks, goalRingOf, MAX_ZOOM, MIN_ZOOM, type GoalRing, type Note } from "@/lib/board-data"
 import {
   GRAPH_LONE,
   GRAPH_MISSION,
@@ -109,6 +109,7 @@ export function GraphCanvas({
   onRename,
   onAddCard,
   onMission,
+  onLinks,
   missionText,
   filter,
   showText,
@@ -118,6 +119,7 @@ export function GraphCanvas({
   rings: GoalRing[]
   missionText: string
   onMission: () => void
+  onLinks: (id: string, parentIds: string[]) => void
   filter: GraphFilter
   showText: boolean
   small: boolean
@@ -136,6 +138,10 @@ export function GraphCanvas({
   const [drag, setDrag] = useState<{ id: string; x: number; y: number } | null>(null)
   const [hoverId, setHoverId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [linking, setLinking] = useState<{ from: string; x: number; y: number } | null>(null)
+  const [hoverLink, setHoverLink] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const linkPress = useRef<number | null>(null)
   const [menu, setMenu] = useState<{ clientX: number; clientY: number; x: number; y: number } | null>(null)
   const vertexPress = useRef<VertexPress | null>(null)
   const panPress = useRef<PanPress | null>(null)
@@ -162,6 +168,12 @@ export function GraphCanvas({
     observer.observe(frame)
     return () => observer.disconnect()
   }, [])
+
+  useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(() => setNotice(null), 3800)
+    return () => window.clearTimeout(timer)
+  }, [notice])
 
   const fit = useCallback(() => {
     if (size.width === 0 || size.height === 0) return
@@ -334,13 +346,105 @@ export function GraphCanvas({
   })
   const shownClusters = layout.clusters.filter((c) => filter.ringId === null || c.id === filter.ringId)
   const editing = editingId ? shownVertices.find((v) => v.id === editingId) : null
-  const missionLines = shownVertices.filter((v) => {
-    const note = byId.get(v.id)
-    return note ? goalLinks(note, byId, rings).includes(GRAPH_MISSION) : false
-  })
   const mission = layout.mission
   const missionActive = hoverId === GRAPH_MISSION || drag?.id === GRAPH_MISSION
   const missionWritten = missionText.trim().length > 0
+
+  const shownById = new Map(shownVertices.map((v) => [v.id, v]))
+  const links = shownVertices.flatMap((from) => {
+    const note = byId.get(from.id)
+    if (!note) return []
+    return goalLinks(note, byId, rings).flatMap((toId) => {
+      const to = toId === GRAPH_MISSION ? mission : shownById.get(toId)
+      return to ? [{ id: `${from.id}>${toId}`, fromId: from.id, toId, from, to }] : []
+    })
+  })
+
+  function nameOf(id: string) {
+    return id === GRAPH_MISSION ? missionLabel(missionText) : shorten(byId.get(id)?.text ?? "")
+  }
+
+  function linkIssue(fromId: string, toId: string): string | null {
+    const from = byId.get(fromId)
+    if (!from) return "That card is gone."
+    const fromRing = goalRingOf(from, rings)
+    if (fromRing < 0) return "Give this card a ring hashtag first. Only a card on a ring has goals above."
+    if (goalLinks(from, byId, rings).includes(toId)) return "That is already a goal above this card."
+    if (toId === GRAPH_MISSION) return null
+    const to = byId.get(toId)
+    const toRing = to ? goalRingOf(to, rings) : -1
+    if (toRing < 0) return "That card has no ring hashtag, so it cannot be a goal above."
+    if (toRing >= fromRing) return "A goal above must sit on a ring closer to the center."
+    return null
+  }
+
+  function targetAt(point: { x: number; y: number }, fromId: string): string | null {
+    let best: string | null = null
+    let bestDistance = Infinity
+    const missionDistance = Math.hypot(point.x - mission.x, point.y - mission.y)
+    if (missionDistance <= GRAPH_MISSION_R * 1.3) {
+      best = GRAPH_MISSION
+      bestDistance = missionDistance
+    }
+    for (const v of shownVertices) {
+      if (v.id === fromId) continue
+      const distance = Math.hypot(point.x - v.x, point.y - v.y)
+      if (distance <= radius * 1.7 && distance < bestDistance) {
+        best = v.id
+        bestDistance = distance
+      }
+    }
+    return best
+  }
+
+  function removeLink(fromId: string, toId: string) {
+    const note = byId.get(fromId)
+    if (!note) return
+    onLinks(
+      fromId,
+      goalLinks(note, byId, rings).filter((id) => id !== toId),
+    )
+    setHoverLink(null)
+    setNotice(`Removed the link from ${nameOf(fromId)} to ${nameOf(toId)}.`)
+  }
+
+  function handleHandleDown(event: React.PointerEvent<SVGGElement>, fromId: string) {
+    if (event.button !== 0) return
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    linkPress.current = event.pointerId
+    setNotice(null)
+    setLinking({ from: fromId, ...toWorld(event.clientX, event.clientY) })
+  }
+
+  function handleHandleMove(event: React.PointerEvent<SVGGElement>) {
+    if (linkPress.current !== event.pointerId) return
+    const point = toWorld(event.clientX, event.clientY)
+    setLinking((current) => (current ? { ...current, ...point } : current))
+  }
+
+  function handleHandleUp(event: React.PointerEvent<SVGGElement>, fromId: string) {
+    if (linkPress.current !== event.pointerId) return
+    linkPress.current = null
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    const target = targetAt(toWorld(event.clientX, event.clientY), fromId)
+    setLinking(null)
+    if (!target) return
+    const issue = linkIssue(fromId, target)
+    if (issue) {
+      setNotice(issue)
+      return
+    }
+    const note = byId.get(fromId)
+    if (!note) return
+    onLinks(fromId, [...goalLinks(note, byId, rings), target])
+    setNotice(`Linked ${nameOf(fromId)} to ${nameOf(target)}.`)
+  }
+
+  const handleVertex = selectedId && editingId !== selectedId ? (shownById.get(selectedId) ?? null) : null
+  const linkTarget = linking ? targetAt(linking, linking.from) : null
+  const linkSource = linking ? (shownById.get(linking.from) ?? null) : null
+  const linkEnd = linkTarget ? (linkTarget === GRAPH_MISSION ? mission : (shownById.get(linkTarget) ?? null)) : null
 
   return (
     <section
@@ -418,21 +522,59 @@ export function GraphCanvas({
               </text>
             ) : null}
 
-            <g aria-hidden="true" pointerEvents="none">
-              {missionLines.map((vertex) => (
-                <line
-                  key={vertex.id}
-                  data-graph-mission-line={vertex.id}
-                  x1={vertex.x}
-                  y1={vertex.y}
-                  x2={mission.x}
-                  y2={mission.y}
-                  stroke="var(--color-accent)"
-                  strokeOpacity={0.8}
-                  strokeWidth={2.5 * Math.min(k, 1.6)}
-                  strokeLinecap="round"
-                />
-              ))}
+            <g>
+              {links.map((link) => {
+                const hot = hoverLink === link.id
+                const toMission = link.toId === GRAPH_MISSION
+                return (
+                  <g
+                    key={link.id}
+                    data-graph-link={link.id}
+                    data-graph-mission-line={toMission ? link.fromId : undefined}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Remove the link from ${nameOf(link.fromId)} to ${nameOf(link.toId)}`}
+                    className="cursor-pointer outline-none"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onPointerEnter={() => setHoverLink(link.id)}
+                    onPointerLeave={() => setHoverLink((current) => (current === link.id ? null : current))}
+                    onFocus={() => setHoverLink(link.id)}
+                    onBlur={() => setHoverLink((current) => (current === link.id ? null : current))}
+                    onClick={() => removeLink(link.fromId, link.toId)}
+                    onContextMenu={(event) => event.stopPropagation()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " " || event.key === "Delete" || event.key === "Backspace") {
+                        event.preventDefault()
+                        removeLink(link.fromId, link.toId)
+                      }
+                    }}
+                  >
+                    <title>Click to remove this link</title>
+                    <line
+                      x1={link.from.x}
+                      y1={link.from.y}
+                      x2={link.to.x}
+                      y2={link.to.y}
+                      stroke="transparent"
+                      strokeWidth={Math.max(14, 18 / view.zoom)}
+                      strokeLinecap="round"
+                      pointerEvents="stroke"
+                    />
+                    <line
+                      x1={link.from.x}
+                      y1={link.from.y}
+                      x2={link.to.x}
+                      y2={link.to.y}
+                      stroke="var(--color-accent)"
+                      strokeOpacity={hot ? 1 : toMission ? 0.8 : 0.6}
+                      strokeWidth={(hot ? 4.5 : 2.5) * Math.min(k, 1.6)}
+                      strokeDasharray={hot ? `${8 * Math.min(k, 1.6)} ${6 * Math.min(k, 1.6)}` : undefined}
+                      strokeLinecap="round"
+                      pointerEvents="none"
+                    />
+                  </g>
+                )
+              })}
             </g>
 
             <g
@@ -551,6 +693,78 @@ export function GraphCanvas({
               )
             })}
 
+            {linking && linkSource ? (
+              <g aria-hidden="true" pointerEvents="none">
+                {shownVertices
+                  .filter((v) => v.id !== linking.from && !linkIssue(linking.from, v.id))
+                  .map((v) => (
+                    <circle
+                      key={v.id}
+                      cx={v.x}
+                      cy={v.y}
+                      r={radius * 1.6}
+                      fill="none"
+                      stroke="var(--color-accent)"
+                      strokeWidth={3}
+                      strokeDasharray="6 5"
+                      strokeOpacity={linkTarget === v.id ? 1 : 0.45}
+                    />
+                  ))}
+                {!linkIssue(linking.from, GRAPH_MISSION) ? (
+                  <circle
+                    cx={mission.x}
+                    cy={mission.y}
+                    r={GRAPH_MISSION_R * 1.35}
+                    fill="none"
+                    stroke="var(--color-accent)"
+                    strokeWidth={3}
+                    strokeDasharray="8 6"
+                    strokeOpacity={linkTarget === GRAPH_MISSION ? 1 : 0.45}
+                  />
+                ) : null}
+                <line
+                  x1={linkSource.x}
+                  y1={linkSource.y}
+                  x2={linkEnd ? linkEnd.x : linking.x}
+                  y2={linkEnd ? linkEnd.y : linking.y}
+                  stroke="var(--color-accent)"
+                  strokeWidth={3 * Math.min(k, 1.6)}
+                  strokeDasharray={`${8 * Math.min(k, 1.6)} ${6 * Math.min(k, 1.6)}`}
+                  strokeLinecap="round"
+                />
+              </g>
+            ) : null}
+
+            {handleVertex ? (
+              <g
+                data-graph-handle={handleVertex.id}
+                aria-hidden="true"
+                className="pointer-events-auto cursor-crosshair"
+                onPointerDown={(event) => handleHandleDown(event, handleVertex.id)}
+                onPointerMove={handleHandleMove}
+                onPointerUp={(event) => handleHandleUp(event, handleVertex.id)}
+                onPointerCancel={() => {
+                  linkPress.current = null
+                  setLinking(null)
+                }}
+                onContextMenu={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                }}
+              >
+                <title>Drag onto a card or the Mission to add a goal above</title>
+                <circle cx={handleVertex.x + (radius * 1.5 + 10) * 0.7071} cy={handleVertex.y - (radius * 1.5 + 10) * 0.7071} r={16} fill="transparent" />
+                <circle
+                  cx={handleVertex.x + (radius * 1.5 + 10) * 0.7071}
+                  cy={handleVertex.y - (radius * 1.5 + 10) * 0.7071}
+                  r={linking ? 9 : 7}
+                  fill="var(--color-accent)"
+                  stroke="var(--color-card)"
+                  strokeWidth={2.5}
+                />
+              </g>
+            ) : null}
+
             {shownVertices.map((vertex) => {
               const note = byId.get(vertex.id)
               if (!note || editingId === vertex.id || !showText) return null
@@ -598,6 +812,15 @@ export function GraphCanvas({
           onFit={fit}
         />
       </div>
+
+      {notice ? (
+        <p
+          role="status"
+          className="pointer-events-none absolute bottom-4 left-1/2 max-w-[28rem] -translate-x-1/2 rounded-xl border border-line bg-card px-4 py-2 text-center text-sm text-balance text-ink shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)]"
+        >
+          {notice}
+        </p>
+      ) : null}
 
       {menu ? (
         <CanvasMenu

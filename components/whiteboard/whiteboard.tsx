@@ -1394,6 +1394,7 @@ export function Whiteboard() {
           small={graphSmall}
           missionText={missionText}
           onMission={openGraphMission}
+          onLinks={(id, parentIds) => updateNote(id, (note) => ({ ...note, parentIds }))}
           onSelect={selectGraphVertex}
           onSpot={saveGraphSpot}
           onMenu={openCardMenu}
