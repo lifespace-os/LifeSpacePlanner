@@ -22,6 +22,12 @@ type KanbanState = {
   /** True while the board shows only cards with a path to the mission. */
   missionOnly: boolean
   setMissionOnly: (on: boolean) => void
+  /** True while the row of ring cards shows above the columns. */
+  ringsOn: boolean
+  setRingsOn: (on: boolean) => void
+  /** The ring card the board is narrowed to, or null when the whole board shows. */
+  ringFocusId: string | null
+  setRingFocusId: (id: string | null) => void
   /** The card whose window is showing, or null when it is hidden. */
   openId: string | null
   openCard: (cardId: string) => void
@@ -41,8 +47,15 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
   const [columnsByBoard, setColumnsByBoard] = useState(defaultColumns)
   const [cards, setCards] = useState<KanbanCard[]>(defaultCards)
   const [missionOnly, setMissionOnly] = useState(false)
+  const [ringsOn, setRingsOnState] = useState(false)
+  const [ringFocusId, setRingFocusId] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, CardDraft>>({})
+
+  const setRingsOn = useCallback((on: boolean) => {
+    setRingsOnState(on)
+    if (!on) setRingFocusId(null)
+  }, [])
 
   const openCard = useCallback((cardId: string) => setOpenId(cardId), [])
   const closeCard = useCallback(() => setOpenId(null), [])
@@ -88,6 +101,10 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
       setCards,
       missionOnly,
       setMissionOnly,
+      ringsOn,
+      setRingsOn,
+      ringFocusId,
+      setRingFocusId,
       openId,
       openCard,
       closeCard,
@@ -96,7 +113,7 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
       revertDraft,
       saveDraft,
     }),
-    [boardId, columnsByBoard, cards, missionOnly, openId, openCard, closeCard, drafts, editDraft, revertDraft, saveDraft],
+    [boardId, columnsByBoard, cards, missionOnly, ringsOn, setRingsOn, ringFocusId, openId, openCard, closeCard, drafts, editDraft, revertDraft, saveDraft],
   )
 
   return <KanbanContext.Provider value={value}>{children}</KanbanContext.Provider>

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next"
 import { Geist, Newsreader } from "next/font/google"
 import { AppNav } from "@/components/app-nav"
+import { GoalsProvider } from "@/components/goals-provider"
 import { KanbanProvider } from "@/components/kanban/kanban-provider"
 import { MissionProvider } from "@/components/mission-provider"
 import "./globals.css"
@@ -23,10 +24,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${geist.variable} ${newsreader.variable}`}>
       <body className="min-h-dvh font-sans antialiased">
         <MissionProvider>
-          <KanbanProvider>
-            <AppNav />
-            {children}
-          </KanbanProvider>
+          <GoalsProvider>
+            <KanbanProvider>
+              <AppNav />
+              {children}
+            </KanbanProvider>
+          </GoalsProvider>
         </MissionProvider>
       </body>
     </html>

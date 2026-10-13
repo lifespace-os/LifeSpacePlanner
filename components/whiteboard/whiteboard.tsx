@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useGoals } from "@/components/goals-provider"
 import { useMission } from "@/components/mission-provider"
 import clsx from "clsx"
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
@@ -120,7 +121,7 @@ function clampZoom(zoom: number) {
 }
 
 export function Whiteboard() {
-  const [notes, setNotes] = useState<Note[]>(SAMPLE_NOTES)
+  const { notes, setNotes, rings, setRings } = useGoals()
   const [zones, setZones] = useState<Zones>(DEFAULT_ZONES)
   const [budgetZones, setBudgetZones] = useState<BudgetZones>({
     investment: { left: 0, top: 0, ...BUDGET_ZONE_SIZE },
@@ -187,7 +188,6 @@ export function Whiteboard() {
   const [graphFilter, setGraphFilter] = useState<GraphFilter>(NO_GRAPH_FILTER)
   const [mapFocus, setMapFocus] = useState<number | null>(null)
   const [mapScale, setMapScale] = useState(GOAL_RING_SCALE.initial)
-  const [rings, setRings] = useState<GoalRing[]>(BUILT_IN_RINGS)
   const ringsRef = useRef(rings)
   ringsRef.current = rings
   const [mapAllThreads, setMapAllThreads] = useState(false)

@@ -11,13 +11,16 @@ import {
   type KanbanBoardId,
   type KanbanColumn,
 } from "@/lib/kanban-data"
+import { useGoals } from "@/components/goals-provider"
 import { useMission } from "@/components/mission-provider"
+import { belowIds, ringCardsOf } from "@/lib/ring-focus"
 import { CardEditor } from "./card-editor"
 import { ColumnEditor } from "./column-editor"
 import { KanbanCardView } from "./kanban-card"
 import { KanbanColumnView } from "./kanban-column"
 import { useKanban } from "./kanban-provider"
 import { MissionStrip } from "./mission-strip"
+import { RingRow } from "./ring-row"
 
 export function KanbanScreen() {
   const {
@@ -29,6 +32,10 @@ export function KanbanScreen() {
     setCards,
     missionOnly,
     setMissionOnly,
+    ringsOn,
+    setRingsOn,
+    ringFocusId,
+    setRingFocusId,
     openId,
     openCard,
     closeCard,
@@ -54,10 +61,45 @@ export function KanbanScreen() {
   const boardCards = useMemo(() => cards.filter((card) => card.boardId === boardId), [cards, boardId])
   const { missionText } = useMission()
   const filtering = missionOnly && missionText.length > 0
-  const visibleCards = useMemo(
-    () => (filtering ? boardCards.filter(hasMissionPath) : boardCards),
-    [filtering, boardCards],
-  )
+  const { notes, rings } = useGoals()
+  const ringNotes = useMemo(() => ringCardsOf(notes, rings), [notes, rings])
+  const focusedId = ringsOn && ringFocusId && ringNotes.some((note) => note.id === ringFocusId) ? ringFocusId : null
+  const below = useMemo(() => (focusedId ? belowIds(focusedId, notes, rings) : null), [focusedId, notes, rings])
+  const shownRingNotes = below ? ringNotes.filter((note) => below.has(note.id)) : ringNotes
+  const taskCounts = useMemo(() => {
+    const result: Record<string, number> = {}
+    for (const note of ringNotes) {
+      const subtree = belowIds(note.id, notes, rings)
+      result[note.id] = boardCards.filter((card) => card.goalIds.some((id) => subtree.has(id))).length
+    }
+    return result
+  }, [ringNotes, notes, rings, boardCards])
+  const visibleCards = useMemo(() => {
+    const byMission = filtering ? boardCards.filter(hasMissionPath) : boardCards
+    return below ? byMission.filter((card) => card.goalIds.some((id) => below.has(id))) : byMission
+  }, [filtering, boardCards, below])
+
+  const pickRing = (id: string) => {
+    if (id === focusedId) {
+      setRingFocusId(null)
+      setStatus("Showing the whole board.")
+      return
+    }
+    setRingFocusId(id)
+    const name = ringNotes.find((note) => note.id === id)?.text || "this card"
+    setStatus(`Showing “${name}” and everything below it.`)
+  }
+
+  useEffect(() => {
+    if (!focusedId || openId) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return
+      setRingFocusId(null)
+      setStatus("Showing the whole board.")
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [focusedId, openId, setRingFocusId])
   const counts = useMemo(() => {
     const result: Record<string, number> = {}
     for (const card of boardCards) result[card.columnId] = (result[card.columnId] ?? 0) + 1
@@ -201,6 +243,24 @@ export function KanbanScreen() {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={ringsOn}
+            onClick={() => setRingsOn(!ringsOn)}
+            className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            <span
+              aria-hidden="true"
+              className={clsx(
+                "flex h-5 w-9 items-center rounded-full border p-0.5 transition-colors",
+                ringsOn ? "border-accent bg-accent" : "border-line bg-desk",
+              )}
+            >
+              <span className={clsx("size-3.5 rounded-full bg-board shadow-sm transition-transform", ringsOn ? "translate-x-4" : "translate-x-0 bg-ink-soft")} />
+            </span>
+            Ring cards
+          </button>
           <p role="status" aria-live="polite" className="max-w-xs text-pretty text-right text-sm text-ink-soft">
             {status}
           </p>
@@ -223,6 +283,8 @@ export function KanbanScreen() {
         total={boardCards.length}
         onToggle={() => setMissionOnly(!missionOnly)}
       />
+
+      {ringsOn && <RingRow cards={shownRingNotes} rings={rings} focusId={focusedId} taskCounts={taskCounts} onPick={pickRing} />}
 
       <div
         id="kanban-panel"

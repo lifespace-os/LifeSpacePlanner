@@ -30,6 +30,8 @@ export type KanbanCard = {
   missionLink: boolean
   /** The card is joined to the mission by the second line. */
   secondLine: boolean
+  /** Ids of the Whiteboard ring cards this task hangs under. Empty means it sits under none. */
+  goalIds: string[]
 }
 
 /** A card has a path to the mission when it holds the goal above or the second line to it. Saved state only, never a draft. */
@@ -146,7 +148,24 @@ function card(
     owner,
     missionLink: false,
     secondLine: false,
+    goalIds: [],
   }
+}
+
+/** Sample tasks hung under the sample ring cards: n1 "Run a half marathon" and n4 "Call Mom on Sunday". */
+const SAMPLE_GOALS: Record<string, string[]> = {
+  y3: ["n1"],
+  m4: ["n1"],
+  a11: ["n1"],
+  w7: ["n1"],
+  d6: ["n1"],
+  a4: ["n4"],
+  a9: ["n4"],
+  w4: ["n4"],
+}
+
+function withGoals(cards: KanbanCard[]): KanbanCard[] {
+  return cards.map((item) => (SAMPLE_GOALS[item.id] ? { ...item, goalIds: SAMPLE_GOALS[item.id]! } : item))
 }
 
 /** Sample start and end times, so the card faces show them from the first load. */
@@ -173,7 +192,7 @@ function withSchedule(cards: KanbanCard[]): KanbanCard[] {
 }
 
 export function defaultCards(): KanbanCard[] {
-  return withSchedule([
+  return withGoals(withSchedule([
     card("a1", "all", "backlog", "Sort the photo archive into years", "home", "2026-11-29", "Me"),
     card("a2", "all", "backlog", "Draft the savings plan for next spring", "money", "2026-12-05", "Me"),
     card("a3", "all", "backlog", "Find a weekly pottery class", "learning", "2026-11-14", "Me"),
@@ -234,7 +253,7 @@ export function defaultCards(): KanbanCard[] {
     card("d8", "day", "theirs", "Wait for Dana's tax draft", "money", "2026-10-13", "Dana"),
     card("d9", "day", "done", "Water the plants", "home", "2026-10-13", "Me"),
     card("d10", "day", "done", "Morning pages", "freedom", "2026-10-13", "Me"),
-  ])
+  ]))
 }
 
 /** Format HH:mm as "9:00 AM". */
