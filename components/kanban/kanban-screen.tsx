@@ -4,21 +4,34 @@ import { useEffect, useMemo, useState } from "react"
 import clsx from "clsx"
 import {
   KANBAN_BOARDS,
-  defaultCards,
-  defaultColumns,
+  draftOf,
   matchColumn,
+  sameDraft,
   type KanbanBoardId,
-  type KanbanCard,
   type KanbanColumn,
 } from "@/lib/kanban-data"
+import { CardEditor } from "./card-editor"
 import { ColumnEditor } from "./column-editor"
 import { KanbanCardView } from "./kanban-card"
 import { KanbanColumnView } from "./kanban-column"
+import { useKanban } from "./kanban-provider"
 
 export function KanbanScreen() {
-  const [boardId, setBoardId] = useState<KanbanBoardId>("all")
-  const [columnsByBoard, setColumnsByBoard] = useState(defaultColumns)
-  const [cards, setCards] = useState<KanbanCard[]>(defaultCards)
+  const {
+    boardId,
+    setBoardId,
+    columnsByBoard,
+    setColumnsByBoard,
+    cards,
+    setCards,
+    openId,
+    openCard,
+    closeCard,
+    drafts,
+    editDraft,
+    revertDraft,
+    saveDraft,
+  } = useKanban()
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overTab, setOverTab] = useState<KanbanBoardId | null>(null)
   const [status, setStatus] = useState("")
@@ -32,6 +45,7 @@ export function KanbanScreen() {
     return () => window.clearTimeout(timer)
   }, [status])
 
+  const openCardData = openId ? (cards.find((item) => item.id === openId) ?? null) : null
   const boardCards = useMemo(() => cards.filter((card) => card.boardId === boardId), [cards, boardId])
   const counts = useMemo(() => {
     const result: Record<string, number> = {}
@@ -226,12 +240,31 @@ export function KanbanScreen() {
                     }}
                     onMoveToColumn={(cardId, columnId) => moveCard(cardId, boardId, columnId, null)}
                     onMoveToBoard={moveToBoard}
+                    onOpen={openCard}
                   />
                 ))}
             </KanbanColumnView>
           ))}
         </div>
       </div>
+
+      {openCardData && (
+        <CardEditor
+          key={openCardData.id}
+          card={openCardData}
+          draft={drafts[openCardData.id] ?? draftOf(openCardData)}
+          dirty={openCardData.id in drafts && !sameDraft(drafts[openCardData.id]!, draftOf(openCardData))}
+          onChange={(patch) => editDraft(openCardData.id, patch)}
+          onClose={closeCard}
+          onSave={() => {
+            if (saveDraft(openCardData.id)) {
+              setStatus("Saved the card.")
+              closeCard()
+            }
+          }}
+          onRevert={() => revertDraft(openCardData.id)}
+        />
+      )}
     </main>
   )
 }

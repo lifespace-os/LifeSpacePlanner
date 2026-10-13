@@ -17,9 +17,65 @@ export type KanbanCard = {
   columnId: string
   title: string
   labelId: string | null
-  /** yyyy-mm-dd */
+  /** The day work starts, yyyy-mm-dd. Empty when unset. */
+  since: string
+  /** HH:mm. Empty when unset. */
+  startTime: string
+  /** The end date, yyyy-mm-dd. */
   due: string
+  /** HH:mm. Empty when unset. */
+  endTime: string
   owner: string
+  /** The card has the mission as a goal above. */
+  missionLink: boolean
+  /** The card is joined to the mission by the second line. */
+  secondLine: boolean
+}
+
+/** What the card window edits. Kept apart from the card until Save writes it. */
+export type CardDraft = {
+  title: string
+  since: string
+  startTime: string
+  due: string
+  endTime: string
+  missionLink: boolean
+  secondLine: boolean
+}
+
+export function draftOf(card: KanbanCard): CardDraft {
+  return {
+    title: card.title,
+    since: card.since,
+    startTime: card.startTime,
+    due: card.due,
+    endTime: card.endTime,
+    missionLink: card.missionLink,
+    secondLine: card.secondLine,
+  }
+}
+
+export function sameDraft(a: CardDraft, b: CardDraft) {
+  return (
+    a.title === b.title &&
+    a.since === b.since &&
+    a.startTime === b.startTime &&
+    a.due === b.due &&
+    a.endTime === b.endTime &&
+    a.missionLink === b.missionLink &&
+    a.secondLine === b.secondLine
+  )
+}
+
+/** Why a draft cannot be saved, or null when it can. */
+export function draftIssue(draft: CardDraft): string | null {
+  if (!draft.title.trim()) return "Write the task before saving."
+  if (draft.since && draft.due) {
+    const start = `${draft.since}T${draft.startTime || "00:00"}`
+    const end = `${draft.due}T${draft.endTime || "23:59"}`
+    if (end < start) return "The end comes before the start."
+  }
+  return null
 }
 
 export const KANBAN_BOARDS: { id: KanbanBoardId; name: string }[] = [
@@ -72,11 +128,47 @@ function card(
   due: string,
   owner: string,
 ): KanbanCard {
-  return { id, boardId, columnId, title, labelId, due, owner }
+  return {
+    id,
+    boardId,
+    columnId,
+    title,
+    labelId,
+    since: "",
+    startTime: "",
+    due,
+    endTime: "",
+    owner,
+    missionLink: false,
+    secondLine: false,
+  }
+}
+
+/** Sample start and end times, so the card faces show them from the first load. */
+const SAMPLE_SCHEDULE: Record<string, [since: string, start: string, end: string]> = {
+  a8: ["2026-10-14", "10:00", "11:00"],
+  a9: ["2026-10-14", "18:30", "19:00"],
+  a10: ["2026-10-13", "09:00", "09:30"],
+  a11: ["2026-10-13", "12:00", "12:30"],
+  a12: ["2026-10-13", "14:00", "14:15"],
+  a13: ["2026-10-14", "13:00", "15:00"],
+  w6: ["2026-10-13", "09:00", "09:30"],
+  w7: ["2026-10-13", "12:00", "12:30"],
+  d4: ["2026-10-13", "09:00", "09:30"],
+  d5: ["2026-10-13", "14:00", "14:15"],
+  d6: ["2026-10-13", "12:00", "12:30"],
+  d7: ["2026-10-13", "16:00", "16:45"],
+}
+
+function withSchedule(cards: KanbanCard[]): KanbanCard[] {
+  return cards.map((item) => {
+    const slot = SAMPLE_SCHEDULE[item.id]
+    return slot ? { ...item, since: slot[0], startTime: slot[1], endTime: slot[2] } : item
+  })
 }
 
 export function defaultCards(): KanbanCard[] {
-  return [
+  return withSchedule([
     card("a1", "all", "backlog", "Sort the photo archive into years", "home", "2026-11-29", "Me"),
     card("a2", "all", "backlog", "Draft the savings plan for next spring", "money", "2026-12-05", "Me"),
     card("a3", "all", "backlog", "Find a weekly pottery class", "learning", "2026-11-14", "Me"),
@@ -137,7 +229,24 @@ export function defaultCards(): KanbanCard[] {
     card("d8", "day", "theirs", "Wait for Dana's tax draft", "money", "2026-10-13", "Dana"),
     card("d9", "day", "done", "Water the plants", "home", "2026-10-13", "Me"),
     card("d10", "day", "done", "Morning pages", "freedom", "2026-10-13", "Me"),
-  ]
+  ])
+}
+
+/** Format HH:mm as "9:00 AM". */
+export function formatTime(time: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(time)
+  if (!match) return time
+  const hour = Number(match[1])
+  const suffix = hour >= 12 ? "PM" : "AM"
+  return `${hour % 12 === 0 ? 12 : hour % 12}:${match[2]} ${suffix}`
+}
+
+/** "9:00 AM – 9:30 AM", "from 9:00 AM", "until 9:30 AM", or "" when neither is set. */
+export function formatTimeRange(startTime: string, endTime: string) {
+  if (startTime && endTime) return `${formatTime(startTime)} – ${formatTime(endTime)}`
+  if (startTime) return `from ${formatTime(startTime)}`
+  if (endTime) return `until ${formatTime(endTime)}`
+  return ""
 }
 
 /** Format a yyyy-mm-dd date as "Oct 16" without depending on the viewer's time zone. */

@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from "react"
 import clsx from "clsx"
-import { Check, Ellipsis } from "lucide-react"
+import { Check, Clock, Ellipsis } from "lucide-react"
 import { SetShape } from "@/components/whiteboard/label-chip"
 import { getLabel } from "@/lib/board-data"
 import {
   KANBAN_BOARDS,
   formatDue,
+  formatTimeRange,
   initials,
   type KanbanBoardId,
   type KanbanCard,
@@ -25,6 +26,7 @@ type Props = {
   onDragEnd: () => void
   onMoveToColumn: (cardId: string, columnId: string) => void
   onMoveToBoard: (cardId: string, boardId: KanbanBoardId) => void
+  onOpen: (cardId: string) => void
 }
 
 const MENU_WIDTH = 240
@@ -40,11 +42,13 @@ export function KanbanCardView({
   onDragEnd,
   onMoveToColumn,
   onMoveToBoard,
+  onOpen,
 }: Props) {
   const [menu, setMenu] = useState<{ top: number; left: number } | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const label = getLabel(card.labelId)
+  const timeRange = formatTimeRange(card.startTime, card.endTime)
 
   useEffect(() => {
     if (!menu) return
@@ -97,6 +101,7 @@ export function KanbanCardView({
       className={clsx("list-none", dragging && "opacity-40")}
     >
       <article
+        onClick={() => onOpen(card.id)}
         className={clsx(
           "group relative cursor-grab rounded-md border border-line bg-card px-3 py-2.5 shadow-sm transition-shadow active:cursor-grabbing hover:shadow-md",
           done && "bg-card/70",
@@ -104,8 +109,22 @@ export function KanbanCardView({
       >
         <div className="flex items-start gap-1.5">
           {done && <Check aria-hidden="true" className="mt-0.5 size-3.5 shrink-0 text-accent" />}
-          <h3 className={clsx("min-w-0 flex-1 text-sm font-medium leading-snug text-pretty", done ? "text-ink-soft" : "text-ink")}>
-            {card.title}
+          <h3 className="min-w-0 flex-1 text-sm font-medium leading-snug text-pretty">
+            <button
+              type="button"
+              data-card-open
+              aria-haspopup="dialog"
+              onClick={(event) => {
+                event.stopPropagation()
+                onOpen(card.id)
+              }}
+              className={clsx(
+                "w-full text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+                done ? "text-ink-soft" : "text-ink",
+              )}
+            >
+              {card.title}
+            </button>
           </h3>
           <button
             ref={buttonRef}
@@ -113,7 +132,11 @@ export function KanbanCardView({
             aria-label={`Move “${card.title}”`}
             aria-haspopup="menu"
             aria-expanded={menu !== null}
-            onClick={() => (menu ? setMenu(null) : openMenu())}
+            onClick={(event) => {
+              event.stopPropagation()
+              if (menu) setMenu(null)
+              else openMenu()
+            }}
             className="-mr-1.5 -mt-1 flex size-6 shrink-0 items-center justify-center rounded text-ink-soft opacity-60 transition-opacity hover:bg-line/50 hover:text-ink focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-accent group-hover:opacity-100"
           >
             <Ellipsis aria-hidden="true" className="size-4" />
@@ -130,6 +153,16 @@ export function KanbanCardView({
             <span className="italic">No label</span>
           )}
         </div>
+
+        {timeRange && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-soft">
+            <Clock aria-hidden="true" className="size-3.5 shrink-0" />
+            <span>
+              <span className="sr-only">Time </span>
+              {timeRange}
+            </span>
+          </p>
+        )}
 
         <div className="mt-2 flex items-center justify-between gap-2 border-t border-line/70 pt-2 text-xs text-ink-soft">
           <span>
