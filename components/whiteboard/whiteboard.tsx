@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useMission } from "@/components/mission-provider"
 import clsx from "clsx"
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
 import {
@@ -159,7 +160,7 @@ export function Whiteboard() {
     [setOpenSectorId],
   )
   const [mode, setMode] = useState<Mode>("unload")
-  const [missionText, setMissionText] = useState("")
+  const { missionText, setMissionText } = useMission()
   const [missionOpen, setMissionOpen] = useState(false)
   const [missionReadOpen, setMissionReadOpen] = useState(false)
   const [missionView, setMissionView] = useState<MissionView>("sentence")

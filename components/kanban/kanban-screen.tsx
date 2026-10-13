@@ -5,16 +5,19 @@ import clsx from "clsx"
 import {
   KANBAN_BOARDS,
   draftOf,
+  hasMissionPath,
   matchColumn,
   sameDraft,
   type KanbanBoardId,
   type KanbanColumn,
 } from "@/lib/kanban-data"
+import { useMission } from "@/components/mission-provider"
 import { CardEditor } from "./card-editor"
 import { ColumnEditor } from "./column-editor"
 import { KanbanCardView } from "./kanban-card"
 import { KanbanColumnView } from "./kanban-column"
 import { useKanban } from "./kanban-provider"
+import { MissionStrip } from "./mission-strip"
 
 export function KanbanScreen() {
   const {
@@ -24,6 +27,8 @@ export function KanbanScreen() {
     setColumnsByBoard,
     cards,
     setCards,
+    missionOnly,
+    setMissionOnly,
     openId,
     openCard,
     closeCard,
@@ -47,6 +52,12 @@ export function KanbanScreen() {
 
   const openCardData = openId ? (cards.find((item) => item.id === openId) ?? null) : null
   const boardCards = useMemo(() => cards.filter((card) => card.boardId === boardId), [cards, boardId])
+  const { missionText } = useMission()
+  const filtering = missionOnly && missionText.length > 0
+  const visibleCards = useMemo(
+    () => (filtering ? boardCards.filter(hasMissionPath) : boardCards),
+    [filtering, boardCards],
+  )
   const counts = useMemo(() => {
     const result: Record<string, number> = {}
     for (const card of boardCards) result[card.columnId] = (result[card.columnId] ?? 0) + 1
@@ -205,6 +216,14 @@ export function KanbanScreen() {
         </div>
       </div>
 
+      <MissionStrip
+        missionText={missionText}
+        filtering={filtering}
+        shown={visibleCards.length}
+        total={boardCards.length}
+        onToggle={() => setMissionOnly(!missionOnly)}
+      />
+
       <div
         id="kanban-panel"
         role="tabpanel"
@@ -223,7 +242,7 @@ export function KanbanScreen() {
                 setDraggingId(null)
               }}
             >
-              {boardCards
+              {visibleCards
                 .filter((card) => card.columnId === column.id)
                 .map((card) => (
                   <KanbanCardView

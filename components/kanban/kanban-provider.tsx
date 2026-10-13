@@ -19,6 +19,9 @@ type KanbanState = {
   setColumnsByBoard: Dispatch<SetStateAction<Record<KanbanBoardId, KanbanColumn[]>>>
   cards: KanbanCard[]
   setCards: Dispatch<SetStateAction<KanbanCard[]>>
+  /** True while the board shows only cards with a path to the mission. */
+  missionOnly: boolean
+  setMissionOnly: (on: boolean) => void
   /** The card whose window is showing, or null when it is hidden. */
   openId: string | null
   openCard: (cardId: string) => void
@@ -37,6 +40,7 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
   const [boardId, setBoardId] = useState<KanbanBoardId>("all")
   const [columnsByBoard, setColumnsByBoard] = useState(defaultColumns)
   const [cards, setCards] = useState<KanbanCard[]>(defaultCards)
+  const [missionOnly, setMissionOnly] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, CardDraft>>({})
 
@@ -82,6 +86,8 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
       setColumnsByBoard,
       cards,
       setCards,
+      missionOnly,
+      setMissionOnly,
       openId,
       openCard,
       closeCard,
@@ -90,7 +96,7 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
       revertDraft,
       saveDraft,
     }),
-    [boardId, columnsByBoard, cards, openId, openCard, closeCard, drafts, editDraft, revertDraft, saveDraft],
+    [boardId, columnsByBoard, cards, missionOnly, openId, openCard, closeCard, drafts, editDraft, revertDraft, saveDraft],
   )
 
   return <KanbanContext.Provider value={value}>{children}</KanbanContext.Provider>

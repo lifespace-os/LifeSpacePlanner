@@ -32,6 +32,11 @@ export type KanbanCard = {
   secondLine: boolean
 }
 
+/** A card has a path to the mission when it holds the goal above or the second line to it. Saved state only, never a draft. */
+export function hasMissionPath(card: KanbanCard) {
+  return card.missionLink || card.secondLine
+}
+
 /** What the card window edits. Kept apart from the card until Save writes it. */
 export type CardDraft = {
   title: string
