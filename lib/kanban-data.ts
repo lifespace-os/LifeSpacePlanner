@@ -152,16 +152,20 @@ function card(
   }
 }
 
-/** Sample tasks hung under the sample ring cards: n1 "Run a half marathon" and n4 "Call Mom on Sunday". */
+/**
+ * Sample tasks hung under the sample project goals: n13 "Train for the half marathon" and n14 "Choose and register
+ * for a race" (both #marathon, under life goal n12 and need n1), and n15 "Spend more time with Mom" (#family-time, under n4).
+ */
 const SAMPLE_GOALS: Record<string, string[]> = {
-  y3: ["n1"],
-  m4: ["n1"],
-  a11: ["n1"],
-  w7: ["n1"],
-  d6: ["n1"],
-  a4: ["n4"],
-  a9: ["n4"],
-  w4: ["n4"],
+  y3: ["n14"],
+  m4: ["n13"],
+  a11: ["n13"],
+  w7: ["n13"],
+  d6: ["n13"],
+  a19: ["n13"],
+  a4: ["n15"],
+  a9: ["n15"],
+  w4: ["n15"],
 }
 
 function withGoals(cards: KanbanCard[]): KanbanCard[] {
@@ -226,7 +230,7 @@ export function defaultCards(): KanbanCard[] {
     card("m1", "month", "todo", "Set up a monthly budget review", "money", "2026-10-31", "Me"),
     card("m2", "month", "todo", "Declutter the wardrobe", "home", "2026-10-27", "Me"),
     card("m3", "month", "doing", "Ship the portfolio refresh", "work", "2026-10-24", "Me"),
-    card("m4", "month", "doing", "Swim twice a week", "health", "2026-10-31", "Me"),
+    card("m4", "month", "doing", "Swim twice a week", "body", "2026-10-31", "Me"),
     card("m5", "month", "done", "Book the autumn trip", "freedom", "2026-10-05", "Me"),
     card("m6", "month", "done", "Finish the pottery starter course", "learning", "2026-10-08", "Me"),
 

@@ -1273,6 +1273,10 @@ const SEEDS: Seed[] = [
   { id: "n9", text: "Write an onboarding guide for the new tool", color: "sky", x: 1020, y: 830, rotation: 1, labels: { area: "work" }, hashtags: ["work", "income", "needed"] },
   { id: "n10", text: "A slow week by the sea", color: "sage", x: 720, y: 140, rotation: -1, hashtags: ["love"] },
   { id: "n11", text: "Reply to every unread group chat", color: "peach", x: 740, y: 470, rotation: 1.5 },
+  { id: "n12", text: "Stay fit and strong for life", color: "sage", x: 1620, y: 90, rotation: -1, hashtags: ["life-goal", "fitness"], parentIds: ["n1"] },
+  { id: "n13", text: "Train for the half marathon", color: "sage", x: 1620, y: 330, rotation: 1.5, hashtags: ["project-goal", "marathon"], parentIds: ["n12"] },
+  { id: "n14", text: "Choose and register for a race", color: "sky", x: 1620, y: 570, rotation: -1.5, hashtags: ["project-goal", "marathon"], parentIds: ["n12"] },
+  { id: "n15", text: "Spend more time with Mom", color: "rose", x: 1620, y: 810, rotation: 1, hashtags: ["project-goal", "family-time"], parentIds: ["n4"] },
 ]
 
 const SAMPLE_GROUP_AREAS = groupAreas(DEFAULT_GROUPS)

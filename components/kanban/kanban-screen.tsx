@@ -14,8 +14,10 @@ import {
 import { useGoals } from "@/components/goals-provider"
 import { useMission } from "@/components/mission-provider"
 import { belowIds, ringCardsOf } from "@/lib/ring-focus"
+import { filterGoalIds, highlightColor, passesFilter, ringHashtags } from "@/lib/kanban-filter"
 import { CardEditor } from "./card-editor"
 import { ColumnEditor } from "./column-editor"
+import { FilterBar } from "./filter-bar"
 import { KanbanCardView } from "./kanban-card"
 import { KanbanColumnView } from "./kanban-column"
 import { useKanban } from "./kanban-provider"
@@ -36,6 +38,8 @@ export function KanbanScreen() {
     setRingsOn,
     ringFocusId,
     setRingFocusId,
+    cardFilter,
+    setCardFilter,
     openId,
     openCard,
     closeCard,
@@ -74,10 +78,17 @@ export function KanbanScreen() {
     }
     return result
   }, [ringNotes, notes, rings, boardCards])
+  const activeFilter = useMemo(() => {
+    if (!cardFilter.ring) return cardFilter
+    const known = ringHashtags(cardFilter.ring, notes, rings).some((entry) => entry.tag === cardFilter.tag)
+    return known ? cardFilter : { ring: cardFilter.ring, tag: null, label: null }
+  }, [cardFilter, notes, rings])
+  const keptIds = useMemo(() => filterGoalIds(activeFilter, notes, rings), [activeFilter, notes, rings])
   const visibleCards = useMemo(() => {
     const byMission = filtering ? boardCards.filter(hasMissionPath) : boardCards
-    return below ? byMission.filter((card) => card.goalIds.some((id) => below.has(id))) : byMission
-  }, [filtering, boardCards, below])
+    const byRing = below ? byMission.filter((card) => card.goalIds.some((id) => below.has(id))) : byMission
+    return byRing.filter((card) => passesFilter(card, activeFilter, keptIds))
+  }, [filtering, boardCards, below, activeFilter, keptIds])
 
   const pickRing = (id: string) => {
     if (id === focusedId) {
@@ -284,6 +295,15 @@ export function KanbanScreen() {
         onToggle={() => setMissionOnly(!missionOnly)}
       />
 
+      <FilterBar
+        filter={activeFilter}
+        onChange={setCardFilter}
+        notes={notes}
+        rings={rings}
+        boardCards={boardCards}
+        shown={visibleCards.length}
+      />
+
       {ringsOn && <RingRow cards={shownRingNotes} rings={rings} focusId={focusedId} taskCounts={taskCounts} onPick={pickRing} />}
 
       <div
@@ -314,6 +334,7 @@ export function KanbanScreen() {
                     counts={counts}
                     done={column.kind === "done"}
                     dragging={draggingId === card.id}
+                    highlight={highlightColor(card, activeFilter)}
                     onDragStart={setDraggingId}
                     onDragEnd={() => {
                       setDraggingId(null)

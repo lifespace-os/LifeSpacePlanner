@@ -22,6 +22,8 @@ type Props = {
   counts: Record<string, number>
   done: boolean
   dragging: boolean
+  /** A sector color the filter lights this card in. Drawn only while the filter lasts; never saved on the card. */
+  highlight?: string | null
   onDragStart: (cardId: string) => void
   onDragEnd: () => void
   onMoveToColumn: (cardId: string, columnId: string) => void
@@ -38,6 +40,7 @@ export function KanbanCardView({
   counts,
   done,
   dragging,
+  highlight = null,
   onDragStart,
   onDragEnd,
   onMoveToColumn,
@@ -102,6 +105,16 @@ export function KanbanCardView({
     >
       <article
         onClick={() => onOpen(card.id)}
+        data-highlight={highlight ?? undefined}
+        style={
+          highlight
+            ? {
+                borderColor: highlight,
+                boxShadow: `0 0 0 2px ${highlight}`,
+                backgroundImage: `linear-gradient(${highlight}2e, ${highlight}2e)`,
+              }
+            : undefined
+        }
         className={clsx(
           "group relative cursor-grab rounded-md border border-line bg-card px-3 py-2.5 shadow-sm transition-shadow active:cursor-grabbing hover:shadow-md",
           done && "bg-card/70",
@@ -148,6 +161,7 @@ export function KanbanCardView({
             <>
               <SetShape shape={label.group.shape} color={label.color} />
               <span className="truncate">{label.name}</span>
+              {highlight && <span className="sr-only"> (highlighted by the filter)</span>}
             </>
           ) : (
             <span className="italic">No label</span>

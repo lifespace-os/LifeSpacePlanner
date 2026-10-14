@@ -11,6 +11,7 @@ import {
   type KanbanCard,
   type KanbanColumn,
 } from "@/lib/kanban-data"
+import { NO_FILTER, type CardFilter } from "@/lib/kanban-filter"
 
 type KanbanState = {
   boardId: KanbanBoardId
@@ -28,6 +29,9 @@ type KanbanState = {
   /** The ring card the board is narrowed to, or null when the whole board shows. */
   ringFocusId: string | null
   setRingFocusId: (id: string | null) => void
+  /** The one filter: ring, then hashtag, then (for a project) a label. Lasts until it is cleared. */
+  cardFilter: CardFilter
+  setCardFilter: Dispatch<SetStateAction<CardFilter>>
   /** The card whose window is showing, or null when it is hidden. */
   openId: string | null
   openCard: (cardId: string) => void
@@ -49,6 +53,7 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
   const [missionOnly, setMissionOnly] = useState(false)
   const [ringsOn, setRingsOnState] = useState(false)
   const [ringFocusId, setRingFocusId] = useState<string | null>(null)
+  const [cardFilter, setCardFilter] = useState<CardFilter>(NO_FILTER)
   const [openId, setOpenId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, CardDraft>>({})
 
@@ -105,6 +110,8 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
       setRingsOn,
       ringFocusId,
       setRingFocusId,
+      cardFilter,
+      setCardFilter,
       openId,
       openCard,
       closeCard,
@@ -113,7 +120,7 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
       revertDraft,
       saveDraft,
     }),
-    [boardId, columnsByBoard, cards, missionOnly, ringsOn, setRingsOn, ringFocusId, openId, openCard, closeCard, drafts, editDraft, revertDraft, saveDraft],
+    [boardId, columnsByBoard, cards, missionOnly, ringsOn, setRingsOn, ringFocusId, cardFilter, openId, openCard, closeCard, drafts, editDraft, revertDraft, saveDraft],
   )
 
   return <KanbanContext.Provider value={value}>{children}</KanbanContext.Provider>
