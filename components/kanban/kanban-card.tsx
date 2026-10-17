@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import clsx from "clsx"
-import { Check, Clock, Ellipsis } from "lucide-react"
+import { ArrowRight, Check, Clock, Ellipsis, Undo2 } from "lucide-react"
 import { SetShape } from "@/components/whiteboard/label-chip"
 import { getLabel } from "@/lib/board-data"
 import {
@@ -29,6 +29,11 @@ type Props = {
   onMoveToColumn: (cardId: string, columnId: string) => void
   onMoveToBoard: (cardId: string, boardId: KanbanBoardId) => void
   onOpen: (cardId: string) => void
+  /** "results" draws the same card in the Results grid: no drag, no move menu, and the board it came from. */
+  mode?: "board" | "results"
+  boardName?: string
+  /** On a Done card: send it to Results. In the Results grid: return it to Done. */
+  onResult?: (cardId: string) => void
 }
 
 const MENU_WIDTH = 240
@@ -46,7 +51,11 @@ export function KanbanCardView({
   onMoveToColumn,
   onMoveToBoard,
   onOpen,
+  mode = "board",
+  boardName,
+  onResult,
 }: Props) {
+  const inResults = mode === "results"
   const [menu, setMenu] = useState<{ top: number; left: number } | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -94,7 +103,7 @@ export function KanbanCardView({
   return (
     <li
       data-card-id={card.id}
-      draggable
+      draggable={!inResults}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = "move"
         event.dataTransfer.setData("text/plain", card.id)
@@ -116,7 +125,8 @@ export function KanbanCardView({
             : undefined
         }
         className={clsx(
-          "group relative cursor-grab rounded-md border border-line bg-card px-3 py-2.5 shadow-sm transition-shadow active:cursor-grabbing hover:shadow-md",
+          "group relative rounded-md border border-line bg-card px-3 py-2.5 shadow-sm transition-shadow hover:shadow-md",
+          inResults ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
           done && "bg-card/70",
         )}
       >
@@ -139,6 +149,7 @@ export function KanbanCardView({
               {card.title}
             </button>
           </h3>
+          {!inResults && (
           <button
             ref={buttonRef}
             type="button"
@@ -154,6 +165,7 @@ export function KanbanCardView({
           >
             <Ellipsis aria-hidden="true" className="size-4" />
           </button>
+          )}
         </div>
 
         <div className="mt-2 flex h-5 items-center gap-1.5 text-xs text-ink-soft">
@@ -165,6 +177,12 @@ export function KanbanCardView({
             </>
           ) : (
             <span className="italic">No label</span>
+          )}
+          {boardName && (
+            <span className="ml-auto shrink-0 rounded border border-line px-1.5 text-[11px] leading-4 text-ink-soft">
+              <span className="sr-only">Board </span>
+              {boardName}
+            </span>
           )}
         </div>
 
@@ -196,6 +214,29 @@ export function KanbanCardView({
             </span>
           </span>
         </div>
+        {onResult && (inResults || done) && (
+          <button
+            type="button"
+            aria-label={`${inResults ? "Return to Done" : "Move to Results"}: “${card.title}”`}
+            onClick={(event) => {
+              event.stopPropagation()
+              onResult(card.id)
+            }}
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs font-medium text-ink transition-colors hover:bg-line/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            {inResults ? (
+              <>
+                <Undo2 aria-hidden="true" className="size-3.5" />
+                Return to Done
+              </>
+            ) : (
+              <>
+                Move to Results
+                <ArrowRight aria-hidden="true" className="size-3.5" />
+              </>
+            )}
+          </button>
+        )}
       </article>
 
       {menu && (

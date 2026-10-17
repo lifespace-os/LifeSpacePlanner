@@ -7,6 +7,8 @@ import {
   draftOf,
   hasMissionPath,
   matchColumn,
+  resultEntries,
+  resultKey,
   sameDraft,
   type KanbanBoardId,
   type KanbanColumn,
@@ -22,7 +24,9 @@ import { KanbanCardView } from "./kanban-card"
 import { KanbanColumnView } from "./kanban-column"
 import { useKanban } from "./kanban-provider"
 import { MissionStrip } from "./mission-strip"
+import { ResultsGrid } from "./results-grid"
 import { RingRow } from "./ring-row"
+import { ToggleSwitch } from "./toggle-switch"
 
 export function KanbanScreen() {
   const {
@@ -36,6 +40,8 @@ export function KanbanScreen() {
     setMissionOnly,
     ringsOn,
     setRingsOn,
+    resultsOn,
+    setResultsOn,
     ringFocusId,
     setRingFocusId,
     cardFilter,
@@ -62,12 +68,36 @@ export function KanbanScreen() {
   }, [status])
 
   const openCardData = openId ? (cards.find((item) => item.id === openId) ?? null) : null
-  const boardCards = useMemo(() => cards.filter((card) => card.boardId === boardId), [cards, boardId])
+  const boardCards = useMemo(
+    () => cards.filter((card) => card.boardId === boardId && !card.inResults),
+    [cards, boardId],
+  )
+  const resultList = useMemo(() => resultEntries(cards), [cards])
+  const resultCards = useMemo(() => resultList.map((entry) => entry.card), [resultList])
+  const boardNamesById = useMemo(() => {
+    const order = KANBAN_BOARDS.map((item) => item.id)
+    const result: Record<string, string> = {}
+    for (const entry of resultList) {
+      result[entry.card.id] = [...entry.boardIds]
+        .sort((a, b) => order.indexOf(a) - order.indexOf(b))
+        .map((id) => KANBAN_BOARDS.find((item) => item.id === id)?.name ?? id)
+        .join(", ")
+    }
+    return result
+  }, [resultList])
+  const doneTaskCount = useMemo(() => {
+    const keys = new Set<string>()
+    for (const card of cards) {
+      if (card.inResults) continue
+      if (columnsByBoard[card.boardId].find((column) => column.id === card.columnId)?.kind === "done") keys.add(resultKey(card))
+    }
+    return keys.size
+  }, [cards, columnsByBoard])
   const { missionText } = useMission()
   const filtering = missionOnly && missionText.length > 0
   const { notes, rings } = useGoals()
   const ringNotes = useMemo(() => ringCardsOf(notes, rings), [notes, rings])
-  const focusedId = ringsOn && ringFocusId && ringNotes.some((note) => note.id === ringFocusId) ? ringFocusId : null
+  const focusedId = ringsOn && !resultsOn && ringFocusId && ringNotes.some((note) => note.id === ringFocusId) ? ringFocusId : null
   const below = useMemo(() => (focusedId ? belowIds(focusedId, notes, rings) : null), [focusedId, notes, rings])
   const shownRingNotes = below ? ringNotes.filter((note) => below.has(note.id)) : ringNotes
   const taskCounts = useMemo(() => {
@@ -89,6 +119,12 @@ export function KanbanScreen() {
     const byRing = below ? byMission.filter((card) => card.goalIds.some((id) => below.has(id))) : byMission
     return byRing.filter((card) => passesFilter(card, activeFilter, keptIds))
   }, [filtering, boardCards, below, activeFilter, keptIds])
+  const visibleResults = useMemo(() => {
+    const byMission = filtering ? resultCards.filter(hasMissionPath) : resultCards
+    return byMission.filter((card) => passesFilter(card, activeFilter, keptIds))
+  }, [filtering, resultCards, activeFilter, keptIds])
+  const listCards = resultsOn ? resultCards : boardCards
+  const listShown = resultsOn ? visibleResults.length : visibleCards.length
 
   const pickRing = (id: string) => {
     if (id === focusedId) {
@@ -118,7 +154,9 @@ export function KanbanScreen() {
   }, [boardCards])
   const boardTotals = useMemo(() => {
     const result: Partial<Record<KanbanBoardId, number>> = {}
-    for (const card of cards) result[card.boardId] = (result[card.boardId] ?? 0) + 1
+    for (const card of cards) {
+      if (!card.inResults) result[card.boardId] = (result[card.boardId] ?? 0) + 1
+    }
     return result
   }, [cards])
 
@@ -127,7 +165,9 @@ export function KanbanScreen() {
     const column = columnsByBoard[targetBoard].find((item) => item.id === columnId)
     if (!card || !column) return
     const sameSpot = card.boardId === targetBoard && card.columnId === columnId
-    const held = cards.filter((item) => item.boardId === targetBoard && item.columnId === columnId && item.id !== cardId).length
+    const held = cards.filter(
+      (item) => item.boardId === targetBoard && item.columnId === columnId && item.id !== cardId && !item.inResults,
+    ).length
     if (column.limit !== undefined && !sameSpot && held >= column.limit) {
       setStatus(`${column.name} is full at ${column.limit} cards. Finish or move one first.`)
       return
@@ -157,6 +197,41 @@ export function KanbanScreen() {
       kind,
     )
     if (target) moveCard(cardId, targetBoard, target.id, null)
+  }
+
+  const isInDone = (card: { boardId: KanbanBoardId; columnId: string }) =>
+    columnsByBoard[card.boardId].find((column) => column.id === card.columnId)?.kind === "done"
+
+  /** One Done card to Results. Copies of the same task in Done on other boards go with it. */
+  const moveToResults = (cardId: string) => {
+    const card = cards.find((item) => item.id === cardId)
+    if (!card || card.inResults || !isInDone(card)) return
+    const key = resultKey(card)
+    setCards((previous) =>
+      previous.map((item) => (!item.inResults && isInDone(item) && resultKey(item) === key ? { ...item, inResults: true } : item)),
+    )
+    setStatus(`Moved “${card.title}” from Done to Results.`)
+  }
+
+  /** Every card in Done, on all five boards, to Results. */
+  const moveAllDone = () => {
+    if (doneTaskCount === 0) return
+    setCards((previous) => previous.map((item) => (!item.inResults && isInDone(item) ? { ...item, inResults: true } : item)))
+    setStatus(`Moved ${doneTaskCount} ${doneTaskCount === 1 ? "task" : "tasks"} from Done to Results.`)
+  }
+
+  const returnToDone = (cardId: string) => {
+    const card = cards.find((item) => item.id === cardId)
+    if (!card) return
+    const key = resultKey(card)
+    setCards((previous) =>
+      previous.map((item) => {
+        if (!item.inResults || resultKey(item) !== key) return item
+        const doneColumn = columnsByBoard[item.boardId].find((column) => column.kind === "done")
+        return { ...item, inResults: false, columnId: isInDone(item) ? item.columnId : (doneColumn?.id ?? item.columnId) }
+      }),
+    )
+    setStatus(`Returned “${card.title}” to Done.`)
   }
 
   const updateColumns = (update: (list: KanbanColumn[]) => KanbanColumn[]) =>
@@ -214,7 +289,7 @@ export function KanbanScreen() {
 
         <div role="tablist" aria-label="Boards" className="flex items-center gap-1 rounded-lg border border-line bg-desk/70 p-1">
           {KANBAN_BOARDS.map((item) => {
-            const active = item.id === boardId
+            const active = item.id === boardId && !resultsOn
             return (
               <button
                 key={item.id}
@@ -223,7 +298,10 @@ export function KanbanScreen() {
                 type="button"
                 aria-selected={active}
                 aria-controls="kanban-panel"
-                onClick={() => setBoardId(item.id)}
+                onClick={() => {
+                  setBoardId(item.id)
+                  setResultsOn(false)
+                }}
                 onDragOver={(event) => {
                   if (!draggingId) return
                   event.preventDefault()
@@ -251,47 +329,44 @@ export function KanbanScreen() {
               </button>
             )
           })}
+          <ToggleSwitch checked={resultsOn} onChange={setResultsOn} label="Results" count={resultCards.length} />
         </div>
 
         <div className="flex items-center gap-3">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={ringsOn}
-            onClick={() => setRingsOn(!ringsOn)}
-            className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            <span
-              aria-hidden="true"
-              className={clsx(
-                "flex h-5 w-9 items-center rounded-full border p-0.5 transition-colors",
-                ringsOn ? "border-accent bg-accent" : "border-line bg-desk",
-              )}
+          {!resultsOn && <ToggleSwitch checked={ringsOn} onChange={setRingsOn} label="Ring cards" />}
+          {!resultsOn && (
+            <button
+              type="button"
+              disabled={doneTaskCount === 0}
+              onClick={moveAllDone}
+              className="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink transition-colors hover:bg-line/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:text-ink-soft/60 disabled:hover:bg-transparent"
             >
-              <span className={clsx("size-3.5 rounded-full bg-board shadow-sm transition-transform", ringsOn ? "translate-x-4" : "translate-x-0 bg-ink-soft")} />
-            </span>
-            Ring cards
-          </button>
+              Move all Done to Results
+              <span className="ml-1.5 text-xs tabular-nums text-ink-soft">{doneTaskCount}</span>
+            </button>
+          )}
           <p role="status" aria-live="polite" className="max-w-xs text-pretty text-right text-sm text-ink-soft">
             {status}
           </p>
-          <ColumnEditor
-            boardName={board.name}
-            columns={columns}
-            counts={counts}
-            onRename={renameColumn}
-            onMove={shiftColumn}
-            onRemove={removeColumn}
-            onAdd={addColumn}
-          />
+          {!resultsOn && (
+            <ColumnEditor
+              boardName={board.name}
+              columns={columns}
+              counts={counts}
+              onRename={renameColumn}
+              onMove={shiftColumn}
+              onRemove={removeColumn}
+              onAdd={addColumn}
+            />
+          )}
         </div>
       </div>
 
       <MissionStrip
         missionText={missionText}
         filtering={filtering}
-        shown={visibleCards.length}
-        total={boardCards.length}
+        shown={listShown}
+        total={listCards.length}
         onToggle={() => setMissionOnly(!missionOnly)}
       />
 
@@ -300,12 +375,22 @@ export function KanbanScreen() {
         onChange={setCardFilter}
         notes={notes}
         rings={rings}
-        boardCards={boardCards}
-        shown={visibleCards.length}
+        boardCards={listCards}
+        shown={listShown}
       />
 
-      {ringsOn && <RingRow cards={shownRingNotes} rings={rings} focusId={focusedId} taskCounts={taskCounts} onPick={pickRing} />}
+      {ringsOn && !resultsOn && <RingRow cards={shownRingNotes} rings={rings} focusId={focusedId} taskCounts={taskCounts} onPick={pickRing} />}
 
+      {resultsOn ? (
+        <ResultsGrid
+          cards={visibleResults}
+          total={resultCards.length}
+          highlightFor={(card) => highlightColor(card, activeFilter)}
+          boardNameOf={(card) => boardNamesById[card.id] ?? ""}
+          onOpen={openCard}
+          onReturn={returnToDone}
+        />
+      ) : (
       <div
         id="kanban-panel"
         role="tabpanel"
@@ -343,12 +428,14 @@ export function KanbanScreen() {
                     onMoveToColumn={(cardId, columnId) => moveCard(cardId, boardId, columnId, null)}
                     onMoveToBoard={moveToBoard}
                     onOpen={openCard}
+                    onResult={column.kind === "done" ? moveToResults : undefined}
                   />
                 ))}
             </KanbanColumnView>
           ))}
         </div>
       </div>
+      )}
 
       {openCardData && (
         <CardEditor

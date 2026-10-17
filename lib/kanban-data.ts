@@ -32,11 +32,43 @@ export type KanbanCard = {
   secondLine: boolean
   /** Ids of the Whiteboard ring cards this task hangs under. Empty means it sits under none. */
   goalIds: string[]
+  /** The card was moved from Done to Results. It shows there once and on no board, until it is returned to Done. */
+  inResults: boolean
 }
 
 /** A card has a path to the mission when it holds the goal above or the second line to it. Saved state only, never a draft. */
 export function hasMissionPath(card: KanbanCard) {
   return card.missionLink || card.secondLine
+}
+
+/** The same task kept on several boards is one task. Its title says so. */
+export function resultKey(card: KanbanCard) {
+  return card.title.trim().toLowerCase()
+}
+
+export type ResultEntry = {
+  /** The one card Results shows for the task. Goals and mission paths of every copy are joined onto it. */
+  card: KanbanCard
+  boardIds: KanbanBoardId[]
+}
+
+/** The cards on Results, once per task however many boards held a copy. */
+export function resultEntries(cards: KanbanCard[]): ResultEntry[] {
+  const groups = new Map<string, KanbanCard[]>()
+  for (const item of cards) {
+    if (!item.inResults) continue
+    const key = resultKey(item)
+    groups.set(key, [...(groups.get(key) ?? []), item])
+  }
+  return [...groups.values()].map((group) => ({
+    card: {
+      ...group[0]!,
+      goalIds: [...new Set(group.flatMap((item) => item.goalIds))],
+      missionLink: group.some((item) => item.missionLink),
+      secondLine: group.some((item) => item.secondLine),
+    },
+    boardIds: [...new Set(group.map((item) => item.boardId))],
+  }))
 }
 
 /** What the card window edits. Kept apart from the card until Save writes it. */
@@ -149,6 +181,7 @@ function card(
     missionLink: false,
     secondLine: false,
     goalIds: [],
+    inResults: false,
   }
 }
 
