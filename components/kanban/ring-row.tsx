@@ -9,8 +9,8 @@ type RingRowProps = {
   cards: Note[]
   rings: GoalRing[]
   focusId: string | null
-  /** How many tasks on this board hang under each ring card, counting the cards below it. */
-  taskCounts: Record<string, number>
+  /** Finished and total tasks under each ring card; finished means in Done or on Results. */
+  taskCounts: Record<string, { done: number; total: number }>
   onPick: (id: string) => void
 }
 
@@ -42,7 +42,7 @@ export function RingRow({ cards, rings, focusId, taskCounts, onPick }: RingRowPr
           const ring = rings[goalRingOf(note, rings)]
           const level = ring?.tags.length === 1 ? ring.name : (getGoalLevel(note.hashtags.find((tag) => ring?.tags.includes(tag.toLowerCase())))?.name ?? ring?.name)
           const selected = note.id === focusId
-          const tasks = taskCounts[note.id] ?? 0
+          const { done, total } = taskCounts[note.id] ?? { done: 0, total: 0 }
           return (
             <li key={note.id} className="shrink-0">
               <button
@@ -58,7 +58,13 @@ export function RingRow({ cards, rings, focusId, taskCounts, onPick }: RingRowPr
               >
                 <span className="text-[10px] font-medium uppercase tracking-[0.12em] opacity-70">{level}</span>
                 <span className="line-clamp-2 text-pretty text-sm font-medium leading-snug">{note.text || "Untitled card"}</span>
-                <span className="text-xs opacity-70">{tasks === 1 ? "1 task" : `${tasks} tasks`}</span>
+                <span
+                  data-task-progress
+                  aria-label={`${done} of ${total} tasks finished`}
+                  className="text-xs font-medium tabular-nums opacity-80"
+                >
+                  {done} / {total}
+                </span>
               </button>
             </li>
           )

@@ -101,13 +101,28 @@ export function KanbanScreen() {
   const below = useMemo(() => (focusedId ? belowIds(focusedId, notes, rings) : null), [focusedId, notes, rings])
   const shownRingNotes = below ? ringNotes.filter((note) => below.has(note.id)) : ringNotes
   const taskCounts = useMemo(() => {
-    const result: Record<string, number> = {}
+    const finishedByTask = new Map<string, boolean>()
+    const goalIdsByTask = new Map<string, string[]>()
+    for (const card of cards) {
+      const key = resultKey(card)
+      const finished = card.inResults || columnsByBoard[card.boardId].find((column) => column.id === card.columnId)?.kind === "done"
+      finishedByTask.set(key, (finishedByTask.get(key) ?? false) || finished)
+      goalIdsByTask.set(key, [...(goalIdsByTask.get(key) ?? []), ...card.goalIds])
+    }
+    const result: Record<string, { done: number; total: number }> = {}
     for (const note of ringNotes) {
       const subtree = belowIds(note.id, notes, rings)
-      result[note.id] = boardCards.filter((card) => card.goalIds.some((id) => subtree.has(id))).length
+      let done = 0
+      let total = 0
+      for (const [key, goalIds] of goalIdsByTask) {
+        if (!goalIds.some((id) => subtree.has(id))) continue
+        total += 1
+        if (finishedByTask.get(key)) done += 1
+      }
+      result[note.id] = { done, total }
     }
     return result
-  }, [ringNotes, notes, rings, boardCards])
+  }, [ringNotes, notes, rings, cards, columnsByBoard])
   const activeFilter = useMemo(() => {
     if (!cardFilter.ring) return cardFilter
     const known = ringHashtags(cardFilter.ring, notes, rings).some((entry) => entry.tag === cardFilter.tag)
