@@ -1252,11 +1252,11 @@ export const DEFAULT_GROUPS: Group[] = GROUP_NAMES.reduce<Group[]>((groups, name
 type Seed = Pick<Note, "id" | "text" | "color" | "x" | "y" | "rotation"> & Partial<Note>
 
 const SEEDS: Seed[] = [
-  { id: "n1", text: "Run a half marathon next spring", color: "sage", x: 60, y: 70, rotation: -2, labels: { area: "body", happiness: "health", budget: "investment" }, hashtags: ["health", "want"] },
+  { id: "n1", text: "Feel strong and healthy, with a half marathon to aim for", color: "sage", x: 60, y: 70, rotation: -2, labels: { area: "body", happiness: "health", budget: "investment" }, hashtags: ["health", "want"], mission: "keep", parentIds: ["mission"] },
   { id: "n2", text: "Renew passport before June", color: "butter", x: 960, y: 80, rotation: 1.5, labels: { area: "home", happiness: "safety" }, hashtags: ["must"] },
   { id: "n3", text: "Am I saving enough for later?", color: "sky", x: 720, y: 820, rotation: -1 },
-  { id: "n4", text: "Call Mom on Sunday", color: "rose", x: 380, y: 300, rotation: 2.5, labels: { area: "relationships", happiness: "love" }, hashtags: ["family", "want"] },
-  { id: "n5", text: "Learn to bake sourdough", color: "peach", x: 120, y: 860, rotation: 1, hashtags: ["love", "good-at"] },
+  { id: "n4", text: "Stay close to Mom", color: "rose", x: 380, y: 300, rotation: 2.5, labels: { area: "relationships", happiness: "love" }, hashtags: ["family", "want"], mission: "keep" },
+  { id: "n5", text: "Learn to bake sourdough", color: "peach", x: 120, y: 860, rotation: 1, hashtags: ["love", "good-at"], mission: "release" },
   {
     id: "n6",
     text: "Fix the leaking kitchen tap",
@@ -1269,14 +1269,14 @@ const SEEDS: Seed[] = [
     task: { title: "Replace kitchen tap washer", labelId: "home", due: "2026-10-18", owner: "Me" },
   },
   { id: "n7", text: "Quarterly tax filing", color: "paper", x: 1320, y: 840, rotation: 2, hashtags: ["income"] },
-  { id: "n8", text: "Tired most afternoons", color: "lilac", x: 420, y: 860, rotation: -2.5 },
+  { id: "n8", text: "Tired most afternoons", color: "lilac", x: 420, y: 860, rotation: -2.5, mission: "keep" },
   { id: "n9", text: "Write an onboarding guide for the new tool", color: "sky", x: 1020, y: 830, rotation: 1, labels: { area: "work" }, hashtags: ["work", "income", "needed"] },
-  { id: "n10", text: "A slow week by the sea", color: "sage", x: 720, y: 140, rotation: -1, hashtags: ["love"] },
-  { id: "n11", text: "Reply to every unread group chat", color: "peach", x: 740, y: 470, rotation: 1.5 },
-  { id: "n12", text: "Stay fit and strong for life", color: "sage", x: 1620, y: 90, rotation: -1, hashtags: ["life-goal", "fitness"], parentIds: ["n1"] },
-  { id: "n13", text: "Train for the half marathon", color: "sage", x: 1620, y: 330, rotation: 1.5, hashtags: ["project-goal", "marathon"], parentIds: ["n12"] },
-  { id: "n14", text: "Choose and register for a race", color: "sky", x: 1620, y: 570, rotation: -1.5, hashtags: ["project-goal", "marathon"], parentIds: ["n12"] },
-  { id: "n15", text: "Spend more time with Mom", color: "rose", x: 1620, y: 810, rotation: 1, hashtags: ["project-goal", "family-time"], parentIds: ["n4"] },
+  { id: "n10", text: "A slow week by the sea", color: "sage", x: 720, y: 140, rotation: -1, hashtags: ["love"], mission: "keep" },
+  { id: "n11", text: "Reply to every unread group chat", color: "peach", x: 740, y: 470, rotation: 1.5, mission: "release" },
+  { id: "n12", text: "Stay fit and strong for life", color: "sage", x: 1620, y: 90, rotation: -1, hashtags: ["life-goal", "fitness"], parentIds: ["n1"], mission: "keep" },
+  { id: "n13", text: "Train for the half marathon", color: "sage", x: 1620, y: 330, rotation: 1.5, hashtags: ["project-goal", "marathon"], parentIds: ["n12"], mission: "keep" },
+  { id: "n14", text: "Choose and register for a race", color: "sky", x: 1620, y: 570, rotation: -1.5, hashtags: ["project-goal", "marathon"], parentIds: ["n12"], mission: "keep" },
+  { id: "n15", text: "Spend more time with Mom", color: "rose", x: 1620, y: 810, rotation: 1, hashtags: ["project-goal", "family-time"], parentIds: ["n4"], mission: "keep" },
 ]
 
 const SAMPLE_GROUP_AREAS = groupAreas(DEFAULT_GROUPS)

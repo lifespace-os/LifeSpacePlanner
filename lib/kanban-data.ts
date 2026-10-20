@@ -201,8 +201,18 @@ const SAMPLE_GOALS: Record<string, string[]> = {
   w4: ["n15"],
 }
 
+/**
+ * The chain n1 → n12 → n13 / n14 runs to the mission. Three of the tasks under it carry the path:
+ * "Walk 30 minutes before lunch" (a11, w7, d6), "Swim twice a week" (m4), and "Run a half marathon" (y3).
+ */
+const SAMPLE_MISSION_PATH = new Set(["a11", "w7", "d6", "m4", "y3"])
+
 function withGoals(cards: KanbanCard[]): KanbanCard[] {
-  return cards.map((item) => (SAMPLE_GOALS[item.id] ? { ...item, goalIds: SAMPLE_GOALS[item.id]! } : item))
+  return cards.map((item) => {
+    const goalIds = SAMPLE_GOALS[item.id]
+    if (!goalIds) return item
+    return { ...item, goalIds, missionLink: SAMPLE_MISSION_PATH.has(item.id) }
+  })
 }
 
 /** Sample start and end times, so the card faces show them from the first load. */

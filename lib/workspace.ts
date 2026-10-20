@@ -70,7 +70,7 @@ export function demoWorkspace(): WorkspaceDoc {
   return {
     version: 1,
     revision: 0,
-    missionText: "",
+    missionText: "I live strong and healthy, close to the people I love, with time left for what I enjoy.",
     notes: structuredClone(SAMPLE_NOTES),
     rings: structuredClone(BUILT_IN_RINGS),
     kanban: { cards: defaultCards(), columnsByBoard: defaultColumns() },
