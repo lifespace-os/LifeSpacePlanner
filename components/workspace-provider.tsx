@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
+import { Fragment, createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
 import { WORKSPACE_URL, demoWorkspace, parseWorkspace, type WorkspaceDoc, type WorkspaceSliceKey } from "@/lib/workspace"
 
 const SAVE_DELAY = 500
@@ -11,6 +11,8 @@ type WorkspaceContextValue = {
   doc: WorkspaceDoc
   status: SaveStatus
   report: <K extends WorkspaceSliceKey>(key: K, value: WorkspaceDoc[K]) => void
+  /** Swaps the whole workspace, saves it, and rebuilds every page from it. False when it could not be saved. */
+  replace: (next: WorkspaceDoc) => Promise<boolean>
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
@@ -27,8 +29,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const timer = useRef<number | null>(null)
   const blocked = useRef(false)
   const flushRef = useRef<(keepalive: boolean) => void>(() => {})
+  const inflight = useRef<Promise<void>>(Promise.resolve())
+  const [epoch, setEpoch] = useState(0)
 
-  const flush = useCallback(async (keepalive: boolean) => {
+  const flushNow = useCallback(async (keepalive: boolean) => {
     if (blocked.current || !pending.current) return
     const body = pending.current
     pending.current = null
@@ -70,9 +74,39 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const flush = useCallback(
+    (keepalive: boolean) => {
+      const run = flushNow(keepalive)
+      inflight.current = run
+      return run
+    },
+    [flushNow],
+  )
+
   flushRef.current = (keepalive) => {
     void flush(keepalive)
   }
+
+  const replace = useCallback(
+    async (next: WorkspaceDoc) => {
+      if (blocked.current) return false
+      if (timer.current !== null) {
+        window.clearTimeout(timer.current)
+        timer.current = null
+      }
+      pending.current = null
+      await inflight.current
+      if (blocked.current) return false
+      const incoming = { ...next, revision: savedRevision.current }
+      docRef.current = incoming
+      pending.current = incoming
+      setDoc(incoming)
+      setEpoch((value) => value + 1)
+      await flush(false)
+      return !blocked.current && pending.current === null
+    },
+    [flush],
+  )
 
   const schedule = useCallback((next: WorkspaceDoc) => {
     if (blocked.current) return
@@ -156,7 +190,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return <p className="flex min-h-dvh items-center justify-center px-6 text-center text-sm text-ink-soft">{error}</p>
   }
 
-  return <WorkspaceContext.Provider value={{ doc, status, report }}>{children}</WorkspaceContext.Provider>
+  return (
+    <WorkspaceContext.Provider value={{ doc, status, report, replace }}>
+      <Fragment key={epoch}>{children}</Fragment>
+    </WorkspaceContext.Provider>
+  )
 }
 
 export function useWorkspace() {

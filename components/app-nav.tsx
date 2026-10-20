@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/", label: "Whiteboard" },
   { href: "/kanban", label: "Kanban" },
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/settings", label: "Settings" },
 ]
 
 const STATUS: Record<"saving" | "saved" | "error" | "conflict", string> = {

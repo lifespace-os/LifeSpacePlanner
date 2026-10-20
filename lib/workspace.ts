@@ -44,6 +44,17 @@ export type WorkspaceKanban = {
   columnsByBoard: Record<KanbanBoardId, KanbanColumn[]>
 }
 
+export type WorkspaceLife = {
+  /** yyyy-mm-dd, or an empty string before a date is entered. */
+  birthDate: string
+  /** How many years the weeks grid covers. */
+  years: number
+}
+
+export const LIFE_YEARS_MIN = 1
+export const LIFE_YEARS_MAX = 120
+export const DEFAULT_LIFE: WorkspaceLife = { birthDate: "", years: 90 }
+
 export type WorkspaceDoc = {
   version: 1
   revision: number
@@ -52,9 +63,13 @@ export type WorkspaceDoc = {
   rings: GoalRing[]
   kanban: WorkspaceKanban
   board: WorkspaceBoard
+  /** Absent in files saved before Settings existed. */
+  life?: WorkspaceLife
 }
 
-export type WorkspaceSliceKey = "missionText" | "notes" | "rings" | "kanban" | "board"
+export type WorkspaceSliceKey = "missionText" | "notes" | "rings" | "kanban" | "board" | "life"
+
+export const SAMPLE_MISSION = "I live strong and healthy, close to the people I love, with time left for what I enjoy."
 
 const BOARD_IDS = KANBAN_BOARDS.map((board) => board.id)
 const COLUMN_KINDS: ColumnKind[] = ["todo", "progress", "later", "done"]
@@ -70,7 +85,7 @@ export function demoWorkspace(): WorkspaceDoc {
   return {
     version: 1,
     revision: 0,
-    missionText: "I live strong and healthy, close to the people I love, with time left for what I enjoy.",
+    missionText: SAMPLE_MISSION,
     notes: structuredClone(SAMPLE_NOTES),
     rings: structuredClone(BUILT_IN_RINGS),
     kanban: { cards: defaultCards(), columnsByBoard: defaultColumns() },
@@ -98,7 +113,56 @@ export function parseWorkspace(value: unknown): { ok: true; doc: WorkspaceDoc } 
   if (!isRingList(value.rings)) return fail("The workspace file is missing the goal rings.")
   if (!isKanban(value.kanban)) return fail("The workspace file is missing the kanban.")
   if (!isBoard(value.board)) return fail("The workspace file is missing the board layout.")
+  if (value.life !== undefined && !isLife(value.life)) return fail("The life in weeks settings in the file are not valid.")
   return { ok: true, doc: value as WorkspaceDoc }
+}
+
+function isLife(value: unknown): value is WorkspaceLife {
+  if (!isRecord(value)) return false
+  const dateOk = typeof value.birthDate === "string" && (value.birthDate === "" || /^\d{4}-\d{2}-\d{2}$/.test(value.birthDate))
+  return dateOk && isInteger(value.years) && value.years >= LIFE_YEARS_MIN && value.years <= LIFE_YEARS_MAX
+}
+
+const SAMPLE_NOTE_TEXT = new Map(SAMPLE_NOTES.map((note) => [note.id, note.text]))
+const SAMPLE_CARD_TITLE = new Map(defaultCards().map((card) => [card.id, card.title]))
+
+/** The sample story is on the board while any of its cards is still there. */
+export function sampleStoryOn(doc: WorkspaceDoc) {
+  return doc.notes.some((note) => SAMPLE_NOTE_TEXT.has(note.id)) || doc.kanban.cards.some((card) => SAMPLE_CARD_TITLE.has(card.id))
+}
+
+/** A card the person added, or a sample card whose words they changed. */
+export function hasWrittenCards(doc: WorkspaceDoc) {
+  const noteWritten = doc.notes.some((note) => SAMPLE_NOTE_TEXT.get(note.id) !== note.text)
+  const cardWritten = doc.kanban.cards.some((card) => SAMPLE_CARD_TITLE.get(card.id) !== card.title)
+  return noteWritten || cardWritten
+}
+
+/** Replaces the whiteboard cards and kanban tasks with the sample story. Columns, rings and the life settings stay. */
+export function withSampleStory(doc: WorkspaceDoc): WorkspaceDoc {
+  const cards = defaultCards().map((card) => {
+    const columns = doc.kanban.columnsByBoard[card.boardId]
+    if (columns.some((column) => column.id === card.columnId)) return card
+    return { ...card, columnId: columns[0]?.id ?? card.columnId }
+  })
+  return {
+    ...doc,
+    missionText: doc.missionText.trim() ? doc.missionText : SAMPLE_MISSION,
+    notes: structuredClone(SAMPLE_NOTES),
+    kanban: { ...doc.kanban, cards },
+    board: { ...doc.board, graphSpots: {}, graphBoxes: {} },
+  }
+}
+
+/** Clears the whiteboard cards and kanban tasks. A mission sentence the person wrote stays. */
+export function withEmptyBoard(doc: WorkspaceDoc): WorkspaceDoc {
+  return {
+    ...doc,
+    missionText: doc.missionText === SAMPLE_MISSION ? "" : doc.missionText,
+    notes: [],
+    kanban: { ...doc.kanban, cards: [] },
+    board: { ...doc.board, graphSpots: {}, graphBoxes: {} },
+  }
 }
 
 function fail(reason: string) {
