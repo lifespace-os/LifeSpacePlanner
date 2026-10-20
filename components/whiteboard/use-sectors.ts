@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react"
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react"
 import {
   BUDGET_COLORS,
   BUDGET_ZONE_IDS,
@@ -11,25 +11,28 @@ import {
   hasHashtag,
   nextSectorColor,
   sectorTag,
-  startingSectorLists,
   type LabelView,
   type Note,
+  type Sector,
   type SectorListId,
   type SphereSetId,
 } from "@/lib/board-data"
+import { newId } from "@/lib/workspace"
 
 /**
  * Sector lists for the Labels mode. Each ready list keeps its own edits, so switching sets never
  * touches the other set's sectors or the hashtags already on cards.
  */
-export function useSectors(setNotes: Dispatch<SetStateAction<Note[]>>) {
+export function useSectors(
+  setNotes: Dispatch<SetStateAction<Note[]>>,
+  initial: { lists: Record<SectorListId, Sector[]>; setId: SphereSetId },
+) {
   const [view, setView] = useState<LabelView>("spheres")
   /** The Wheel view: the same wheel of the chosen set, without the card board. */
   const [wheelOnly, setWheelOnly] = useState(false)
-  const [setId, setSetId] = useState<SphereSetId>("five")
-  const [lists, setLists] = useState(startingSectorLists)
+  const [setId, setSetId] = useState<SphereSetId>(initial.setId)
+  const [lists, setLists] = useState(initial.lists)
   const [openSectorId, setOpenSectorId] = useState<string | null>(null)
-  const nextId = useRef(0)
 
   const activeId: SectorListId = view === "happiness" ? "happiness" : setId
   const otherId: SectorListId = view === "happiness" ? setId : "happiness"
@@ -49,7 +52,7 @@ export function useSectors(setNotes: Dispatch<SetStateAction<Note[]>>) {
       const tag = sectorTag(clean)
       if (!tag) return "Give the sector a name."
       if (sectors.some((sector) => sectorTag(sector.name) === tag)) return "This list already has that sector."
-      const id = `${activeId}-new-${nextId.current++}`
+      const id = newId(activeId)
       const color = nextSectorColor(sectors, activeId === "happiness" ? [...HAPPINESS_COLORS, ...SECTOR_COLORS] : SECTOR_COLORS)
       setLists((prev) => ({ ...prev, [activeId]: [...prev[activeId], { id, name: clean, color }] }))
       return null
@@ -169,6 +172,7 @@ export function useSectors(setNotes: Dispatch<SetStateAction<Note[]>>) {
 
   return {
     tagColors,
+    lists,
     /** Both lists the task window offers, whichever Labels view is open. */
     sphereSectors: lists[setId],
     happinessSectors: lists.happiness,

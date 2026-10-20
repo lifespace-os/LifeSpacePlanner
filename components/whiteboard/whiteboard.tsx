@@ -3,19 +3,18 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useGoals } from "@/components/goals-provider"
 import { useMission } from "@/components/mission-provider"
+import { useWorkspace, useWorkspaceSlice } from "@/components/workspace-provider"
+import { newId, type WorkspaceBoard } from "@/lib/workspace"
 import clsx from "clsx"
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
 import {
   BUDGET_TAGS,
-  BUILT_IN_RINGS,
   insertRing,
   stripRingTags,
   type GoalRing,
   LABEL_SET_IDS,
   labelSetLists,
   writeLabelSet,
-  BUDGET_ZONE_GAP,
-  BUDGET_ZONE_SIZE,
   arrangeCards,
   type CardSpot,
   budgetAreas,
@@ -24,8 +23,6 @@ import {
   CARD_MIN_HEIGHT,
   CARD_WIDTH,
   DEFAULT_GOAL_PLAN,
-  DEFAULT_GROUPS,
-  DEFAULT_ZONES,
   GOAL_LEVELS,
   GOAL_POINT_SIZE,
   GOAL_RING_SCALE,
@@ -38,7 +35,6 @@ import {
   MAX_ZOOM,
   MIN_ZOOM,
   MODES,
-  SAMPLE_NOTES,
   WHEEL_REACH,
   ZONE_MIN_SIZE,
   ZONE_TAGS,
@@ -121,17 +117,15 @@ function clampZoom(zoom: number) {
 }
 
 export function Whiteboard() {
+  const { doc } = useWorkspace()
   const { notes, setNotes, rings, setRings } = useGoals()
-  const [zones, setZones] = useState<Zones>(DEFAULT_ZONES)
-  const [budgetZones, setBudgetZones] = useState<BudgetZones>({
-    investment: { left: 0, top: 0, ...BUDGET_ZONE_SIZE },
-    expense: { left: BUDGET_ZONE_SIZE.width + BUDGET_ZONE_GAP, top: 0, ...BUDGET_ZONE_SIZE },
-  })
-  const [groups, setGroups] = useState<Group[]>(DEFAULT_GROUPS)
+  const [zones, setZones] = useState<Zones>(doc.board.zones)
+  const [budgetZones, setBudgetZones] = useState<BudgetZones>(doc.board.budgetZones)
+  const [groups, setGroups] = useState<Group[]>(doc.board.groups)
   const [clusterView, setClusterView] = useState<ClusterView>("wantmust")
   const [groupsOpen, setGroupsOpen] = useState(true)
   const [labelsOpen, setLabelsOpen] = useState(true)
-  const sectorState = useSectors(setNotes)
+  const sectorState = useSectors(setNotes, { lists: doc.board.sectorLists, setId: doc.board.sphereSetId })
   const labelView = sectorState.view
   const labelLists = useMemo(
     () => labelSetLists(sectorState.sphereSectors, sectorState.happinessSectors),
@@ -177,8 +171,21 @@ export function Whiteboard() {
   const [goalView, setGoalView] = useState<GoalView>("needs")
   const [goalsPanelOpen, setGoalsPanelOpen] = useState(true)
   const [mapSelected, setMapSelected] = useState<string | null>(null)
-  const [graphSpots, setGraphSpots] = useState<Record<string, GraphSpot>>({})
-  const [graphBoxes, setGraphBoxes] = useState<Record<string, GraphBox>>({})
+  const [graphSpots, setGraphSpots] = useState<Record<string, GraphSpot>>(doc.board.graphSpots)
+  const [graphBoxes, setGraphBoxes] = useState<Record<string, GraphBox>>(doc.board.graphBoxes)
+  const board = useMemo<WorkspaceBoard>(
+    () => ({
+      zones,
+      budgetZones,
+      groups,
+      sectorLists: sectorState.lists,
+      sphereSetId: sectorState.setId,
+      graphSpots,
+      graphBoxes,
+    }),
+    [zones, budgetZones, groups, sectorState.lists, sectorState.setId, graphSpots, graphBoxes],
+  )
+  useWorkspaceSlice("board", board)
   const [graphSelected, setGraphSelected] = useState<string | null>(null)
   const [graphMissionOpen, setGraphMissionOpen] = useState(false)
   const [allBoardLinks, setAllBoardLinks] = useState(false)
@@ -206,7 +213,6 @@ export function Whiteboard() {
   const rootRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<View>(view)
-  const idCounter = useRef(0)
   const ikigaiPlaced = useRef(false)
 
   const ikigaiOn = mode === "mission" && missionView === "ikigai"
@@ -507,8 +513,7 @@ export function Whiteboard() {
 
   const createCardAt = useCallback(
     (worldX: number, worldY: number, color: CardColorId) => {
-      idCounter.current += 1
-      const id = `card-${idCounter.current}`
+      const id = newId("card")
       const area = layer ? areaTagAt(layer.areas, worldX, worldY) : null
       const levelTag = goalFormOn ? (goalView === "life" ? "life-goal" : "project-goal") : null
       setNotes((prev) => {
@@ -541,8 +546,7 @@ export function Whiteboard() {
   )
 
   const createGraphCard = useCallback(() => {
-    idCounter.current += 1
-    const id = `card-${idCounter.current}`
+    const id = newId("card")
     const rect = viewportRef.current?.getBoundingClientRect()
     const center = screenToWorld((rect?.left ?? 0) + (rect?.width ?? 0) / 2, (rect?.top ?? 0) + (rect?.height ?? 0) / 2)
     setNotes((prev) => {
@@ -590,8 +594,7 @@ export function Whiteboard() {
 
   const splitGoalCard = useCallback(
     (id: string, draft: GoalDraft, secondText: string) => {
-      idCounter.current += 1
-      const siblingId = `card-${idCounter.current}`
+      const siblingId = newId("card")
       setNotes((prev) => {
         const source = prev.find((note) => note.id === id)
         if (!source) return prev

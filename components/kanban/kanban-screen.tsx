@@ -14,6 +14,7 @@ import {
   type KanbanColumn,
 } from "@/lib/kanban-data"
 import { useGoals } from "@/components/goals-provider"
+import { newId } from "@/lib/workspace"
 import { useMission } from "@/components/mission-provider"
 import { belowIds, ringCardsOf } from "@/lib/ring-focus"
 import { filterGoalIds, highlightColor, passesFilter, ringHashtags } from "@/lib/kanban-filter"
@@ -285,7 +286,7 @@ export function KanbanScreen() {
   }
 
   const addColumn = (name: string) => {
-    const created: KanbanColumn = { id: `col-${Date.now().toString(36)}`, name, kind: "todo" }
+    const created: KanbanColumn = { id: newId("col"), name, kind: "todo" }
     updateColumns((list) => {
       const doneAt = list.findIndex((column) => column.kind === "done")
       if (doneAt < 0) return [...list, created]

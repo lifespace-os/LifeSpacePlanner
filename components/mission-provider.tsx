@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useMemo, useState } from "react"
+import { useWorkspace, useWorkspaceSlice } from "@/components/workspace-provider"
 
 type MissionState = {
   /** The saved mission sentence, or an empty string before one is written. */
@@ -12,7 +13,9 @@ const MissionContext = createContext<MissionState | null>(null)
 
 /** Sits above the pages, so the sentence written in Mission is the same one Kanban shows. */
 export function MissionProvider({ children }: { children: React.ReactNode }) {
-  const [missionText, setMissionText] = useState("")
+  const { doc } = useWorkspace()
+  const [missionText, setMissionText] = useState(doc.missionText)
+  useWorkspaceSlice("missionText", missionText)
   const value = useMemo<MissionState>(() => ({ missionText, setMissionText }), [missionText])
   return <MissionContext.Provider value={value}>{children}</MissionContext.Provider>
 }

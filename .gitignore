@@ -12,6 +12,9 @@ Thumbs.db
 
 # docs
 docs
+
+# saved workspace
+data/
 # deps & build
 node_modules/
 .next/

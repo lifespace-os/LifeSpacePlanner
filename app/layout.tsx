@@ -4,6 +4,7 @@ import { AppNav } from "@/components/app-nav"
 import { GoalsProvider } from "@/components/goals-provider"
 import { KanbanProvider } from "@/components/kanban/kanban-provider"
 import { MissionProvider } from "@/components/mission-provider"
+import { WorkspaceProvider } from "@/components/workspace-provider"
 import "./globals.css"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" })
@@ -23,14 +24,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${geist.variable} ${newsreader.variable}`}>
       <body className="min-h-dvh font-sans antialiased">
-        <MissionProvider>
-          <GoalsProvider>
-            <KanbanProvider>
-              <AppNav />
-              {children}
-            </KanbanProvider>
-          </GoalsProvider>
-        </MissionProvider>
+        <WorkspaceProvider>
+          <MissionProvider>
+            <GoalsProvider>
+              <KanbanProvider>
+                <AppNav />
+                {children}
+              </KanbanProvider>
+            </GoalsProvider>
+          </MissionProvider>
+        </WorkspaceProvider>
       </body>
     </html>
   )

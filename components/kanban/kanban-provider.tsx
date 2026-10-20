@@ -1,9 +1,8 @@
 "use client"
 
 import { createContext, useCallback, useContext, useMemo, useState, type Dispatch, type SetStateAction } from "react"
+import { useWorkspace, useWorkspaceSlice } from "@/components/workspace-provider"
 import {
-  defaultCards,
-  defaultColumns,
   draftIssue,
   draftOf,
   type CardDraft,
@@ -50,9 +49,12 @@ const KanbanContext = createContext<KanbanState | null>(null)
 
 /** Sits above the pages, so leaving Kanban for Whiteboard does not clear the boards or an open window. */
 export function KanbanProvider({ children }: { children: React.ReactNode }) {
+  const { doc } = useWorkspace()
   const [boardId, setBoardId] = useState<KanbanBoardId>("all")
-  const [columnsByBoard, setColumnsByBoard] = useState(defaultColumns)
-  const [cards, setCards] = useState<KanbanCard[]>(defaultCards)
+  const [columnsByBoard, setColumnsByBoard] = useState(doc.kanban.columnsByBoard)
+  const [cards, setCards] = useState<KanbanCard[]>(doc.kanban.cards)
+  const kanban = useMemo(() => ({ cards, columnsByBoard }), [cards, columnsByBoard])
+  useWorkspaceSlice("kanban", kanban)
   const [missionOnly, setMissionOnly] = useState(false)
   const [ringsOn, setRingsOnState] = useState(false)
   const [resultsOn, setResultsOn] = useState(false)

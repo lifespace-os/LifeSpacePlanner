@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import clsx from "clsx"
+import { useWorkspace } from "@/components/workspace-provider"
 
 const LINKS = [
   { href: "/", label: "Whiteboard" },
@@ -10,8 +11,17 @@ const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
 ]
 
+const STATUS: Record<"saving" | "saved" | "error" | "conflict", string> = {
+  saving: "Saving",
+  saved: "Saved",
+  error: "Could not save",
+  conflict: "Data changed in another tab. Reload to see the latest.",
+}
+
 export function AppNav() {
   const pathname = usePathname()
+  const { status } = useWorkspace()
+  const statusText = status ? STATUS[status] : null
 
   return (
     <header className="border-b border-line/80 bg-desk">
@@ -20,6 +30,11 @@ export function AppNav() {
           <span className="font-serif text-xl font-medium tracking-tight">LifeSpace</span>
           <span className="text-xs uppercase tracking-[0.18em] text-ink-soft">Kaizen planner</span>
         </Link>
+        {statusText ? (
+          <p aria-live="polite" className="text-xs text-ink-soft">
+            {statusText}
+          </p>
+        ) : null}
         <nav aria-label="Main">
           <ul className="flex items-center gap-1">
             {LINKS.map((link) => {
