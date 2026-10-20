@@ -233,7 +233,9 @@ function isCard(value: unknown): boolean {
     Array.isArray(value.goalIds) &&
     (value.steps === undefined || (Array.isArray(value.steps) && value.steps.every(isStep))) &&
     (value.repeat === undefined || isRepeat(value.repeat)) &&
-    (value.occurrence === undefined || typeof value.occurrence === "number")
+    (value.occurrence === undefined || typeof value.occurrence === "number") &&
+  (value.hashtags === undefined || (Array.isArray(value.hashtags) && value.hashtags.every((tag) => typeof tag === "string"))) &&
+  (value.freeIds === undefined || (Array.isArray(value.freeIds) && value.freeIds.every((id) => typeof id === "string")))
   )
 }
 

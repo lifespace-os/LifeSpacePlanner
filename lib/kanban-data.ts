@@ -76,6 +76,10 @@ export type KanbanCard = {
   repeat?: CardRepeat
   /** Which copy in a repeating run this card is. Missing for the first, and for tasks that never repeat. */
   occurrence?: number
+  /** Hashtags added in the card search window, without the #. Missing in files saved before search existed. */
+  hashtags?: string[]
+  /** Free lines to other cards. They set no ring and are not a path to the mission. */
+  freeIds?: string[]
 }
 
 /** A card has a path to the mission when it holds the goal above or the second line to it. Saved state only, never a draft. */

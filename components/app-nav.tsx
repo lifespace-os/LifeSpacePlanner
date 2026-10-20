@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import clsx from "clsx"
+import { CardSearch } from "@/components/search/card-search"
 import { useWorkspace } from "@/components/workspace-provider"
 
 const LINKS = [
@@ -81,7 +82,8 @@ export function AppNav() {
           <span className="font-serif text-xl font-medium tracking-tight">LifeSpace</span>
           <span className="text-xs uppercase tracking-[0.18em] text-ink-soft">Kaizen planner</span>
         </Link>
-        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 pl-4">
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-3 pl-4">
+          <CardSearch />
           <p aria-live="polite" className="min-w-0 truncate text-xs text-ink-soft">
             {message}
           </p>
