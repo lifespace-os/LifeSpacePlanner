@@ -25,6 +25,7 @@ import {
   type KanbanCard,
   type KanbanColumn,
 } from "@/lib/kanban-data"
+import { isViewHref, type ViewHref } from "@/lib/views"
 
 /** One address for the workspace. A later server can answer the same path. */
 export const WORKSPACE_URL = "/api/workspace"
@@ -65,9 +66,11 @@ export type WorkspaceDoc = {
   board: WorkspaceBoard
   /** Absent in files saved before Settings existed. */
   life?: WorkspaceLife
+  /** The view the header slot remembers. Absent until a view has been chosen. */
+  lastView?: ViewHref
 }
 
-export type WorkspaceSliceKey = "missionText" | "notes" | "rings" | "kanban" | "board" | "life"
+export type WorkspaceSliceKey = "missionText" | "notes" | "rings" | "kanban" | "board" | "life" | "lastView"
 
 export const SAMPLE_MISSION = "I live strong and healthy, close to the people I love, with time left for what I enjoy."
 
@@ -114,6 +117,7 @@ export function parseWorkspace(value: unknown): { ok: true; doc: WorkspaceDoc } 
   if (!isKanban(value.kanban)) return fail("The workspace file is missing the kanban.")
   if (!isBoard(value.board)) return fail("The workspace file is missing the board layout.")
   if (value.life !== undefined && !isLife(value.life)) return fail("The life in weeks settings in the file are not valid.")
+  if (value.lastView !== undefined && !isViewHref(value.lastView)) return fail("The remembered view in the file is not valid.")
   return { ok: true, doc: value as WorkspaceDoc }
 }
 

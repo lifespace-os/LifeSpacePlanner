@@ -149,7 +149,7 @@ function BackupSection() {
   async function load() {
     if (!incoming) return
     setBusy(true)
-    await replace({ ...incoming, life: incoming.life ?? doc.life })
+    await replace({ ...incoming, life: incoming.life ?? doc.life, lastView: incoming.lastView ?? doc.lastView })
     setBusy(false)
     setIncoming(null)
   }

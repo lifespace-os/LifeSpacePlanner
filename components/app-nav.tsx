@@ -7,7 +7,7 @@ import clsx from "clsx"
 import { CardSearch } from "@/components/search/card-search"
 import { ViewsMenu } from "@/components/views-menu"
 import { useWorkspace } from "@/components/workspace-provider"
-import { openViewFor } from "@/lib/views"
+import { openViewFor, slotViewFor } from "@/lib/views"
 
 const BEFORE_VIEWS = [
   { href: "/", label: "Whiteboard" },
@@ -32,6 +32,32 @@ function NavLink({ href, label, pathname }: { href: string; label: string; pathn
         className={clsx(NAV_ITEM, active ? "bg-ink text-board" : "text-ink-soft hover:bg-line/50 hover:text-ink")}
       >
         {label}
+      </Link>
+    </li>
+  )
+}
+
+function ViewSlot({ pathname }: { pathname: string }) {
+  const { doc, report } = useWorkspace()
+  const openView = openViewFor(pathname)
+  const shown = slotViewFor(pathname, doc.lastView)
+
+  useEffect(() => {
+    if (openView) report("lastView", openView.href)
+  }, [openView, report])
+
+  return (
+    <li className="w-24 shrink-0">
+      <Link
+        href={shown.href}
+        aria-current={openView ? "page" : undefined}
+        className={clsx(
+          NAV_ITEM,
+          "w-full truncate text-center",
+          openView ? "bg-ink text-board" : "text-ink-soft hover:bg-line/50 hover:text-ink",
+        )}
+      >
+        {shown.label}
       </Link>
     </li>
   )
@@ -82,7 +108,6 @@ function SaveMark({ mark }: { mark: "saving" | "saved" | null }) {
 
 export function AppNav() {
   const pathname = usePathname()
-  const openView = openViewFor(pathname)
   const { status } = useWorkspace()
   const [checkVisible, setCheckVisible] = useState(false)
   const message = status === "error" || status === "conflict" ? MESSAGE[status] : null
@@ -120,17 +145,7 @@ export function AppNav() {
             {BEFORE_VIEWS.map((link) => (
               <NavLink key={link.href} {...link} pathname={pathname} />
             ))}
-            <li className="w-24 shrink-0" aria-hidden={openView ? undefined : true}>
-              {openView ? (
-                <Link
-                  href={openView.href}
-                  aria-current="page"
-                  className={clsx(NAV_ITEM, "w-full truncate bg-ink text-center text-board")}
-                >
-                  {openView.label}
-                </Link>
-              ) : null}
-            </li>
+            <ViewSlot pathname={pathname} />
             <li>
               <ViewsMenu />
             </li>
