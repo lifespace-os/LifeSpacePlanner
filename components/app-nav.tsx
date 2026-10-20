@@ -5,14 +5,37 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import clsx from "clsx"
 import { CardSearch } from "@/components/search/card-search"
+import { ViewsMenu } from "@/components/views-menu"
 import { useWorkspace } from "@/components/workspace-provider"
+import { openViewFor } from "@/lib/views"
 
-const LINKS = [
+const BEFORE_VIEWS = [
   { href: "/", label: "Whiteboard" },
   { href: "/kanban", label: "Kanban" },
+]
+
+const AFTER_VIEWS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/settings", label: "Settings" },
 ]
+
+const NAV_ITEM =
+  "block rounded-md px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+
+function NavLink({ href, label, pathname }: { href: string; label: string; pathname: string }) {
+  const active = href === "/" ? pathname === "/" : pathname.startsWith(href)
+  return (
+    <li>
+      <Link
+        href={href}
+        aria-current={active ? "page" : undefined}
+        className={clsx(NAV_ITEM, active ? "bg-ink text-board" : "text-ink-soft hover:bg-line/50 hover:text-ink")}
+      >
+        {label}
+      </Link>
+    </li>
+  )
+}
 
 const MESSAGE: Record<"error" | "conflict", string> = {
   error: "Could not save",
@@ -59,6 +82,7 @@ function SaveMark({ mark }: { mark: "saving" | "saved" | null }) {
 
 export function AppNav() {
   const pathname = usePathname()
+  const openView = openViewFor(pathname)
   const { status } = useWorkspace()
   const [checkVisible, setCheckVisible] = useState(false)
   const message = status === "error" || status === "conflict" ? MESSAGE[status] : null
@@ -93,23 +117,26 @@ export function AppNav() {
         </div>
         <nav aria-label="Main" className="ml-1">
           <ul className="flex items-center gap-1">
-            {LINKS.map((link) => {
-              const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href)
-              return (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    aria-current={active ? "page" : undefined}
-                    className={clsx(
-                      "rounded-md px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                      active ? "bg-ink text-board" : "text-ink-soft hover:bg-line/50 hover:text-ink",
-                    )}
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              )
-            })}
+            {BEFORE_VIEWS.map((link) => (
+              <NavLink key={link.href} {...link} pathname={pathname} />
+            ))}
+            <li className="w-24 shrink-0" aria-hidden={openView ? undefined : true}>
+              {openView ? (
+                <Link
+                  href={openView.href}
+                  aria-current="page"
+                  className={clsx(NAV_ITEM, "w-full truncate bg-ink text-center text-board")}
+                >
+                  {openView.label}
+                </Link>
+              ) : null}
+            </li>
+            <li>
+              <ViewsMenu />
+            </li>
+            {AFTER_VIEWS.map((link) => (
+              <NavLink key={link.href} {...link} pathname={pathname} />
+            ))}
           </ul>
         </nav>
       </div>
