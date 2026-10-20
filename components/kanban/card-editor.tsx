@@ -2,7 +2,37 @@
 
 import { useEffect, useId, useRef, useState } from "react"
 import { X } from "lucide-react"
-import { draftIssue, type CardDraft, type CardStep, type KanbanCard } from "@/lib/kanban-data"
+import {
+  draftIssue,
+  type CardDraft,
+  type CardRepeat,
+  type CardStep,
+  type KanbanCard,
+  type RepeatMode,
+  type RepeatRhythm,
+} from "@/lib/kanban-data"
+
+const REPEAT_MODES: { id: RepeatMode; label: string }[] = [
+  { id: "once", label: "Once" },
+  { id: "times", label: "A number of times" },
+  { id: "forever", label: "Until I turn it off" },
+]
+
+const REPEAT_RHYTHMS: { id: RepeatRhythm; label: string }[] = [
+  { id: "daily", label: "Every day" },
+  { id: "weekly", label: "Chosen days of the week" },
+  { id: "monthly", label: "The same date every month" },
+]
+
+const WEEKDAYS: { day: number; short: string; long: string }[] = [
+  { day: 1, short: "Mon", long: "Monday" },
+  { day: 2, short: "Tue", long: "Tuesday" },
+  { day: 3, short: "Wed", long: "Wednesday" },
+  { day: 4, short: "Thu", long: "Thursday" },
+  { day: 5, short: "Fri", long: "Friday" },
+  { day: 6, short: "Sat", long: "Saturday" },
+  { day: 0, short: "Sun", long: "Sunday" },
+]
 
 type Props = {
   card: KanbanCard
@@ -109,6 +139,8 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
             </div>
 
             <StepList steps={draft.steps} onChange={(steps) => onChange({ steps })} />
+
+            <RepeatSection repeat={draft.repeat} onChange={(repeat) => onChange({ repeat })} />
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <fieldset className="min-w-0">
@@ -316,6 +348,103 @@ function StepList({ steps, onChange }: { steps: CardStep[]; onChange: (steps: Ca
         >
           Add
         </button>
+      </div>
+    </fieldset>
+  )
+}
+
+function RepeatSection({ repeat, onChange }: { repeat: CardRepeat; onChange: (repeat: CardRepeat) => void }) {
+  const name = useId()
+  const timesId = useId()
+  const repeating = repeat.mode !== "once"
+
+  const toggleDay = (day: number) =>
+    onChange({
+      ...repeat,
+      weekdays: repeat.weekdays.includes(day) ? repeat.weekdays.filter((item) => item !== day) : [...repeat.weekdays, day].sort(),
+    })
+
+  return (
+    <fieldset>
+      <legend className="mb-1.5 text-sm font-medium text-ink">Repeat</legend>
+      <div className="flex flex-col gap-3">
+        <div role="radiogroup" aria-label="How often the task repeats" className="flex flex-wrap gap-x-4 gap-y-1.5">
+          {REPEAT_MODES.map((mode) => (
+            <label key={mode.id} className="flex cursor-pointer items-center gap-2 text-sm text-ink has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent">
+              <input
+                type="radio"
+                name={`${name}-mode`}
+                checked={repeat.mode === mode.id}
+                onChange={() => onChange({ ...repeat, mode: mode.id })}
+                className="size-4 accent-[var(--color-accent)]"
+              />
+              {mode.label}
+            </label>
+          ))}
+        </div>
+
+        {repeat.mode === "times" && (
+          <div className="flex items-center gap-2">
+            <label htmlFor={timesId} className="text-sm text-ink">
+              Copies to come
+            </label>
+            <input
+              id={timesId}
+              type="number"
+              min={1}
+              max={365}
+              inputMode="numeric"
+              value={repeat.times || ""}
+              onChange={(event) => onChange({ ...repeat, times: Number(event.target.value) })}
+              className={`${FIELD} w-24`}
+            />
+          </div>
+        )}
+
+        {repeating && (
+          <div className="flex flex-col gap-2">
+            <div role="radiogroup" aria-label="The rhythm" className="flex flex-col gap-1.5">
+              {REPEAT_RHYTHMS.map((rhythm) => (
+                <label key={rhythm.id} className="flex cursor-pointer items-center gap-2 text-sm text-ink has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent">
+                  <input
+                    type="radio"
+                    name={`${name}-rhythm`}
+                    checked={repeat.rhythm === rhythm.id}
+                    onChange={() => onChange({ ...repeat, rhythm: rhythm.id })}
+                    className="size-4 accent-[var(--color-accent)]"
+                  />
+                  {rhythm.label}
+                </label>
+              ))}
+            </div>
+
+            {repeat.rhythm === "weekly" && (
+              <div role="group" aria-label="Days of the week" className="flex flex-wrap gap-1.5">
+                {WEEKDAYS.map((weekday) => {
+                  const on = repeat.weekdays.includes(weekday.day)
+                  return (
+                    <button
+                      key={weekday.day}
+                      type="button"
+                      aria-pressed={on}
+                      aria-label={weekday.long}
+                      onClick={() => toggleDay(weekday.day)}
+                      className={`min-w-11 rounded-md border px-2.5 py-1.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                        on ? "border-ink bg-ink text-board" : "border-line text-ink hover:bg-line/50"
+                      }`}
+                    >
+                      {weekday.short}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            <p className="text-xs text-ink-soft">
+              When this task moves to Done, one next copy appears in the column it left. The finished card stays in Done.
+            </p>
+          </div>
+        )}
       </div>
     </fieldset>
   )

@@ -15,6 +15,7 @@ import {
 } from "@/lib/kanban-data"
 import { useGoals } from "@/components/goals-provider"
 import { newId } from "@/lib/workspace"
+import { finishedCard, nextCopy, todayIso } from "@/lib/repeat"
 import { useMission } from "@/components/mission-provider"
 import { belowIds, ringCardsOf } from "@/lib/ring-focus"
 import { filterGoalIds, highlightColor, passesFilter, ringHashtags } from "@/lib/kanban-filter"
@@ -188,17 +189,22 @@ export function KanbanScreen() {
       setStatus(`${column.name} is full at ${column.limit} cards. Finish or move one first.`)
       return
     }
+    const nextOne = column.kind === "done" && !isInDone(card) ? nextCopy(card, todayIso(), newId("card")) : null
     setCards((previous) => {
       const rest = previous.filter((item) => item.id !== cardId)
       const index = beforeId ? rest.findIndex((item) => item.id === beforeId) : -1
       const at = index < 0 ? rest.length : index
-      return [...rest.slice(0, at), { ...card, boardId: targetBoard, columnId }, ...rest.slice(at)]
+      const moved = { ...(nextOne ? finishedCard(card) : card), boardId: targetBoard, columnId }
+      return [...rest.slice(0, at), moved, ...rest.slice(at), ...(nextOne ? [nextOne] : [])]
     })
     const targetName = KANBAN_BOARDS.find((item) => item.id === targetBoard)?.name
+    const copyNote = nextOne
+      ? ` The next copy is in ${columnsByBoard[card.boardId].find((item) => item.id === card.columnId)?.name ?? "its column"}.`
+      : ""
     setStatus(
-      targetBoard === card.boardId
+      (targetBoard === card.boardId
         ? `Moved “${card.title}” to ${column.name}.`
-        : `Moved “${card.title}” to ${column.name} on the ${targetName} board.`,
+        : `Moved “${card.title}” to ${column.name} on the ${targetName} board.`) + copyNote,
     )
   }
 

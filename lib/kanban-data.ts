@@ -18,6 +18,35 @@ export type CardStep = {
   done: boolean
 }
 
+/** "once" never copies. "times" copies a set number more times. "forever" copies until the person turns it off. */
+export type RepeatMode = "once" | "times" | "forever"
+
+export type RepeatRhythm = "daily" | "weekly" | "monthly"
+
+export type CardRepeat = {
+  mode: RepeatMode
+  /** Copies still to come when the mode is "times". */
+  times: number
+  rhythm: RepeatRhythm
+  /** Days of the week for the weekly rhythm. 0 is Sunday, 6 is Saturday. */
+  weekdays: number[]
+  /** The day of the month the monthly rhythm keeps across copies. 0 means take it from the card's date. */
+  monthDay: number
+}
+
+export const ONCE: CardRepeat = { mode: "once", times: 3, rhythm: "daily", weekdays: [], monthDay: 0 }
+
+export function sameRepeat(a: CardRepeat, b: CardRepeat) {
+  return (
+    a.mode === b.mode &&
+    a.times === b.times &&
+    a.rhythm === b.rhythm &&
+    a.monthDay === b.monthDay &&
+    a.weekdays.length === b.weekdays.length &&
+    a.weekdays.every((day, index) => day === b.weekdays[index])
+  )
+}
+
 export type KanbanCard = {
   id: string
   boardId: KanbanBoardId
@@ -43,6 +72,10 @@ export type KanbanCard = {
   inResults: boolean
   /** The checklist in the task window. Missing in files saved before steps existed. */
   steps?: CardStep[]
+  /** How the task repeats. Missing means once. */
+  repeat?: CardRepeat
+  /** Which copy in a repeating run this card is. Missing for the first, and for tasks that never repeat. */
+  occurrence?: number
 }
 
 /** A card has a path to the mission when it holds the goal above or the second line to it. Saved state only, never a draft. */
@@ -50,9 +83,10 @@ export function hasMissionPath(card: KanbanCard) {
   return card.missionLink || card.secondLine
 }
 
-/** The same task kept on several boards is one task. Its title says so. */
+/** The same task kept on several boards is one task. Its title says so. Each copy of a repeating task is a task of its own. */
 export function resultKey(card: KanbanCard) {
-  return card.title.trim().toLowerCase()
+  const title = card.title.trim().toLowerCase()
+  return card.occurrence ? `${title}#${card.occurrence}` : title
 }
 
 export type ResultEntry = {
@@ -90,6 +124,7 @@ export type CardDraft = {
   missionLink: boolean
   secondLine: boolean
   steps: CardStep[]
+  repeat: CardRepeat
 }
 
 export function draftOf(card: KanbanCard): CardDraft {
@@ -102,6 +137,7 @@ export function draftOf(card: KanbanCard): CardDraft {
     missionLink: card.missionLink,
     secondLine: card.secondLine,
     steps: card.steps ?? [],
+    repeat: card.repeat ?? ONCE,
   }
 }
 
@@ -114,6 +150,7 @@ export function sameDraft(a: CardDraft, b: CardDraft) {
     a.endTime === b.endTime &&
     a.missionLink === b.missionLink &&
     a.secondLine === b.secondLine &&
+    sameRepeat(a.repeat, b.repeat) &&
     a.steps.length === b.steps.length &&
     a.steps.every((step, index) => {
       const other = b.steps[index]
@@ -129,6 +166,13 @@ export function draftIssue(draft: CardDraft): string | null {
     const start = `${draft.since}T${draft.startTime || "00:00"}`
     const end = `${draft.due}T${draft.endTime || "23:59"}`
     if (end < start) return "The end comes before the start."
+  }
+  const { repeat } = draft
+  if (repeat.mode === "times" && !(Number.isInteger(repeat.times) && repeat.times >= 1 && repeat.times <= 365)) {
+    return "Repeat between 1 and 365 times."
+  }
+  if (repeat.mode !== "once" && repeat.rhythm === "weekly" && repeat.weekdays.length === 0) {
+    return "Choose at least one day of the week."
   }
   return null
 }

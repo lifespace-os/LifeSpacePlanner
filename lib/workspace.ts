@@ -231,7 +231,21 @@ function isCard(value: unknown): boolean {
     typeof value.columnId === "string" &&
     BOARD_IDS.some((id) => id === value.boardId) &&
     Array.isArray(value.goalIds) &&
-    (value.steps === undefined || (Array.isArray(value.steps) && value.steps.every(isStep)))
+    (value.steps === undefined || (Array.isArray(value.steps) && value.steps.every(isStep))) &&
+    (value.repeat === undefined || isRepeat(value.repeat)) &&
+    (value.occurrence === undefined || typeof value.occurrence === "number")
+  )
+}
+
+function isRepeat(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (value.mode === "once" || value.mode === "times" || value.mode === "forever") &&
+    typeof value.times === "number" &&
+    (value.rhythm === "daily" || value.rhythm === "weekly" || value.rhythm === "monthly") &&
+    Array.isArray(value.weekdays) &&
+    value.weekdays.every((day) => typeof day === "number") &&
+    typeof value.monthDay === "number"
   )
 }
 
