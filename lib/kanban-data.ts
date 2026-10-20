@@ -11,6 +11,13 @@ export type KanbanColumn = {
   limit?: number
 }
 
+/** One line in a task's checklist. It belongs to its task, is not a card, and sits in no column. */
+export type CardStep = {
+  id: string
+  text: string
+  done: boolean
+}
+
 export type KanbanCard = {
   id: string
   boardId: KanbanBoardId
@@ -34,6 +41,8 @@ export type KanbanCard = {
   goalIds: string[]
   /** The card was moved from Done to Results. It shows there once and on no board, until it is returned to Done. */
   inResults: boolean
+  /** The checklist in the task window. Missing in files saved before steps existed. */
+  steps?: CardStep[]
 }
 
 /** A card has a path to the mission when it holds the goal above or the second line to it. Saved state only, never a draft. */
@@ -80,6 +89,7 @@ export type CardDraft = {
   endTime: string
   missionLink: boolean
   secondLine: boolean
+  steps: CardStep[]
 }
 
 export function draftOf(card: KanbanCard): CardDraft {
@@ -91,6 +101,7 @@ export function draftOf(card: KanbanCard): CardDraft {
     endTime: card.endTime,
     missionLink: card.missionLink,
     secondLine: card.secondLine,
+    steps: card.steps ?? [],
   }
 }
 
@@ -102,7 +113,12 @@ export function sameDraft(a: CardDraft, b: CardDraft) {
     a.due === b.due &&
     a.endTime === b.endTime &&
     a.missionLink === b.missionLink &&
-    a.secondLine === b.secondLine
+    a.secondLine === b.secondLine &&
+    a.steps.length === b.steps.length &&
+    a.steps.every((step, index) => {
+      const other = b.steps[index]
+      return other !== undefined && step.id === other.id && step.text === other.text && step.done === other.done
+    })
   )
 }
 

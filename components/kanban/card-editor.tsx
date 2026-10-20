@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useId, useRef } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { X } from "lucide-react"
-import { draftIssue, type CardDraft, type KanbanCard } from "@/lib/kanban-data"
+import { draftIssue, type CardDraft, type CardStep, type KanbanCard } from "@/lib/kanban-data"
 
 type Props = {
   card: KanbanCard
@@ -107,6 +107,8 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
                 className={`${FIELD} resize-none leading-snug`}
               />
             </div>
+
+            <StepList steps={draft.steps} onChange={(steps) => onChange({ steps })} />
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
               <fieldset className="min-w-0">
@@ -226,6 +228,96 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
         </form>
       </div>
     </div>
+  )
+}
+
+function StepList({ steps, onChange }: { steps: CardStep[]; onChange: (steps: CardStep[]) => void }) {
+  const [text, setText] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
+  const inputId = useId()
+  const finished = steps.filter((step) => step.done).length
+
+  const addStep = () => {
+    const clean = text.trim()
+    if (!clean) return
+    onChange([...steps, { id: crypto.randomUUID(), text: clean, done: false }])
+    setText("")
+    inputRef.current?.focus()
+  }
+
+  const toggleStep = (stepId: string) =>
+    onChange(steps.map((step) => (step.id === stepId ? { ...step, done: !step.done } : step)))
+
+  const removeStep = (stepId: string) => {
+    onChange(steps.filter((step) => step.id !== stepId))
+    inputRef.current?.focus()
+  }
+
+  return (
+    <fieldset>
+      <legend className="mb-1.5 flex w-full items-baseline justify-between gap-3 text-sm font-medium text-ink">
+        <span>Steps</span>
+        {steps.length > 0 && (
+          <span className="text-xs font-normal text-ink-soft">
+            {finished} of {steps.length} checked
+          </span>
+        )}
+      </legend>
+      {steps.length > 0 && (
+        <ul className="mb-2 flex flex-col gap-1">
+          {steps.map((step) => (
+            <li key={step.id} className="flex items-start gap-2.5 rounded-md border border-line px-2.5 py-1.5">
+              <input
+                type="checkbox"
+                checked={step.done}
+                onChange={() => toggleStep(step.id)}
+                aria-label={step.text}
+                className="mt-0.5 size-4 shrink-0 accent-[var(--color-accent)]"
+              />
+              <span className={`min-w-0 flex-1 break-words text-sm leading-snug ${step.done ? "text-ink-soft line-through" : "text-ink"}`}>
+                {step.text}
+              </span>
+              <button
+                type="button"
+                aria-label={`Remove step: ${step.text}`}
+                onClick={() => removeStep(step.id)}
+                className="-mr-1 flex size-6 shrink-0 items-center justify-center rounded text-ink-soft hover:bg-line/50 hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                <X aria-hidden="true" className="size-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex items-center gap-2">
+        <label htmlFor={inputId} className="sr-only">
+          New step
+        </label>
+        <input
+          id={inputId}
+          ref={inputRef}
+          type="text"
+          value={text}
+          maxLength={200}
+          placeholder="Add a step"
+          onChange={(event) => setText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || event.nativeEvent.isComposing || event.keyCode === 229) return
+            event.preventDefault()
+            addStep()
+          }}
+          className={FIELD}
+        />
+        <button
+          type="button"
+          onClick={addStep}
+          disabled={!text.trim()}
+          className="shrink-0 rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:bg-line/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Add
+        </button>
+      </div>
+    </fieldset>
   )
 }
 

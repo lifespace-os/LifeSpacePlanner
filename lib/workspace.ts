@@ -230,8 +230,13 @@ function isCard(value: unknown): boolean {
     typeof value.title === "string" &&
     typeof value.columnId === "string" &&
     BOARD_IDS.some((id) => id === value.boardId) &&
-    Array.isArray(value.goalIds)
+    Array.isArray(value.goalIds) &&
+    (value.steps === undefined || (Array.isArray(value.steps) && value.steps.every(isStep)))
   )
+}
+
+function isStep(value: unknown): boolean {
+  return isRecord(value) && typeof value.id === "string" && typeof value.text === "string" && typeof value.done === "boolean"
 }
 
 function isColumn(value: unknown): boolean {
