@@ -109,7 +109,7 @@ function TaskRow({ row, onOpen }: { row: TodoRow; onOpen: (cardId: string) => vo
   const empty = <span className="text-ink-soft">None</span>
 
   return (
-    <li data-task={task.id} className={clsx(columns, "flex flex-col gap-1 border-b border-line/60 px-4 py-3 last:border-b-0")}>
+    <li data-task={task.id} className={clsx(columns, "flex flex-col gap-1 border-b border-line/60 px-4 py-3 transition-colors last:border-b-0 hover:bg-line/40")}>
       <div className="min-w-0">
         <div className="flex items-start gap-2">
           {task.done && <Check aria-label="Done" className="mt-0.5 size-4 shrink-0 text-accent" />}
