@@ -4,6 +4,7 @@ import { Fragment, createContext, useCallback, useContext, useEffect, useRef, us
 import { WORKSPACE_URL, demoWorkspace, parseWorkspace, type WorkspaceDoc, type WorkspaceSliceKey } from "@/lib/workspace"
 
 const SAVE_DELAY = 500
+const LOAD_TIMEOUT_MS = 20_000
 
 export type SaveStatus = "saving" | "saved" | "error" | "conflict" | null
 
@@ -31,6 +32,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const flushRef = useRef<(keepalive: boolean) => void>(() => {})
   const inflight = useRef<Promise<void>>(Promise.resolve())
   const [epoch, setEpoch] = useState(0)
+  const [loadAttempt, setLoadAttempt] = useState(0)
 
   const flushNow = useCallback(async (keepalive: boolean) => {
     if (blocked.current || !pending.current) return
@@ -128,8 +130,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   )
 
   useEffect(() => {
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), LOAD_TIMEOUT_MS)
     let cancel = false
-    fetch(WORKSPACE_URL, { cache: "no-store" })
+    fetch(WORKSPACE_URL, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         const body = (await response.json()) as { doc?: unknown; error?: unknown }
         if (cancel) return
@@ -165,8 +169,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       })
     return () => {
       cancel = true
+      window.clearTimeout(timeout)
+      controller.abort()
     }
-  }, [])
+  }, [loadAttempt])
 
   useEffect(() => {
     if (phase !== "ready") return
@@ -187,7 +193,22 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     return <p className="flex min-h-dvh items-center justify-center text-sm text-ink-soft">Loading your cards…</p>
   }
   if (phase === "invalid" || !doc) {
-    return <p className="flex min-h-dvh items-center justify-center px-6 text-center text-sm text-ink-soft">{error}</p>
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-sm text-ink-soft">{error}</p>
+        <button
+          type="button"
+          onClick={() => {
+            setError("")
+            setPhase("loading")
+            setLoadAttempt((attempt) => attempt + 1)
+          }}
+          className="rounded-md bg-ink px-4 py-2 text-sm text-board hover:opacity-90"
+        >
+          Retry
+        </button>
+      </div>
+    )
   }
 
   return (

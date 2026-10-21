@@ -23,7 +23,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geist.variable} ${newsreader.variable}`}>
-      <body className="min-h-dvh font-sans antialiased">
+      <body className="min-h-dvh font-sans antialiased" suppressHydrationWarning>
         <WorkspaceProvider>
           <MissionProvider>
             <GoalsProvider>

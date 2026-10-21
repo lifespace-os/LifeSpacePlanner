@@ -18,6 +18,8 @@ data/
 # deps & build
 node_modules/
 .next/
+build/
+dist/
 next-env.d.ts
 *.tsbuildinfo
 .env*.local

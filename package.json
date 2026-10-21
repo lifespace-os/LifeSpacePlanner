@@ -2,10 +2,25 @@
   "name": "lifespace-planner",
   "version": "0.1.0",
   "private": true,
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
+    "build": "next build && node scripts/prepare-standalone.mjs",
+    "start": "next start",
+    "app": "electron .",
+    "pack": "npm run build && node scripts/stage-app.mjs && electron-builder --mac --dir"
+  },
+  "build": {
+    "appId": "os.lifespace.planner",
+    "productName": "LifeSpace Planner",
+    "directories": { "output": "dist" },
+    "files": ["electron/**/*", "package.json", "docs/logo.png"],
+    "extraResources": [
+      { "from": "build/standalone", "to": "standalone" },
+      { "from": "build/node", "to": "node" },
+      { "from": "build/seed", "to": "seed" }
+    ],
+    "mac": { "identity": null, "target": ["dir"], "icon": "docs/logo.png" }
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -20,6 +35,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
   }
 }

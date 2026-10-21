@@ -1,8 +1,19 @@
 import { mkdir, readFile, rename, writeFile } from "fs/promises"
+import os from "os"
 import path from "path"
 import { parseWorkspace, type WorkspaceDoc } from "@/lib/workspace"
 
-const filePath = path.join(process.cwd(), "data", "workspace.json")
+const DATA_DIR_NAME = "LifeSpace Planner"
+
+function workspaceFile() {
+  const dir =
+    process.env.LIFESPACE_DATA_DIR || path.join(os.homedir(), "Library", "Application Support", DATA_DIR_NAME)
+  return path.join(dir, "workspace.json")
+}
+
+function seedFile() {
+  return process.env.LIFESPACE_SEED || path.join(process.cwd(), "data", "workspace.json")
+}
 
 type Stored = { missing: true } | { missing: false; doc: WorkspaceDoc } | { missing: false; error: string }
 
@@ -39,6 +50,7 @@ export async function PUT(request: Request) {
   }
 
   const next: WorkspaceDoc = { ...parsed.doc, revision: body.baseRevision + 1 }
+  const filePath = workspaceFile()
   await mkdir(path.dirname(filePath), { recursive: true })
   const temporary = `${filePath}.tmp`
   await writeFile(temporary, JSON.stringify(next, null, 2))
@@ -47,21 +59,57 @@ export async function PUT(request: Request) {
 }
 
 async function readStored(): Promise<Stored> {
+  const filePath = workspaceFile()
   try {
-    const text = await readFile(filePath, "utf8")
-    let json: unknown
-    try {
-      json = JSON.parse(text)
-    } catch {
-      return { missing: false, error: "The workspace file is not valid JSON." }
-    }
-    const parsed = parseWorkspace(json)
-    if (!parsed.ok) return { missing: false, error: parsed.reason }
-    return { missing: false, doc: parsed.doc }
+    return await readWorkspaceFile(filePath)
+  } catch (error) {
+    if (!isEnoent(error)) return { missing: false, error: "Could not read the workspace file." }
+  }
+  const copied = await copySeed(filePath)
+  if (!copied) return { missing: true }
+  try {
+    return await readWorkspaceFile(filePath)
   } catch (error) {
     if (isEnoent(error)) return { missing: true }
     return { missing: false, error: "Could not read the workspace file." }
   }
+}
+
+async function readWorkspaceFile(filePath: string): Promise<Stored> {
+  const text = await readFile(filePath, "utf8")
+  let json: unknown
+  try {
+    json = JSON.parse(text)
+  } catch {
+    return { missing: false, error: "The workspace file is not valid JSON." }
+  }
+  const parsed = parseWorkspace(json)
+  if (!parsed.ok) return { missing: false, error: parsed.reason }
+  return { missing: false, doc: parsed.doc }
+}
+
+/** Copies a valid seed once. A broken seed is left unused, and an existing file is never replaced. */
+async function copySeed(filePath: string) {
+  let text: string
+  try {
+    text = await readFile(/*turbopackIgnore: true*/ seedFile(), "utf8")
+  } catch {
+    return false
+  }
+  let json: unknown
+  try {
+    json = JSON.parse(text)
+  } catch {
+    return false
+  }
+  if (!parseWorkspace(json).ok) return false
+  await mkdir(path.dirname(filePath), { recursive: true })
+  try {
+    await writeFile(filePath, text, { flag: "wx" })
+  } catch (error) {
+    if (!isEexist(error)) return false
+  }
+  return true
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,5 +117,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isEnoent(error: unknown) {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT"
+  return isCode(error, "ENOENT")
+}
+
+function isEexist(error: unknown) {
+  return isCode(error, "EEXIST")
+}
+
+function isCode(error: unknown, code: string) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === code
 }

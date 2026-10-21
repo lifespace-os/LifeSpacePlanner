@@ -34,7 +34,7 @@ export function SettingsScreen() {
         <BackupSection />
         <LifeSection />
         <p className="border-t border-line pt-6 text-sm text-ink-soft">
-          Your cards live in a file on this machine, in data/workspace.json. There is no account.
+          Your cards live in a file on this machine, at ~/Library/Application Support/LifeSpace Planner/workspace.json. There is no account.
         </p>
       </div>
     </main>
