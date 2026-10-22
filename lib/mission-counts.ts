@@ -22,13 +22,13 @@ export type MissionCounts = {
   total: number
 }
 
-type Counted = { tags: Set<string>; choice: "keep" | "release" | null }
+export type Counted = { tags: Set<string>; choice: "keep" | "release" | null }
 
 /**
  * Every whiteboard card and every task. A task made from a card replaces that card, so nothing counts twice.
  * Copies of one task kept on several boards count once, the way the Kanban counts them.
  */
-function allCards(notes: Note[], cards: KanbanCard[]): Counted[] {
+export function allCards(notes: Note[], cards: KanbanCard[]): Counted[] {
   const counted: Counted[] = notes.map((note) => ({
     tags: new Set((note.hashtags ?? []).map((tag) => tag.toLowerCase())),
     choice: note.mission,

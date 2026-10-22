@@ -6,6 +6,7 @@ import { GoalList } from "@/components/dashboard/goal-list"
 import { MapTile } from "@/components/dashboard/map-tile"
 import { MissionTile } from "@/components/dashboard/mission-tile"
 import { WeeklyReview } from "@/components/dashboard/weekly-review"
+import { WheelsTile } from "@/components/dashboard/wheels-tile"
 import { useGoals } from "@/components/goals-provider"
 import { useKanban } from "@/components/kanban/kanban-provider"
 import { useWorkspace } from "@/components/workspace-provider"
@@ -13,6 +14,7 @@ import { finishedCounts, flowOf, goalTaskCounts, taskStates } from "@/lib/dashbo
 import { ladderSections } from "@/lib/gantt"
 import { missionCounts } from "@/lib/mission-counts"
 import { todayIso } from "@/lib/repeat"
+import { wheelsData } from "@/lib/wheels"
 
 export function DashboardScreen() {
   const { cards, columnsByBoard } = useKanban()
@@ -30,6 +32,10 @@ export function DashboardScreen() {
   const totals = useMemo(() => goalTaskCounts(tasks, notes, rings), [tasks, notes, rings])
   const sections = useMemo(() => ladderSections(notes, new Map()), [notes])
   const mission = useMemo(() => missionCounts(notes, cards), [notes, cards])
+  const wheels = useMemo(
+    () => wheelsData(doc.board.sectorLists, doc.board.sphereSetId, notes, cards),
+    [doc.board.sectorLists, doc.board.sphereSetId, notes, cards],
+  )
 
   const tiles: { id: string; name: string; value: number | undefined }[] = [
     { id: "today", name: "Today", value: counts?.today },
@@ -92,6 +98,16 @@ export function DashboardScreen() {
           The rings and the Graph as you arranged them on the Whiteboard, without card text. Ring names stay.
         </p>
         <MapTile notes={notes} rings={rings} spots={doc.board.graphSpots} boxes={doc.board.graphBoxes} />
+      </section>
+
+      <section aria-labelledby="wheels-heading" className="flex flex-col gap-3">
+        <h2 id="wheels-heading" className="font-serif text-xl font-medium">
+          Wheels
+        </h2>
+        <p className="text-sm text-ink-soft text-pretty">
+          The life spheres and Happiness components from the Labels mode, with the same names and colors.
+        </p>
+        <WheelsTile data={wheels} />
       </section>
 
       <section aria-labelledby="goals-heading" className="flex flex-col gap-3">
