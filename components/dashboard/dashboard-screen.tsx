@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { FlowDiagram } from "@/components/dashboard/flow-diagram"
 import { GoalList } from "@/components/dashboard/goal-list"
+import { MissionTile } from "@/components/dashboard/mission-tile"
 import { WeeklyReview } from "@/components/dashboard/weekly-review"
 import { useGoals } from "@/components/goals-provider"
 import { useKanban } from "@/components/kanban/kanban-provider"
 import { finishedCounts, flowOf, goalTaskCounts, taskStates } from "@/lib/dashboard"
 import { ladderSections } from "@/lib/gantt"
+import { missionCounts } from "@/lib/mission-counts"
 import { todayIso } from "@/lib/repeat"
 
 export function DashboardScreen() {
@@ -24,6 +26,7 @@ export function DashboardScreen() {
   const flow = useMemo(() => flowOf(notes, rings, tasks), [notes, rings, tasks])
   const totals = useMemo(() => goalTaskCounts(tasks, notes, rings), [tasks, notes, rings])
   const sections = useMemo(() => ladderSections(notes, new Map()), [notes])
+  const mission = useMemo(() => missionCounts(notes, cards), [notes, cards])
 
   const tiles: { id: string; name: string; value: number | undefined }[] = [
     { id: "today", name: "Today", value: counts?.today },
@@ -66,6 +69,16 @@ export function DashboardScreen() {
         <div className="rounded-xl border border-line bg-card p-4">
           <FlowDiagram flow={flow} />
         </div>
+      </section>
+
+      <section aria-labelledby="mission-heading" className="flex flex-col gap-3">
+        <h2 id="mission-heading" className="font-serif text-xl font-medium">
+          Mission
+        </h2>
+        <p className="text-sm text-ink-soft text-pretty">
+          How many cards carry the hashtag of each Ikigai circle, each overlap, and the center. Keep and Release count every card once.
+        </p>
+        <MissionTile counts={mission} />
       </section>
 
       <section aria-labelledby="goals-heading" className="flex flex-col gap-3">
