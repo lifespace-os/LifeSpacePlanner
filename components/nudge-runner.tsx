@@ -2,13 +2,17 @@
 
 import { useEffect, useRef } from "react"
 import { useWorkspace } from "@/components/workspace-provider"
-import { DEFAULT_NUDGE, NUDGE_CHECK_EVENT, NUDGE_TITLE, dueKinds, localDate, markFired } from "@/lib/nudge"
+import { useLanguage } from "@/components/language-provider"
+import { DEFAULT_NUDGE, NUDGE_CHECK_EVENT, NUDGE_TITLE_KEY, dueKinds, localDate, markFired } from "@/lib/nudge"
 
 const CHECK_EVERY_MS = 30_000
 
 /** Shows the daily system notifications. It draws nothing. */
 export function NudgeRunner() {
   const { doc, report } = useWorkspace()
+  const { t } = useLanguage()
+  const tRef = useRef(t)
+  tRef.current = t
   const nudgeRef = useRef(doc.nudge ?? DEFAULT_NUDGE)
   nudgeRef.current = doc.nudge ?? DEFAULT_NUDGE
   const shownHere = useRef(new Set<string>())
@@ -23,7 +27,7 @@ export function NudgeRunner() {
         const key = `${kind}-${localDate(now)}`
         if (shownHere.current.has(key)) continue
         try {
-          const shown = new Notification(NUDGE_TITLE[kind], { tag: `lifespace-${key}` })
+          const shown = new Notification(tRef.current(NUDGE_TITLE_KEY[kind]), { tag: `lifespace-${key}` })
           shown.onclick = () => window.focus()
         } catch {
           continue

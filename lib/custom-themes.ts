@@ -8,6 +8,7 @@ import {
   type ThemeColors,
   type ThemeKey,
 } from "@/lib/themes"
+import type { MessageKey, MessageVars } from "@/lib/i18n"
 
 /** A theme the person loaded from a file. Only a name, a mode and the ten interface colors are kept. */
 export type CustomTheme = {
@@ -86,23 +87,22 @@ function idForName(name: string): CustomTheme["id"] {
 
 const INK_SURFACES = ["board", "card", "desk"] as const
 
-export type ThemeFileResult = { ok: true; theme: CustomTheme } | { ok: false; reason: string }
+export type ThemeFileResult =
+  | { ok: true; theme: CustomTheme }
+  | { ok: false; reason: MessageKey; vars?: MessageVars }
 
 /** Reads the parsed contents of a theme file. Keys other than the name and the ten colors are ignored. */
 export function parseThemeFile(value: unknown): ThemeFileResult {
-  if (!isRecord(value)) return { ok: false, reason: "That file is not a theme, so nothing was loaded." }
+  if (!isRecord(value)) return { ok: false, reason: "settings.theme.err.notTheme" }
   const name = cleanName(value.name)
-  if (!name) return { ok: false, reason: "The theme file has no name, so nothing was loaded." }
-  if (!isRecord(value.colors)) return { ok: false, reason: "The theme file has no colors, so nothing was loaded." }
+  if (!name) return { ok: false, reason: "settings.theme.err.noName" }
+  if (!isRecord(value.colors)) return { ok: false, reason: "settings.theme.err.noColors" }
 
   const colors = {} as ThemeColors
   for (const colorName of COLOR_NAMES) {
     const hex = normalizeHex(value.colors[colorName])
     if (!hex) {
-      return {
-        ok: false,
-        reason: `The color "${colorName}" is missing or is not a hex color like #2f5d50, so the theme was not loaded.`,
-      }
+      return { ok: false, reason: "settings.theme.err.badColor", vars: { color: colorName } }
     }
     colors[colorName] = hex
   }
@@ -112,7 +112,8 @@ export function parseThemeFile(value: unknown): ThemeFileResult {
     if (ratio < MIN_INK_CONTRAST) {
       return {
         ok: false,
-        reason: `The ink is too faint to read on the ${surface} (${ratio.toFixed(1)} to 1, it needs at least ${MIN_INK_CONTRAST} to 1), so the theme was not loaded.`,
+        reason: "settings.theme.err.faintInk",
+        vars: { surface, ratio: ratio.toFixed(1), min: MIN_INK_CONTRAST },
       }
     }
   }
@@ -123,12 +124,12 @@ export function parseThemeFile(value: unknown): ThemeFileResult {
 
 /** Reads the text of a theme file. */
 export function parseThemeText(text: string): ThemeFileResult {
-  if (text.length > FILE_MAX_CHARS) return { ok: false, reason: "That file is too large to be a theme, so nothing was loaded." }
+  if (text.length > FILE_MAX_CHARS) return { ok: false, reason: "settings.theme.tooLarge" }
   let json: unknown
   try {
     json = JSON.parse(text)
   } catch {
-    return { ok: false, reason: "That file is not valid JSON, so nothing was loaded." }
+    return { ok: false, reason: "settings.theme.err.notJson" }
   }
   return parseThemeFile(json)
 }

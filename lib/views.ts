@@ -1,8 +1,8 @@
 export const VIEWS = [
-  { href: "/views/calendar", label: "Calendar" },
-  { href: "/views/gantt", label: "Gantt" },
-  { href: "/views/life-in-weeks", label: "Life in weeks" },
-  { href: "/views/todo-list", label: "Todo list" },
+  { href: "/views/calendar", labelKey: "view.calendar" },
+  { href: "/views/gantt", labelKey: "view.gantt" },
+  { href: "/views/life-in-weeks", labelKey: "view.life-in-weeks" },
+  { href: "/views/todo-list", labelKey: "view.todo-list" },
 ] as const
 
 export type ViewHref = (typeof VIEWS)[number]["href"]

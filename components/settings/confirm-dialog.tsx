@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useId, useRef } from "react"
+import { useT } from "@/components/language-provider"
 
 type ConfirmDialogProps = {
   open: boolean
@@ -13,6 +14,7 @@ type ConfirmDialogProps = {
 }
 
 export function ConfirmDialog({ open, title, children, confirmLabel, busy = false, onConfirm, onCancel }: ConfirmDialogProps) {
+  const t = useT()
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
 
@@ -45,7 +47,7 @@ export function ConfirmDialog({ open, title, children, confirmLabel, busy = fals
           onClick={onCancel}
           className="rounded-md border border-line bg-card px-4 py-2 text-sm text-ink transition-colors hover:bg-line/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
         >
-          Cancel
+          {t("common.cancel")}
         </button>
         <button
           type="button"
@@ -53,7 +55,7 @@ export function ConfirmDialog({ open, title, children, confirmLabel, busy = fals
           onClick={onConfirm}
           className="rounded-md bg-release px-4 py-2 text-sm text-board transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:opacity-50"
         >
-          {busy ? "Working…" : confirmLabel}
+          {busy ? t("common.working") : confirmLabel}
         </button>
       </div>
     </dialog>

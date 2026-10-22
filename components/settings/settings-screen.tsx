@@ -3,12 +3,13 @@
 import { Check } from "lucide-react"
 import { useEffect, useId, useRef, useState } from "react"
 import { ToggleSwitch } from "@/components/kanban/toggle-switch"
+import { useLanguage, useT } from "@/components/language-provider"
 import { ConfirmDialog } from "@/components/settings/confirm-dialog"
 import { useWorkspace } from "@/components/workspace-provider"
 import {
   DEFAULT_NUDGE,
   NUDGE_CHECK_EVENT,
-  NUDGE_TITLE,
+  NUDGE_TITLE_KEY,
   isTime,
   withTime,
   type NudgeKind,
@@ -23,6 +24,7 @@ import {
   withCustomTheme,
   type CustomTheme,
 } from "@/lib/custom-themes"
+import { LANGUAGES, type MessageKey, type Translate } from "@/lib/i18n"
 import { DEFAULT_THEME_SCHEDULE, isScheduleTime, type ThemeSchedule } from "@/lib/theme-schedule"
 import { DEFAULT_THEME, THEMES, type Theme, type ThemeKey } from "@/lib/themes"
 import {
@@ -46,18 +48,24 @@ const secondaryButton = `${buttonBase} border border-line bg-card text-ink hover
 const inputClass =
   "w-full rounded-md border border-line bg-card px-3 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-[invalid=true]:border-release"
 
+function themeLabel(t: Translate, theme: Pick<Theme, "id" | "name">) {
+  return THEMES.some((builtIn) => builtIn.id === theme.id) ? t(`theme.${theme.id}` as MessageKey) : theme.name
+}
+
 export function SettingsScreen() {
+  const t = useT()
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-10">
-      <h1 className="font-serif text-4xl font-medium tracking-tight text-balance">Settings</h1>
+      <h1 className="font-serif text-4xl font-medium tracking-tight text-balance">{t("settings.title")}</h1>
       <div className="mt-8 flex flex-col gap-10">
+        <LanguageSection />
         <ThemeSection />
         <SampleStorySection />
         <BackupSection />
         <LifeSection />
         <NudgeSection />
         <p className="border-t border-line pt-6 text-sm text-ink-soft">
-          Your cards live in a file on this machine, at ~/Library/Application Support/LifeSpace Planner/workspace.json. There is no account.
+          {t("settings.footer")}
         </p>
       </div>
     </main>
@@ -75,12 +83,66 @@ function SectionShell({ id, title, children }: { id: string; title: string; chil
   )
 }
 
-const THEME_GROUPS: { mode: Theme["mode"]; title: string }[] = [
-  { mode: "light", title: "Light" },
-  { mode: "dark", title: "Dark" },
+const THEME_GROUPS: { mode: Theme["mode"]; titleKey: MessageKey }[] = [
+  { mode: "light", titleKey: "settings.theme.light" },
+  { mode: "dark", titleKey: "settings.theme.dark" },
 ]
 
+function LanguageSection() {
+  const headingId = useId()
+  const { lang, t } = useLanguage()
+  const { report } = useWorkspace()
+  const optionRefs = useRef(new Map<string, HTMLButtonElement>())
+
+  function choose(id: (typeof LANGUAGES)[number]["id"]) {
+    report("language", id)
+  }
+
+  function onKeyDown(event: React.KeyboardEvent, index: number) {
+    const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0
+    if (!step) return
+    event.preventDefault()
+    const next = LANGUAGES[(index + step + LANGUAGES.length) % LANGUAGES.length]
+    choose(next.id)
+    optionRefs.current.get(next.id)?.focus()
+  }
+
+  return (
+    <SectionShell id={headingId} title={t("settings.language.title")}>
+      <p className="text-sm text-ink-soft">{t("settings.language.help")}</p>
+      <div role="radiogroup" aria-label={t("settings.language.group")} className="flex flex-wrap gap-2">
+        {LANGUAGES.map((language, index) => {
+          const selected = language.id === lang
+          return (
+            <button
+              key={language.id}
+              ref={(node) => {
+                if (node) optionRefs.current.set(language.id, node)
+                else optionRefs.current.delete(language.id)
+              }}
+              type="button"
+              role="radio"
+              lang={language.id}
+              aria-checked={selected}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => choose(language.id)}
+              onKeyDown={(event) => onKeyDown(event, index)}
+              className={`flex items-center gap-2 rounded-md border bg-card px-4 py-2 text-sm text-ink transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                selected ? "border-accent ring-2 ring-accent" : "border-line hover:border-ink-soft"
+              }`}
+            >
+              {language.name}
+              {selected && <Check aria-hidden="true" className="size-4 shrink-0 text-accent" />}
+            </button>
+          )
+        })}
+      </div>
+    </SectionShell>
+  )
+}
+
 function ThemeSection() {
+  const t = useT()
   const headingId = useId()
   const { doc, report } = useWorkspace()
   const customs = doc.customThemes ?? []
@@ -116,25 +178,25 @@ function ThemeSection() {
   }
 
   return (
-    <SectionShell id={headingId} title="Theme">
+    <SectionShell id={headingId} title={t("settings.theme.title")}>
       <p className="text-sm text-ink-soft">
-        Changes the colors of the app. Whiteboard card colors stay the same, and the Dashboard export is always a light
-        sheet.
+        {t("settings.theme.help")}
       </p>
-      <ToggleSwitch checked={schedule.enabled} onChange={follow} label="Follow the time of day" />
+      <ToggleSwitch checked={schedule.enabled} onChange={follow} label={t("settings.theme.follow")} />
       {schedule.enabled ? (
-        <ScheduleFields schedule={schedule} nowName={shown.name} customs={customs} />
+        <ScheduleFields schedule={schedule} nowName={themeLabel(t, shown)} customs={customs} />
       ) : (
       <div role="radiogroup" aria-labelledby={headingId} className="flex flex-col gap-4">
         {THEME_GROUPS.map((group) => (
           <div key={group.mode} className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium text-ink-soft">{group.title}</h3>
+            <h3 className="text-sm font-medium text-ink-soft">{t(group.titleKey)}</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {ordered.map((theme, index) =>
                 theme.mode !== group.mode ? null : (
                   <ThemeOption
                     key={theme.id}
                     theme={theme}
+                    label={themeLabel(t, theme)}
                     selected={theme.id === current}
                     onSelect={() => choose(theme.id)}
                     onKeyDown={(event) => onKeyDown(event, index)}
@@ -166,6 +228,7 @@ function ThemeFileTools({
   current: ThemeKey
   schedule: ThemeSchedule
 }) {
+  const t = useT()
   const { report } = useWorkspace()
   const fileInput = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState<{ text: string; problem: boolean } | null>(null)
@@ -178,7 +241,7 @@ function ThemeFileTools({
     link.download = themeFileName(shown.name)
     link.click()
     URL.revokeObjectURL(url)
-    setMessage({ text: `Saved ${shown.name} as ${link.download}.`, problem: false })
+    setMessage({ text: t("settings.theme.saved", { name: themeLabel(t, shown), file: link.download }), problem: false })
   }
 
   async function onFile(event: React.ChangeEvent<HTMLInputElement>) {
@@ -186,25 +249,25 @@ function ThemeFileTools({
     event.target.value = ""
     if (!file) return
     if (file.size > 20_000) {
-      setMessage({ text: "That file is too large to be a theme, so nothing was loaded.", problem: true })
+      setMessage({ text: t("settings.theme.tooLarge"), problem: true })
       return
     }
     const parsed = parseThemeText(await file.text())
     if (!parsed.ok) {
-      setMessage({ text: parsed.reason, problem: true })
+      setMessage({ text: t(parsed.reason, localizeVars(t, parsed.vars)), problem: true })
       return
     }
     const next = withCustomTheme(customs, parsed.theme)
     if (!next.ok) {
       setMessage({
-        text: `You can keep ${MAX_CUSTOM_THEMES} loaded themes. Remove one first, then load this file again.`,
+        text: t("settings.theme.limit", { max: MAX_CUSTOM_THEMES }),
         problem: true,
       })
       return
     }
     report("customThemes", next.list)
     setMessage({
-      text: `${next.replaced ? "Updated" : "Loaded"} ${parsed.theme.name}. Pick it from the list above.`,
+      text: t(next.replaced ? "settings.theme.updatedMsg" : "settings.theme.loadedMsg", { name: parsed.theme.name }),
       problem: false,
     })
   }
@@ -220,21 +283,20 @@ function ThemeFileTools({
         evening: schedule.evening === theme.id ? DEFAULT_THEME_SCHEDULE.evening : schedule.evening,
       })
     }
-    setMessage({ text: `Removed ${theme.name}.`, problem: false })
+    setMessage({ text: t("settings.theme.removedMsg", { name: theme.name }), problem: false })
   }
 
   return (
     <div className="flex flex-col gap-3 border-t border-line pt-4">
       <p className="text-sm text-ink-soft">
-        A theme file lists the ten interface colors by name, each as a hex color. Download theme saves{" "}
-        <span className="font-medium text-ink">{shown.name}</span>, the theme that is on.
+        {t("settings.theme.fileHelp", { name: themeLabel(t, shown) })}
       </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={download} className={secondaryButton}>
-          Download theme
+          {t("settings.theme.download")}
         </button>
         <button type="button" onClick={() => fileInput.current?.click()} className={secondaryButton}>
-          Load theme
+          {t("settings.theme.load")}
         </button>
         <input
           ref={fileInput}
@@ -242,7 +304,7 @@ function ThemeFileTools({
           accept="application/json,.json"
           className="sr-only"
           tabIndex={-1}
-          aria-label="Choose a theme file"
+          aria-label={t("settings.theme.chooseFile")}
           onChange={onFile}
         />
       </div>
@@ -250,7 +312,7 @@ function ThemeFileTools({
         {message?.text}
       </p>
       {customs.length > 0 && (
-        <ul aria-label="Loaded themes" className="flex flex-col gap-2">
+        <ul aria-label={t("settings.theme.loadedList")} className="flex flex-col gap-2">
           {customs.map((theme) => (
             <li
               key={theme.id}
@@ -258,15 +320,15 @@ function ThemeFileTools({
             >
               <span className="min-w-0 truncate text-sm text-ink">
                 {theme.name}
-                <span className="text-ink-soft">{theme.mode === "dark" ? " (dark)" : " (light)"}</span>
+                <span className="text-ink-soft">{theme.mode === "dark" ? t("settings.theme.darkTag") : t("settings.theme.lightTag")}</span>
               </span>
               <button
                 type="button"
                 onClick={() => remove(theme)}
-                aria-label={`Remove ${theme.name}`}
+                aria-label={t("settings.theme.removeNamed", { name: theme.name })}
                 className="shrink-0 rounded-md px-2 py-1 text-sm text-release hover:bg-line/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                Remove
+                {t("common.remove")}
               </button>
             </li>
           ))}
@@ -279,11 +341,17 @@ function ThemeFileTools({
 const SCHEDULE_SLOTS: {
   slot: "day" | "evening"
   timeKey: "dayTime" | "eveningTime"
-  label: string
+  labelKey: MessageKey
+  themeLabelKey: MessageKey
 }[] = [
-  { slot: "day", timeKey: "dayTime", label: "Day" },
-  { slot: "evening", timeKey: "eveningTime", label: "Evening" },
+  { slot: "day", timeKey: "dayTime", labelKey: "settings.theme.day", themeLabelKey: "settings.theme.dayTheme" },
+  { slot: "evening", timeKey: "eveningTime", labelKey: "settings.theme.evening", themeLabelKey: "settings.theme.eveningTheme" },
 ]
+
+function localizeVars(t: Translate, vars?: Record<string, string | number>) {
+  if (!vars || typeof vars.surface !== "string") return vars
+  return { ...vars, surface: t(`settings.theme.surface.${vars.surface}` as MessageKey) }
+}
 
 function ScheduleFields({
   schedule,
@@ -294,6 +362,7 @@ function ScheduleFields({
   nowName: string
   customs: CustomTheme[]
 }) {
+  const t = useT()
   const fieldId = useId()
   const { report } = useWorkspace()
   const [times, setTimes] = useState({ dayTime: schedule.dayTime, eveningTime: schedule.eveningTime })
@@ -312,18 +381,17 @@ function ScheduleFields({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-ink-soft">
-        Showing <span className="font-medium text-ink">{nowName}</span> now. The app switches at these times while it is
-        open, and picks the right theme when it opens.
+        {t("settings.theme.showingNow", { name: nowName })}
       </p>
       <div className="grid gap-4 sm:grid-cols-2">
-        {SCHEDULE_SLOTS.map(({ slot, timeKey, label }) => {
+        {SCHEDULE_SLOTS.map(({ slot, timeKey, labelKey, themeLabelKey }) => {
           const valid = isScheduleTime(times[timeKey])
           return (
             <div key={slot} className="flex flex-col gap-3 rounded-lg border border-line bg-card p-4">
-              <h3 className="text-sm font-medium text-ink">{label}</h3>
+              <h3 className="text-sm font-medium text-ink">{t(labelKey)}</h3>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor={`${fieldId}-${slot}-theme`} className="text-sm text-ink">
-                  {label} theme
+                  {t(themeLabelKey)}
                 </label>
                 <select
                   id={`${fieldId}-${slot}-theme`}
@@ -332,16 +400,16 @@ function ScheduleFields({
                   className={inputClass}
                 >
                   {THEME_GROUPS.map((group) => (
-                    <optgroup key={group.mode} label={group.title}>
+                    <optgroup key={group.mode} label={t(group.titleKey)}>
                       {THEMES.filter((theme) => theme.mode === group.mode).map((theme) => (
                         <option key={theme.id} value={theme.id}>
-                          {theme.name}
+                          {themeLabel(t, theme)}
                         </option>
                       ))}
                     </optgroup>
                   ))}
                   {customs.length > 0 && (
-                    <optgroup label="Loaded">
+                    <optgroup label={t("settings.theme.loaded")}>
                       {customs.map((theme) => (
                         <option key={theme.id} value={theme.id}>
                           {theme.name}
@@ -353,7 +421,7 @@ function ScheduleFields({
               </div>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor={`${fieldId}-${slot}-time`} className="text-sm text-ink">
-                  Starts at
+                  {t("settings.theme.startsAt")}
                 </label>
                 <input
                   id={`${fieldId}-${slot}-time`}
@@ -365,7 +433,7 @@ function ScheduleFields({
                   className={inputClass}
                 />
                 <p id={`${fieldId}-${slot}-help`} className={`text-xs ${valid ? "text-ink-soft" : "text-release"}`}>
-                  {valid ? "Local time." : "Enter a time."}
+                  {valid ? t("common.localTime") : t("common.enterTime")}
                 </p>
               </div>
             </div>
@@ -373,11 +441,10 @@ function ScheduleFields({
         })}
       </div>
       {sameTimes && (
-        <p className="text-sm text-ink-soft">Both times are the same, so the day theme stays on all day.</p>
+        <p className="text-sm text-ink-soft">{t("settings.theme.sameTimes")}</p>
       )}
       <p className="text-sm text-ink-soft">
-        Turning this off keeps the theme that is on. It is separate from the daily nudge, and a change of theme sends no
-        notification.
+        {t("settings.theme.followNote")}
       </p>
     </div>
   )
@@ -385,12 +452,14 @@ function ScheduleFields({
 
 function ThemeOption({
   theme,
+  label,
   selected,
   onSelect,
   onKeyDown,
   buttonRef,
 }: {
   theme: Theme
+  label: string
   selected: boolean
   onSelect: () => void
   onKeyDown: (event: React.KeyboardEvent) => void
@@ -433,7 +502,7 @@ function ThemeOption({
         </span>
       </span>
       <span className="flex items-center justify-between gap-2 px-0.5 text-sm text-ink">
-        {theme.name}
+        {label}
         {selected && <Check aria-hidden="true" className="size-4 shrink-0 text-accent" />}
       </span>
     </button>
@@ -441,6 +510,7 @@ function ThemeOption({
 }
 
 function SampleStorySection() {
+  const t = useT()
   const headingId = useId()
   const { doc, replace } = useWorkspace()
   const [asking, setAsking] = useState<Swap | null>(null)
@@ -462,30 +532,28 @@ function SampleStorySection() {
   }
 
   return (
-    <SectionShell id={headingId} title="Sample story">
-      <ToggleSwitch checked={on} onChange={choose} label="Show the sample story" />
-      <p className="text-sm text-ink-soft">Off leaves an empty board for the whiteboard and the Kanban.</p>
+    <SectionShell id={headingId} title={t("settings.sample.title")}>
+      <ToggleSwitch checked={on} onChange={choose} label={t("settings.sample.show")} />
+      <p className="text-sm text-ink-soft">{t("settings.sample.help")}</p>
       <ConfirmDialog
         open={asking === "sample"}
-        title="Put the sample story back?"
-        confirmLabel="Replace with sample"
+        title={t("settings.sample.putBackTitle")}
+        confirmLabel={t("settings.sample.putBackConfirm")}
         busy={busy}
         onConfirm={() => void swap("sample")}
         onCancel={() => setAsking(null)}
       >
-        This replaces the cards you wrote on the whiteboard and the Kanban with the sample story. Download a backup first
-        if you want to keep them.
+        {t("settings.sample.putBackBody")}
       </ConfirmDialog>
       <ConfirmDialog
         open={asking === "empty"}
-        title="Empty the board?"
-        confirmLabel="Empty the board"
+        title={t("settings.sample.emptyTitle")}
+        confirmLabel={t("settings.sample.emptyConfirm")}
         busy={busy}
         onConfirm={() => void swap("empty")}
         onCancel={() => setAsking(null)}
       >
-        This removes every whiteboard card and Kanban task, including the ones you wrote. Download a backup first if you
-        want to keep them.
+        {t("settings.sample.emptyBody")}
       </ConfirmDialog>
     </SectionShell>
   )
@@ -499,6 +567,7 @@ function today() {
 }
 
 function BackupSection() {
+  const t = useT()
   const headingId = useId()
   const { doc, replace } = useWorkspace()
   const fileInput = useRef<HTMLInputElement>(null)
@@ -523,12 +592,12 @@ function BackupSection() {
     try {
       json = JSON.parse(await file.text())
     } catch {
-      setProblem("That file is not valid JSON, so nothing was loaded.")
+      setProblem(t("settings.backup.notJson"))
       return
     }
     const parsed = parseWorkspace(json)
     if (!parsed.ok) {
-      setProblem(`${parsed.reason} Nothing was loaded.`)
+      setProblem(t("settings.backup.nothingLoaded", { reason: parsed.reason }))
       return
     }
     setIncoming(parsed.doc)
@@ -551,14 +620,14 @@ function BackupSection() {
   }
 
   return (
-    <SectionShell id={headingId} title="Backup">
-      <p className="text-sm text-ink-soft">Download your cards as a JSON file, or load one back.</p>
+    <SectionShell id={headingId} title={t("settings.backup.title")}>
+      <p className="text-sm text-ink-soft">{t("settings.backup.help")}</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={download} className={primaryButton}>
-          Download JSON
+          {t("settings.backup.download")}
         </button>
         <button type="button" onClick={() => fileInput.current?.click()} className={secondaryButton}>
-          Load JSON file
+          {t("settings.backup.load")}
         </button>
         <input
           ref={fileInput}
@@ -566,7 +635,7 @@ function BackupSection() {
           accept="application/json,.json"
           className="sr-only"
           tabIndex={-1}
-          aria-label="Choose a backup JSON file"
+          aria-label={t("settings.backup.chooseFile")}
           onChange={(event) => {
             void pick(event.target.files?.[0])
             event.target.value = ""
@@ -580,14 +649,16 @@ function BackupSection() {
       )}
       <ConfirmDialog
         open={incoming !== null}
-        title="Load this backup?"
-        confirmLabel="Replace my cards"
+        title={t("settings.backup.confirmTitle")}
+        confirmLabel={t("settings.backup.confirmLabel")}
         busy={busy}
         onConfirm={() => void load()}
         onCancel={() => setIncoming(null)}
       >
-        The file holds {incoming?.notes.length ?? 0} whiteboard cards and {incoming?.kanban.cards.length ?? 0} Kanban
-        tasks. Loading it replaces everything on the whiteboard and the Kanban now.
+        {t("settings.backup.confirmBody", {
+          notes: incoming?.notes.length ?? 0,
+          tasks: incoming?.kanban.cards.length ?? 0,
+        })}
       </ConfirmDialog>
     </SectionShell>
   )
@@ -595,12 +666,13 @@ function BackupSection() {
 
 type Permission = NotificationPermission | "unsupported" | null
 
-const NUDGE_FIELDS: { kind: NudgeKind; label: string }[] = [
-  { kind: "morning", label: "Morning" },
-  { kind: "evening", label: "Evening" },
+const NUDGE_FIELDS: { kind: NudgeKind; labelKey: MessageKey }[] = [
+  { kind: "morning", labelKey: "settings.nudge.morningTime" },
+  { kind: "evening", labelKey: "settings.nudge.eveningTime" },
 ]
 
 function NudgeSection() {
+  const t = useT()
   const headingId = useId()
   const fieldId = useId()
   const { doc, report } = useWorkspace()
@@ -625,15 +697,15 @@ function NudgeSection() {
   }
 
   return (
-    <SectionShell id={headingId} title="Daily nudge">
-      <p className="text-sm text-ink-soft">One system notification in the morning and one in the evening, each once a day.</p>
+    <SectionShell id={headingId} title={t("settings.nudge.title")}>
+      <p className="text-sm text-ink-soft">{t("settings.nudge.help")}</p>
       <div className="grid gap-4 sm:grid-cols-2">
-        {NUDGE_FIELDS.map(({ kind, label }) => {
+        {NUDGE_FIELDS.map(({ kind, labelKey }) => {
           const valid = isTime(times[kind])
           return (
             <div key={kind} className="flex flex-col gap-1.5">
               <label htmlFor={`${fieldId}-${kind}`} className="text-sm text-ink">
-                {label} time
+                {t(labelKey)}
               </label>
               <input
                 id={`${fieldId}-${kind}`}
@@ -645,7 +717,7 @@ function NudgeSection() {
                 className={inputClass}
               />
               <p id={`${fieldId}-${kind}-help`} className={`text-xs ${valid ? "text-ink-soft" : "text-release"}`}>
-                {valid ? `Shows “${NUDGE_TITLE[kind]}”.` : "Enter a time."}
+                {valid ? t("settings.nudge.shows", { title: t(NUDGE_TITLE_KEY[kind]) }) : t("common.enterTime")}
               </p>
             </div>
           )
@@ -654,24 +726,25 @@ function NudgeSection() {
       {permission === "default" && (
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" onClick={() => void allow()} className={primaryButton}>
-            Allow notifications
+            {t("settings.nudge.allow")}
           </button>
-          <p className="text-sm text-ink-soft">The app needs your permission before it can show them.</p>
+          <p className="text-sm text-ink-soft">{t("settings.nudge.needsPermission")}</p>
         </div>
       )}
       {permission === "denied" && (
         <p className="text-sm text-ink-soft">
-          Notifications are blocked for this app, so none will show. Allow them in your system or browser settings.
+          {t("settings.nudge.blocked")}
         </p>
       )}
       {permission === "unsupported" && (
-        <p className="text-sm text-ink-soft">This window cannot show system notifications.</p>
+        <p className="text-sm text-ink-soft">{t("settings.nudge.unsupported")}</p>
       )}
     </SectionShell>
   )
 }
 
 function LifeSection() {
+  const t = useT()
   const headingId = useId()
   const dateId = useId()
   const yearsId = useId()
@@ -700,11 +773,11 @@ function LifeSection() {
   }
 
   return (
-    <SectionShell id={headingId} title="Life in weeks">
+    <SectionShell id={headingId} title={t("settings.life.title")}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={dateId} className="text-sm text-ink">
-            Date of birth
+            {t("settings.life.birth")}
           </label>
           <input
             id={dateId}
@@ -715,11 +788,11 @@ function LifeSection() {
             onChange={(event) => changeDate(event.target.value)}
             className={inputClass}
           />
-          {!dateValid && <p className="text-xs text-release">Enter a date that is not in the future.</p>}
+          {!dateValid && <p className="text-xs text-release">{t("settings.life.birthError")}</p>}
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor={yearsId} className="text-sm text-ink">
-            Years the grid covers
+            {t("settings.life.years")}
           </label>
           <input
             id={yearsId}
@@ -735,7 +808,7 @@ function LifeSection() {
           />
           {!yearsValid && (
             <p className="text-xs text-release">
-              Enter a whole number from {LIFE_YEARS_MIN} to {LIFE_YEARS_MAX}.
+              {t("settings.life.yearsError", { min: LIFE_YEARS_MIN, max: LIFE_YEARS_MAX })}
             </p>
           )}
         </div>

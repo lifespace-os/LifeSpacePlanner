@@ -31,6 +31,7 @@ import { isNudge, type WorkspaceNudge } from "@/lib/nudge"
 import { isCustomThemeList, type CustomTheme } from "@/lib/custom-themes"
 import { isThemeSchedule, type ThemeSchedule } from "@/lib/theme-schedule"
 import { isThemeKey, type ThemeKey } from "@/lib/themes"
+import { isLanguage, type Language } from "@/lib/i18n"
 import { isViewHref, type ViewHref } from "@/lib/views"
 
 /** One address for the workspace. A later server can answer the same path. */
@@ -84,6 +85,8 @@ export type WorkspaceDoc = {
   customThemes?: CustomTheme[]
   /** Switches the theme by the time of day. Absent means off, with the default times. */
   themeSchedule?: ThemeSchedule
+  /** The interface language. Absent means English. */
+  language?: Language
 }
 
 export type WorkspaceSliceKey =
@@ -99,6 +102,7 @@ export type WorkspaceSliceKey =
   | "theme"
   | "customThemes"
   | "themeSchedule"
+  | "language"
 
 export const SAMPLE_MISSION = "I live strong and healthy, close to the people I love, with time left for what I enjoy."
 
@@ -151,6 +155,7 @@ export function parseWorkspace(value: unknown): { ok: true; doc: WorkspaceDoc } 
   if (value.customThemes !== undefined && !isCustomThemeList(value.customThemes)) return fail("The loaded themes in the file are not valid.")
   if (value.theme !== undefined && !isThemeKey(value.theme)) return fail("The theme in the file is not a theme this app knows.")
   if (value.themeSchedule !== undefined && !isThemeSchedule(value.themeSchedule)) return fail("The time of day theme settings in the file are not valid.")
+  if (value.language !== undefined && !isLanguage(value.language)) return fail("The language in the file is not one this app knows.")
   return { ok: true, doc: value as WorkspaceDoc }
 }
 

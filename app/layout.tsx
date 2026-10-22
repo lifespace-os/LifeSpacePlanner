@@ -3,6 +3,7 @@ import { Geist, Newsreader } from "next/font/google"
 import { AppNav } from "@/components/app-nav"
 import { GoalsProvider } from "@/components/goals-provider"
 import { KanbanProvider } from "@/components/kanban/kanban-provider"
+import { LanguageProvider } from "@/components/language-provider"
 import { MissionProvider } from "@/components/mission-provider"
 import { NudgeRunner } from "@/components/nudge-runner"
 import { ThemeApplier } from "@/components/theme-applier"
@@ -32,16 +33,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-dvh font-sans antialiased" suppressHydrationWarning>
         <WorkspaceProvider>
-          <ThemeApplier />
-          <MissionProvider>
-            <GoalsProvider>
-              <KanbanProvider>
-                <AppNav />
-                <NudgeRunner />
-                {children}
-              </KanbanProvider>
-            </GoalsProvider>
-          </MissionProvider>
+          <LanguageProvider>
+            <ThemeApplier />
+            <MissionProvider>
+              <GoalsProvider>
+                <KanbanProvider>
+                  <AppNav />
+                  <NudgeRunner />
+                  {children}
+                </KanbanProvider>
+              </GoalsProvider>
+            </MissionProvider>
+          </LanguageProvider>
         </WorkspaceProvider>
       </body>
     </html>

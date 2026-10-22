@@ -13,10 +13,10 @@ export const DEFAULT_NUDGE: WorkspaceNudge = { morning: "08:00", evening: "21:00
 
 export const NUDGE_KINDS: NudgeKind[] = ["morning", "evening"]
 
-export const NUDGE_TITLE: Record<NudgeKind, string> = {
-  morning: "Plan today",
-  evening: "Plan tomorrow",
-}
+export const NUDGE_TITLE_KEY = {
+  morning: "nudge.morning",
+  evening: "nudge.evening",
+} as const satisfies Record<NudgeKind, string>
 
 /** Asks the runner to look again now, for example right after notifications are allowed. */
 export const NUDGE_CHECK_EVENT = "lifespace:nudge-check"

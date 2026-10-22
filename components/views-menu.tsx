@@ -5,9 +5,11 @@ import type { KeyboardEvent, MouseEvent } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import clsx from "clsx"
+import { useT } from "@/components/language-provider"
 import { VIEWS, openViewFor } from "@/lib/views"
 
 export function ViewsMenu() {
+  const t = useT()
   const pathname = usePathname()
   const openView = openViewFor(pathname)
   const menuId = useId()
@@ -114,7 +116,7 @@ export function ViewsMenu() {
           open ? "bg-line/50 text-ink" : "text-ink-soft hover:bg-line/50 hover:text-ink",
         )}
       >
-        Views
+        {t("nav.views")}
         <svg
           aria-hidden="true"
           viewBox="0 0 12 12"
@@ -129,7 +131,7 @@ export function ViewsMenu() {
           <div
             id={menuId}
             role="menu"
-            aria-label="Views"
+            aria-label={t("nav.views")}
             onKeyDown={onMenuKeyDown}
             className="min-w-40 rounded-md border border-line bg-board p-1 shadow-md"
           >
@@ -149,7 +151,7 @@ export function ViewsMenu() {
                   openView?.href === view.href && "bg-line/40",
                 )}
               >
-                {view.label}
+                {t(view.labelKey)}
               </Link>
             ))}
           </div>
