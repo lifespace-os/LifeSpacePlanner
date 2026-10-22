@@ -13,7 +13,8 @@ import {
   withTime,
   type NudgeKind,
 } from "@/lib/nudge"
-import { DEFAULT_THEME, THEMES, type Theme, type ThemeId } from "@/lib/themes"
+import { DEFAULT_THEME_SCHEDULE, isScheduleTime, type ThemeSchedule } from "@/lib/theme-schedule"
+import { DEFAULT_THEME, THEMES, themeOf, type Theme, type ThemeId } from "@/lib/themes"
 import {
   DEFAULT_LIFE,
   LIFE_YEARS_MAX,
@@ -73,10 +74,15 @@ function ThemeSection() {
   const headingId = useId()
   const { doc, report } = useWorkspace()
   const current: ThemeId = doc.theme ?? DEFAULT_THEME
+  const schedule = doc.themeSchedule ?? DEFAULT_THEME_SCHEDULE
   const optionRefs = useRef(new Map<ThemeId, HTMLButtonElement>())
 
   function choose(id: ThemeId) {
     report("theme", id)
+  }
+
+  function follow(enabled: boolean) {
+    report("themeSchedule", { ...schedule, enabled })
   }
 
   function move(from: number, step: number) {
@@ -101,6 +107,10 @@ function ThemeSection() {
         Changes the colors of the app. Whiteboard card colors stay the same, and the Dashboard export is always a light
         sheet.
       </p>
+      <ToggleSwitch checked={schedule.enabled} onChange={follow} label="Follow the time of day" />
+      {schedule.enabled ? (
+        <ScheduleFields schedule={schedule} nowName={themeOf(current).name} />
+      ) : (
       <div role="radiogroup" aria-labelledby={headingId} className="flex flex-col gap-4">
         {THEME_GROUPS.map((group) => (
           <div key={group.mode} className="flex flex-col gap-2">
@@ -125,7 +135,98 @@ function ThemeSection() {
           </div>
         ))}
       </div>
+      )}
     </SectionShell>
+  )
+}
+
+const SCHEDULE_SLOTS: {
+  slot: "day" | "evening"
+  timeKey: "dayTime" | "eveningTime"
+  label: string
+}[] = [
+  { slot: "day", timeKey: "dayTime", label: "Day" },
+  { slot: "evening", timeKey: "eveningTime", label: "Evening" },
+]
+
+function ScheduleFields({ schedule, nowName }: { schedule: ThemeSchedule; nowName: string }) {
+  const fieldId = useId()
+  const { report } = useWorkspace()
+  const [times, setTimes] = useState({ dayTime: schedule.dayTime, eveningTime: schedule.eveningTime })
+
+  function changeTime(timeKey: "dayTime" | "eveningTime", value: string) {
+    setTimes((current) => ({ ...current, [timeKey]: value }))
+    if (isScheduleTime(value)) report("themeSchedule", { ...schedule, [timeKey]: value })
+  }
+
+  function changeTheme(slot: "day" | "evening", id: ThemeId) {
+    report("themeSchedule", { ...schedule, [slot]: id })
+  }
+
+  const sameTimes = isScheduleTime(times.dayTime) && times.dayTime === times.eveningTime
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-ink-soft">
+        Showing <span className="font-medium text-ink">{nowName}</span> now. The app switches at these times while it is
+        open, and picks the right theme when it opens.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {SCHEDULE_SLOTS.map(({ slot, timeKey, label }) => {
+          const valid = isScheduleTime(times[timeKey])
+          return (
+            <div key={slot} className="flex flex-col gap-3 rounded-lg border border-line bg-card p-4">
+              <h3 className="text-sm font-medium text-ink">{label}</h3>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor={`${fieldId}-${slot}-theme`} className="text-sm text-ink">
+                  {label} theme
+                </label>
+                <select
+                  id={`${fieldId}-${slot}-theme`}
+                  value={schedule[slot]}
+                  onChange={(event) => changeTheme(slot, event.target.value as ThemeId)}
+                  className={inputClass}
+                >
+                  {THEME_GROUPS.map((group) => (
+                    <optgroup key={group.mode} label={group.title}>
+                      {THEMES.filter((theme) => theme.mode === group.mode).map((theme) => (
+                        <option key={theme.id} value={theme.id}>
+                          {theme.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor={`${fieldId}-${slot}-time`} className="text-sm text-ink">
+                  Starts at
+                </label>
+                <input
+                  id={`${fieldId}-${slot}-time`}
+                  type="time"
+                  value={times[timeKey]}
+                  aria-invalid={!valid}
+                  aria-describedby={`${fieldId}-${slot}-help`}
+                  onChange={(event) => changeTime(timeKey, event.target.value)}
+                  className={inputClass}
+                />
+                <p id={`${fieldId}-${slot}-help`} className={`text-xs ${valid ? "text-ink-soft" : "text-release"}`}>
+                  {valid ? "Local time." : "Enter a time."}
+                </p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      {sameTimes && (
+        <p className="text-sm text-ink-soft">Both times are the same, so the day theme stays on all day.</p>
+      )}
+      <p className="text-sm text-ink-soft">
+        Turning this off keeps the theme that is on. It is separate from the daily nudge, and a change of theme sends no
+        notification.
+      </p>
+    </div>
   )
 }
 
@@ -289,6 +390,7 @@ function BackupSection() {
       lastView: incoming.lastView ?? doc.lastView,
       nudge: incoming.nudge ?? doc.nudge,
       theme: incoming.theme ?? doc.theme,
+      themeSchedule: incoming.themeSchedule ?? (incoming.theme ? undefined : doc.themeSchedule),
     })
     setBusy(false)
     setIncoming(null)
