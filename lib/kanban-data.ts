@@ -466,29 +466,42 @@ export function defaultCards(): KanbanCard[] {
   ])))))
 }
 
-/** Format HH:mm as "9:00 AM". */
-export function formatTime(time: string) {
+/** Format HH:mm as "9:00 AM" in English, or in the clock style of the given locale. */
+export function formatTime(time: string, locale = "en-US") {
   const match = /^(\d{2}):(\d{2})$/.exec(time)
   if (!match) return time
   const hour = Number(match[1])
+  if (!locale.startsWith("en")) {
+    const date = new Date(Date.UTC(2000, 0, 1, hour, Number(match[2])))
+    return date.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit", timeZone: "UTC" })
+  }
   const suffix = hour >= 12 ? "PM" : "AM"
   return `${hour % 12 === 0 ? 12 : hour % 12}:${match[2]} ${suffix}`
 }
 
+type RangeWords = { from: (time: string) => string; until: (time: string) => string }
+
+const ENGLISH_RANGE_WORDS: RangeWords = { from: (time) => `from ${time}`, until: (time) => `until ${time}` }
+
 /** "9:00 AM – 9:30 AM", "from 9:00 AM", "until 9:30 AM", or "" when neither is set. */
-export function formatTimeRange(startTime: string, endTime: string) {
-  if (startTime && endTime) return `${formatTime(startTime)} – ${formatTime(endTime)}`
-  if (startTime) return `from ${formatTime(startTime)}`
-  if (endTime) return `until ${formatTime(endTime)}`
+export function formatTimeRange(
+  startTime: string,
+  endTime: string,
+  locale = "en-US",
+  words: RangeWords = ENGLISH_RANGE_WORDS,
+) {
+  if (startTime && endTime) return `${formatTime(startTime, locale)} – ${formatTime(endTime, locale)}`
+  if (startTime) return words.from(formatTime(startTime, locale))
+  if (endTime) return words.until(formatTime(endTime, locale))
   return ""
 }
 
 /** Format a yyyy-mm-dd date as "Oct 16" without depending on the viewer's time zone. */
-export function formatDue(due: string) {
+export function formatDue(due: string, locale = "en-US") {
   if (!due) return ""
   const date = new Date(`${due}T00:00:00Z`)
   if (Number.isNaN(date.getTime())) return due
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
+  return date.toLocaleDateString(locale, { month: "short", day: "numeric", timeZone: "UTC" })
 }
 
 export function initials(owner: string) {

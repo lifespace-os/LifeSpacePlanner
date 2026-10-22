@@ -14,6 +14,8 @@ import {
   type KanbanColumn,
 } from "@/lib/kanban-data"
 import { useGoals } from "@/components/goals-provider"
+import { useLanguage } from "@/components/language-provider"
+import { boardLabel, columnLabel } from "@/lib/kanban-names"
 import { goalTaskCounts, taskStates } from "@/lib/dashboard"
 import { newId } from "@/lib/workspace"
 import { finishedCard, nextCopy, todayIso } from "@/lib/repeat"
@@ -57,6 +59,7 @@ export function KanbanScreen() {
     revertDraft,
     saveDraft,
   } = useKanban()
+  const { t, tn } = useLanguage()
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [overTab, setOverTab] = useState<KanbanBoardId | null>(null)
   const [status, setStatus] = useState("")
@@ -83,11 +86,11 @@ export function KanbanScreen() {
     for (const entry of resultList) {
       result[entry.card.id] = [...entry.boardIds]
         .sort((a, b) => order.indexOf(a) - order.indexOf(b))
-        .map((id) => KANBAN_BOARDS.find((item) => item.id === id)?.name ?? id)
+        .map((id) => boardLabel(t, id))
         .join(", ")
     }
     return result
-  }, [resultList])
+  }, [resultList, t])
   const doneTaskCount = useMemo(() => {
     const keys = new Set<string>()
     for (const card of cards) {
@@ -128,12 +131,12 @@ export function KanbanScreen() {
   const pickRing = (id: string) => {
     if (id === focusedId) {
       setRingFocusId(null)
-      setStatus("Showing the whole board.")
+      setStatus(t("kanban.showingWholeBoard"))
       return
     }
     setRingFocusId(id)
-    const name = ringNotes.find((note) => note.id === id)?.text || "this card"
-    setStatus(`Showing “${name}” and everything below it.`)
+    const name = ringNotes.find((note) => note.id === id)?.text || t("kanban.thisCard")
+    setStatus(t("kanban.showingFocused", { name }))
   }
 
   useEffect(() => {
@@ -141,11 +144,11 @@ export function KanbanScreen() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return
       setRingFocusId(null)
-      setStatus("Showing the whole board.")
+      setStatus(t("kanban.showingWholeBoard"))
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [focusedId, openId, setRingFocusId])
+  }, [focusedId, openId, setRingFocusId, t])
   const counts = useMemo(() => {
     const result: Record<string, number> = {}
     for (const card of boardCards) result[card.columnId] = (result[card.columnId] ?? 0) + 1
@@ -168,7 +171,7 @@ export function KanbanScreen() {
       (item) => item.boardId === targetBoard && item.columnId === columnId && item.id !== cardId && !item.inResults,
     ).length
     if (column.limit !== undefined && !sameSpot && held >= column.limit) {
-      setStatus(`${column.name} is full at ${column.limit} cards. Finish or move one first.`)
+      setStatus(t("kanban.full", { column: columnLabel(t, column), limit: column.limit }))
       return
     }
     const nextOne = column.kind === "done" && !isInDone(card) ? nextCopy(card, todayIso(), newId("card")) : null
@@ -180,14 +183,14 @@ export function KanbanScreen() {
       const moved = { ...(nextOne ? finishedCard(card) : card), boardId: targetBoard, columnId, doneAt }
       return [...rest.slice(0, at), moved, ...rest.slice(at), ...(nextOne ? [nextOne] : [])]
     })
-    const targetName = KANBAN_BOARDS.find((item) => item.id === targetBoard)?.name
-    const copyNote = nextOne
-      ? ` The next copy is in ${columnsByBoard[card.boardId].find((item) => item.id === card.columnId)?.name ?? "its column"}.`
-      : ""
+    const targetName = boardLabel(t, targetBoard)
+    const sourceColumn = columnsByBoard[card.boardId].find((item) => item.id === card.columnId)
+    const copyNote = nextOne ? t("kanban.copyNote", { column: sourceColumn ? columnLabel(t, sourceColumn) : "" }) : ""
+    const columnName = columnLabel(t, column)
     setStatus(
       (targetBoard === card.boardId
-        ? `Moved “${card.title}” to ${column.name}.`
-        : `Moved “${card.title}” to ${column.name} on the ${targetName} board.`) + copyNote,
+        ? t("kanban.movedSimple", { title: card.title, column: columnName })
+        : t("kanban.movedCross", { title: card.title, column: columnName, board: targetName })) + copyNote,
     )
   }
 
@@ -215,14 +218,14 @@ export function KanbanScreen() {
     setCards((previous) =>
       previous.map((item) => (!item.inResults && isInDone(item) && resultKey(item) === key ? { ...item, inResults: true } : item)),
     )
-    setStatus(`Moved “${card.title}” from Done to Results.`)
+    setStatus(t("kanban.movedToResults", { title: card.title }))
   }
 
   /** Every card in Done, on all five boards, to Results. */
   const moveAllDone = () => {
     if (doneTaskCount === 0) return
     setCards((previous) => previous.map((item) => (!item.inResults && isInDone(item) ? { ...item, inResults: true } : item)))
-    setStatus(`Moved ${doneTaskCount} ${doneTaskCount === 1 ? "task" : "tasks"} from Done to Results.`)
+    setStatus(tn("kanban.movedAllDone", doneTaskCount))
   }
 
   const returnToDone = (cardId: string) => {
@@ -236,7 +239,7 @@ export function KanbanScreen() {
         return { ...item, inResults: false, columnId: isInDone(item) ? item.columnId : (doneColumn?.id ?? item.columnId) }
       }),
     )
-    setStatus(`Returned “${card.title}” to Done.`)
+    setStatus(t("kanban.returnedToDone", { title: card.title }))
   }
 
   const updateColumns = (update: (list: KanbanColumn[]) => KanbanColumn[]) =>
@@ -269,8 +272,8 @@ export function KanbanScreen() {
     const moved = counts[columnId] ?? 0
     setStatus(
       moved > 0
-        ? `Removed ${columns[index]!.name}. ${moved} ${moved === 1 ? "card" : "cards"} moved to ${neighbor.name}.`
-        : `Removed ${columns[index]!.name}.`,
+        ? tn("kanban.removedColumnMoved", moved, { name: columnLabel(t, columns[index]!), neighbor: columnLabel(t, neighbor) })
+        : t("kanban.removedColumn", { name: columnLabel(t, columns[index]!) }),
     )
   }
 
@@ -281,18 +284,18 @@ export function KanbanScreen() {
       if (doneAt < 0) return [...list, created]
       return [...list.slice(0, doneAt), created, ...list.slice(doneAt)]
     })
-    setStatus(`Added ${name}.`)
+    setStatus(t("kanban.addedColumn", { name }))
   }
 
   return (
     <main className="board-grain flex h-[calc(100dvh-3.5rem)] flex-col">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-6 pb-4 pt-5">
         <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-ink-soft">Tasks in motion</p>
-          <h1 className="font-serif text-3xl font-medium tracking-tight text-ink">Kanban</h1>
+          <p className="text-xs uppercase tracking-[0.18em] text-ink-soft">{t("kanban.eyebrow")}</p>
+          <h1 className="font-serif text-3xl font-medium tracking-tight text-ink">{t("nav.kanban")}</h1>
         </div>
 
-        <div role="tablist" aria-label="Boards" className="flex items-center gap-1 rounded-lg border border-line bg-desk/70 p-1">
+        <div role="tablist" aria-label={t("kanban.boardsLabel")} className="flex items-center gap-1 rounded-lg border border-line bg-desk/70 p-1">
           {KANBAN_BOARDS.map((item) => {
             const active = item.id === boardId && !resultsOn
             return (
@@ -327,18 +330,18 @@ export function KanbanScreen() {
                   overTab === item.id && "bg-accent text-board outline-2 outline-accent",
                 )}
               >
-                {item.name}
+                {boardLabel(t, item.id)}
                 <span className={clsx("text-xs tabular-nums", active || overTab === item.id ? "text-board/70" : "text-ink-soft/70")}>
                   {boardTotals[item.id] ?? 0}
                 </span>
               </button>
             )
           })}
-          <ToggleSwitch checked={resultsOn} onChange={setResultsOn} label="Results" count={resultCards.length} />
+          <ToggleSwitch checked={resultsOn} onChange={setResultsOn} label={t("kanban.resultsLabel")} count={resultCards.length} />
         </div>
 
         <div className="flex items-center gap-3">
-          {!resultsOn && <ToggleSwitch checked={ringsOn} onChange={setRingsOn} label="Ring cards" />}
+          {!resultsOn && <ToggleSwitch checked={ringsOn} onChange={setRingsOn} label={t("kanban.ringsLabel")} />}
           {!resultsOn && (
             <button
               type="button"
@@ -346,7 +349,7 @@ export function KanbanScreen() {
               onClick={moveAllDone}
               className="rounded-md border border-line px-2.5 py-1.5 text-sm text-ink transition-colors hover:bg-line/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:text-ink-soft/60 disabled:hover:bg-transparent"
             >
-              Move all Done to Results
+              {t("kanban.moveAllDone")}
               <span className="ml-1.5 text-xs tabular-nums text-ink-soft">{doneTaskCount}</span>
             </button>
           )}
@@ -355,7 +358,7 @@ export function KanbanScreen() {
           </p>
           {!resultsOn && (
             <ColumnEditor
-              boardName={board.name}
+              boardName={boardLabel(t, board.id)}
               columns={columns}
               counts={counts}
               onRename={renameColumn}
@@ -452,7 +455,7 @@ export function KanbanScreen() {
           onClose={closeCard}
           onSave={() => {
             if (saveDraft(openCardData.id)) {
-              setStatus("Saved the card.")
+              setStatus(t("kanban.savedCard"))
               closeCard()
             }
           }}

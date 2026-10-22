@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react"
 import clsx from "clsx"
 import { ArrowRight, BellRing, Check, Clock, Ellipsis, Undo2 } from "lucide-react"
+import { useLanguage } from "@/components/language-provider"
 import { SetShape } from "@/components/whiteboard/label-chip"
 import { getLabel } from "@/lib/board-data"
+import { boardLabel, columnLabel } from "@/lib/kanban-names"
 import {
   KANBAN_BOARDS,
   REMIND_COLUMN_ID,
@@ -56,12 +58,16 @@ export function KanbanCardView({
   boardName,
   onResult,
 }: Props) {
+  const { t, locale } = useLanguage()
   const inResults = mode === "results"
   const [menu, setMenu] = useState<{ top: number; left: number } | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const label = getLabel(card.labelId)
-  const timeRange = formatTimeRange(card.startTime, card.endTime)
+  const timeRange = formatTimeRange(card.startTime, card.endTime, locale, {
+    from: (time) => t("time.from", { time }),
+    until: (time) => t("time.until", { time }),
+  })
 
   useEffect(() => {
     if (!menu) return
@@ -154,7 +160,7 @@ export function KanbanCardView({
           <button
             ref={buttonRef}
             type="button"
-            aria-label={`Move “${card.title}”`}
+            aria-label={t("card.moveAria", { title: card.title })}
             aria-haspopup="menu"
             aria-expanded={menu !== null}
             onClick={(event) => {
@@ -174,14 +180,14 @@ export function KanbanCardView({
             <>
               <SetShape shape={label.group.shape} color={label.color} />
               <span className="truncate">{label.name}</span>
-              {highlight && <span className="sr-only"> (highlighted by the filter)</span>}
+              {highlight && <span className="sr-only">{t("card.highlightedSr")}</span>}
             </>
           ) : (
-            <span className="italic">No label</span>
+            <span className="italic">{t("card.noLabel")}</span>
           )}
           {boardName && (
             <span className="ml-auto shrink-0 rounded border border-line px-1.5 text-[11px] leading-4 text-ink-soft">
-              <span className="sr-only">Board </span>
+              <span className="sr-only">{t("card.boardSr")}</span>
               {boardName}
             </span>
           )}
@@ -191,7 +197,7 @@ export function KanbanCardView({
           <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-soft">
             <Clock aria-hidden="true" className="size-3.5 shrink-0" />
             <span>
-              <span className="sr-only">Time </span>
+              <span className="sr-only">{t("card.timeSr")}</span>
               {timeRange}
             </span>
           </p>
@@ -201,17 +207,19 @@ export function KanbanCardView({
           <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-soft">
             <BellRing aria-hidden="true" className="size-3.5 shrink-0" />
             {card.remind ? (
-              <time dateTime={card.remind}>Remind {formatDue(card.remind)}</time>
+              <time dateTime={card.remind}>{t("card.remind", { date: formatDue(card.remind, locale) })}</time>
             ) : (
-              <span className="italic">No remind date</span>
+              <span className="italic">{t("card.noRemind")}</span>
             )}
           </p>
         )}
 
         <div className="mt-2 flex items-center justify-between gap-2 border-t border-line/70 pt-2 text-xs text-ink-soft">
           <span>
-            <span className="sr-only">Due </span>
-            <time dateTime={card.due}>{card.due ? `Due ${formatDue(card.due)}` : "No due date"}</time>
+            <span className="sr-only">{t("card.dueSr")}</span>
+            <time dateTime={card.due}>
+              {card.due ? t("card.due", { date: formatDue(card.due, locale) }) : t("card.noDue")}
+            </time>
           </span>
           <span className="flex min-w-0 items-center gap-1.5">
             <span
@@ -221,15 +229,15 @@ export function KanbanCardView({
               {initials(card.owner)}
             </span>
             <span className="truncate">
-              <span className="sr-only">Owner </span>
-              {card.owner || "No owner"}
+              <span className="sr-only">{t("card.ownerSr")}</span>
+              {card.owner || t("card.noOwner")}
             </span>
           </span>
         </div>
         {onResult && (inResults || done) && (
           <button
             type="button"
-            aria-label={`${inResults ? "Return to Done" : "Move to Results"}: “${card.title}”`}
+            aria-label={t(inResults ? "card.resultAriaReturn" : "card.resultAriaMove", { title: card.title })}
             onClick={(event) => {
               event.stopPropagation()
               onResult(card.id)
@@ -239,11 +247,11 @@ export function KanbanCardView({
             {inResults ? (
               <>
                 <Undo2 aria-hidden="true" className="size-3.5" />
-                Return to Done
+                {t("card.returnToDone")}
               </>
             ) : (
               <>
-                Move to Results
+                {t("card.moveToResults")}
                 <ArrowRight aria-hidden="true" className="size-3.5" />
               </>
             )}
@@ -255,11 +263,11 @@ export function KanbanCardView({
         <div
           ref={menuRef}
           role="menu"
-          aria-label={`Move “${card.title}”`}
+          aria-label={t("card.moveAria", { title: card.title })}
           style={{ position: "fixed", top: menu.top, left: menu.left, width: MENU_WIDTH, maxHeight: MENU_MAX_HEIGHT }}
           className="z-50 overflow-y-auto rounded-lg border border-line bg-card p-1.5 shadow-lg"
         >
-          <p className="px-2 pb-1 pt-1 text-xs uppercase tracking-[0.14em] text-ink-soft">Column</p>
+          <p className="px-2 pb-1 pt-1 text-xs uppercase tracking-[0.14em] text-ink-soft">{t("card.columnHeading")}</p>
           {columns.map((column) => {
             const current = column.id === card.columnId
             const full = !current && column.limit !== undefined && (counts[column.id] ?? 0) >= column.limit
@@ -275,17 +283,17 @@ export function KanbanCardView({
                 }}
                 className="flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-sm text-ink hover:bg-line/50 focus-visible:bg-line/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:text-ink-soft/60 disabled:hover:bg-transparent"
               >
-                <span className="truncate">{column.name}</span>
+                <span className="truncate">{columnLabel(t, column)}</span>
                 {current ? (
                   <Check aria-hidden="true" className="size-3.5 shrink-0 text-accent" />
                 ) : full ? (
-                  <span className="shrink-0 text-xs">Full</span>
+                  <span className="shrink-0 text-xs">{t("card.full")}</span>
                 ) : null}
               </button>
             )
           })}
           <p className="mt-1 border-t border-line/70 px-2 pb-1 pt-2.5 text-xs uppercase tracking-[0.14em] text-ink-soft">
-            Board
+            {t("card.boardHeading")}
           </p>
           {KANBAN_BOARDS.filter((board) => board.id !== card.boardId).map((board) => (
             <button
@@ -298,7 +306,7 @@ export function KanbanCardView({
               }}
               className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-ink hover:bg-line/50 focus-visible:bg-line/50 focus-visible:outline-none"
             >
-              {board.name}
+              {boardLabel(t, board.id)}
             </button>
           ))}
         </div>
