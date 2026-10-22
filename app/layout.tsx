@@ -4,6 +4,7 @@ import { AppNav } from "@/components/app-nav"
 import { GoalsProvider } from "@/components/goals-provider"
 import { KanbanProvider } from "@/components/kanban/kanban-provider"
 import { MissionProvider } from "@/components/mission-provider"
+import { NudgeRunner } from "@/components/nudge-runner"
 import { WorkspaceProvider } from "@/components/workspace-provider"
 import "./globals.css"
 
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <GoalsProvider>
               <KanbanProvider>
                 <AppNav />
+                <NudgeRunner />
                 {children}
               </KanbanProvider>
             </GoalsProvider>

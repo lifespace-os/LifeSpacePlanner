@@ -1,9 +1,17 @@
 "use client"
 
-import { useId, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { ToggleSwitch } from "@/components/kanban/toggle-switch"
 import { ConfirmDialog } from "@/components/settings/confirm-dialog"
 import { useWorkspace } from "@/components/workspace-provider"
+import {
+  DEFAULT_NUDGE,
+  NUDGE_CHECK_EVENT,
+  NUDGE_TITLE,
+  isTime,
+  withTime,
+  type NudgeKind,
+} from "@/lib/nudge"
 import {
   DEFAULT_LIFE,
   LIFE_YEARS_MAX,
@@ -33,6 +41,7 @@ export function SettingsScreen() {
         <SampleStorySection />
         <BackupSection />
         <LifeSection />
+        <NudgeSection />
         <p className="border-t border-line pt-6 text-sm text-ink-soft">
           Your cards live in a file on this machine, at ~/Library/Application Support/LifeSpace Planner/workspace.json. There is no account.
         </p>
@@ -149,7 +158,12 @@ function BackupSection() {
   async function load() {
     if (!incoming) return
     setBusy(true)
-    await replace({ ...incoming, life: incoming.life ?? doc.life, lastView: incoming.lastView ?? doc.lastView })
+    await replace({
+      ...incoming,
+      life: incoming.life ?? doc.life,
+      lastView: incoming.lastView ?? doc.lastView,
+      nudge: incoming.nudge ?? doc.nudge,
+    })
     setBusy(false)
     setIncoming(null)
   }
@@ -193,6 +207,84 @@ function BackupSection() {
         The file holds {incoming?.notes.length ?? 0} whiteboard cards and {incoming?.kanban.cards.length ?? 0} Kanban
         tasks. Loading it replaces everything on the whiteboard and the Kanban now.
       </ConfirmDialog>
+    </SectionShell>
+  )
+}
+
+type Permission = NotificationPermission | "unsupported" | null
+
+const NUDGE_FIELDS: { kind: NudgeKind; label: string }[] = [
+  { kind: "morning", label: "Morning" },
+  { kind: "evening", label: "Evening" },
+]
+
+function NudgeSection() {
+  const headingId = useId()
+  const fieldId = useId()
+  const { doc, report } = useWorkspace()
+  const saved = doc.nudge ?? DEFAULT_NUDGE
+  const [times, setTimes] = useState<Record<NudgeKind, string>>({ morning: saved.morning, evening: saved.evening })
+  const [permission, setPermission] = useState<Permission>(null)
+
+  useEffect(() => {
+    setPermission(typeof Notification === "undefined" ? "unsupported" : Notification.permission)
+  }, [])
+
+  function change(kind: NudgeKind, value: string) {
+    setTimes((current) => ({ ...current, [kind]: value }))
+    if (isTime(value)) report("nudge", withTime(saved, kind, value, new Date()))
+  }
+
+  async function allow() {
+    if (typeof Notification === "undefined") return
+    const result = await Notification.requestPermission()
+    setPermission(result)
+    if (result === "granted") window.dispatchEvent(new Event(NUDGE_CHECK_EVENT))
+  }
+
+  return (
+    <SectionShell id={headingId} title="Daily nudge">
+      <p className="text-sm text-ink-soft">One system notification in the morning and one in the evening, each once a day.</p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {NUDGE_FIELDS.map(({ kind, label }) => {
+          const valid = isTime(times[kind])
+          return (
+            <div key={kind} className="flex flex-col gap-1.5">
+              <label htmlFor={`${fieldId}-${kind}`} className="text-sm text-ink">
+                {label} time
+              </label>
+              <input
+                id={`${fieldId}-${kind}`}
+                type="time"
+                value={times[kind]}
+                aria-invalid={!valid}
+                aria-describedby={`${fieldId}-${kind}-help`}
+                onChange={(event) => change(kind, event.target.value)}
+                className={inputClass}
+              />
+              <p id={`${fieldId}-${kind}-help`} className={`text-xs ${valid ? "text-ink-soft" : "text-release"}`}>
+                {valid ? `Shows “${NUDGE_TITLE[kind]}”.` : "Enter a time."}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+      {permission === "default" && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" onClick={() => void allow()} className={primaryButton}>
+            Allow notifications
+          </button>
+          <p className="text-sm text-ink-soft">The app needs your permission before it can show them.</p>
+        </div>
+      )}
+      {permission === "denied" && (
+        <p className="text-sm text-ink-soft">
+          Notifications are blocked for this app, so none will show. Allow them in your system or browser settings.
+        </p>
+      )}
+      {permission === "unsupported" && (
+        <p className="text-sm text-ink-soft">This window cannot show system notifications.</p>
+      )}
     </SectionShell>
   )
 }

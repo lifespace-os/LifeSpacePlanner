@@ -25,6 +25,7 @@ import {
   type KanbanCard,
   type KanbanColumn,
 } from "@/lib/kanban-data"
+import { isNudge, type WorkspaceNudge } from "@/lib/nudge"
 import { isViewHref, type ViewHref } from "@/lib/views"
 
 /** One address for the workspace. A later server can answer the same path. */
@@ -68,9 +69,11 @@ export type WorkspaceDoc = {
   life?: WorkspaceLife
   /** The view the header slot remembers. Absent until a view has been chosen. */
   lastView?: ViewHref
+  /** The two daily notification times and the day each last fired. Absent until a time is changed. */
+  nudge?: WorkspaceNudge
 }
 
-export type WorkspaceSliceKey = "missionText" | "notes" | "rings" | "kanban" | "board" | "life" | "lastView"
+export type WorkspaceSliceKey = "missionText" | "notes" | "rings" | "kanban" | "board" | "life" | "lastView" | "nudge"
 
 export const SAMPLE_MISSION = "I live strong and healthy, close to the people I love, with time left for what I enjoy."
 
@@ -118,6 +121,7 @@ export function parseWorkspace(value: unknown): { ok: true; doc: WorkspaceDoc } 
   if (!isBoard(value.board)) return fail("The workspace file is missing the board layout.")
   if (value.life !== undefined && !isLife(value.life)) return fail("The life in weeks settings in the file are not valid.")
   if (value.lastView !== undefined && !isViewHref(value.lastView)) return fail("The remembered view in the file is not valid.")
+  if (value.nudge !== undefined && !isNudge(value.nudge)) return fail("The daily nudge times in the file are not valid.")
   return { ok: true, doc: value as WorkspaceDoc }
 }
 
