@@ -20,11 +20,13 @@ import {
   KANBAN_BOARDS,
   defaultCards,
   defaultColumns,
+  isCardOrigin,
   type ColumnKind,
   type KanbanBoardId,
   type KanbanCard,
   type KanbanColumn,
 } from "@/lib/kanban-data"
+import { isReviews, type WeeklyReviews } from "@/lib/dashboard"
 import { isNudge, type WorkspaceNudge } from "@/lib/nudge"
 import { isViewHref, type ViewHref } from "@/lib/views"
 
@@ -71,9 +73,20 @@ export type WorkspaceDoc = {
   lastView?: ViewHref
   /** The two daily notification times and the day each last fired. Absent until a time is changed. */
   nudge?: WorkspaceNudge
+  /** The weekly reviews, by the Monday of their week. Absent until one is saved. */
+  reviews?: WeeklyReviews
 }
 
-export type WorkspaceSliceKey = "missionText" | "notes" | "rings" | "kanban" | "board" | "life" | "lastView" | "nudge"
+export type WorkspaceSliceKey =
+  | "missionText"
+  | "notes"
+  | "rings"
+  | "kanban"
+  | "board"
+  | "life"
+  | "lastView"
+  | "nudge"
+  | "reviews"
 
 export const SAMPLE_MISSION = "I live strong and healthy, close to the people I love, with time left for what I enjoy."
 
@@ -122,6 +135,7 @@ export function parseWorkspace(value: unknown): { ok: true; doc: WorkspaceDoc } 
   if (value.life !== undefined && !isLife(value.life)) return fail("The life in weeks settings in the file are not valid.")
   if (value.lastView !== undefined && !isViewHref(value.lastView)) return fail("The remembered view in the file is not valid.")
   if (value.nudge !== undefined && !isNudge(value.nudge)) return fail("The daily nudge times in the file are not valid.")
+  if (value.reviews !== undefined && !isReviews(value.reviews)) return fail("The weekly reviews in the file are not valid.")
   return { ok: true, doc: value as WorkspaceDoc }
 }
 
@@ -241,6 +255,8 @@ function isCard(value: unknown): boolean {
     Array.isArray(value.goalIds) &&
     (value.steps === undefined || (Array.isArray(value.steps) && value.steps.every(isStep))) &&
     (value.remind === undefined || typeof value.remind === "string") &&
+    (value.fromCard === undefined || isCardOrigin(value.fromCard)) &&
+    (value.doneAt === undefined || typeof value.doneAt === "string") &&
     (value.repeat === undefined || isRepeat(value.repeat)) &&
     (value.occurrence === undefined || typeof value.occurrence === "number") &&
   (value.hashtags === undefined || (Array.isArray(value.hashtags) && value.hashtags.every((tag) => typeof tag === "string"))) &&

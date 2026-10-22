@@ -14,6 +14,7 @@ import {
   type KanbanColumn,
 } from "@/lib/kanban-data"
 import { useGoals } from "@/components/goals-provider"
+import { goalTaskCounts, taskStates } from "@/lib/dashboard"
 import { newId } from "@/lib/workspace"
 import { finishedCard, nextCopy, todayIso } from "@/lib/repeat"
 import { useMission } from "@/components/mission-provider"
@@ -102,29 +103,10 @@ export function KanbanScreen() {
   const focusedId = ringsOn && !resultsOn && ringFocusId && ringNotes.some((note) => note.id === ringFocusId) ? ringFocusId : null
   const below = useMemo(() => (focusedId ? belowIds(focusedId, notes, rings) : null), [focusedId, notes, rings])
   const shownRingNotes = below ? ringNotes.filter((note) => below.has(note.id)) : ringNotes
-  const taskCounts = useMemo(() => {
-    const finishedByTask = new Map<string, boolean>()
-    const goalIdsByTask = new Map<string, string[]>()
-    for (const card of cards) {
-      const key = resultKey(card)
-      const finished = card.inResults || columnsByBoard[card.boardId].find((column) => column.id === card.columnId)?.kind === "done"
-      finishedByTask.set(key, (finishedByTask.get(key) ?? false) || finished)
-      goalIdsByTask.set(key, [...(goalIdsByTask.get(key) ?? []), ...card.goalIds])
-    }
-    const result: Record<string, { done: number; total: number }> = {}
-    for (const note of ringNotes) {
-      const subtree = belowIds(note.id, notes, rings)
-      let done = 0
-      let total = 0
-      for (const [key, goalIds] of goalIdsByTask) {
-        if (!goalIds.some((id) => subtree.has(id))) continue
-        total += 1
-        if (finishedByTask.get(key)) done += 1
-      }
-      result[note.id] = { done, total }
-    }
-    return result
-  }, [ringNotes, notes, rings, cards, columnsByBoard])
+  const taskCounts = useMemo(
+    () => goalTaskCounts(taskStates(cards, columnsByBoard), notes, rings),
+    [notes, rings, cards, columnsByBoard],
+  )
   const activeFilter = useMemo(() => {
     if (!cardFilter.ring) return cardFilter
     const known = ringHashtags(cardFilter.ring, notes, rings).some((entry) => entry.tag === cardFilter.tag)
@@ -194,7 +176,8 @@ export function KanbanScreen() {
       const rest = previous.filter((item) => item.id !== cardId)
       const index = beforeId ? rest.findIndex((item) => item.id === beforeId) : -1
       const at = index < 0 ? rest.length : index
-      const moved = { ...(nextOne ? finishedCard(card) : card), boardId: targetBoard, columnId }
+      const doneAt = column.kind === "done" ? (card.doneAt ?? todayIso()) : undefined
+      const moved = { ...(nextOne ? finishedCard(card) : card), boardId: targetBoard, columnId, doneAt }
       return [...rest.slice(0, at), moved, ...rest.slice(at), ...(nextOne ? [nextOne] : [])]
     })
     const targetName = KANBAN_BOARDS.find((item) => item.id === targetBoard)?.name

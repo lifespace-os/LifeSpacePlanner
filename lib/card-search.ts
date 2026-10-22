@@ -1,4 +1,12 @@
-import { CARD_MIN_HEIGHT, normalizeHashtag, type GoalRing, type IkigaiCircleId, type Note } from "@/lib/board-data"
+import {
+  BUILT_IN_RINGS,
+  CARD_MIN_HEIGHT,
+  normalizeHashtag,
+  type GoalRing,
+  type IkigaiCircleId,
+  type Note,
+} from "@/lib/board-data"
+import { originOf } from "@/lib/dashboard"
 import { KANBAN_BOARDS, type KanbanCard, type KanbanColumn, type KanbanBoardId } from "@/lib/kanban-data"
 import { newId } from "@/lib/workspace"
 
@@ -213,9 +221,16 @@ function rewireAll(notes: Note[], cards: KanbanCard[], from: string, to: string)
 
 /**
  * Turns a whiteboard card into a task in the first to-do column of All work. The card leaves the whiteboard. Free lines
- * to it follow the task. A card that other cards hang under on the goal map cannot be turned.
+ * to it follow the task. A card that other cards hang under on the goal map cannot be turned. The task keeps the marks
+ * the card had, so the Dashboard can follow it from the whiteboard to Done.
  */
-export function noteToTask(notes: Note[], cards: KanbanCard[], id: string, columns: KanbanColumn[]): Change {
+export function noteToTask(
+  notes: Note[],
+  cards: KanbanCard[],
+  id: string,
+  columns: KanbanColumn[],
+  rings: GoalRing[] = BUILT_IN_RINGS,
+): Change {
   const note = notes.find((item) => item.id === id)
   if (!note) return { ok: false, message: "That card is gone." }
   const title = noteText(note)
@@ -247,6 +262,7 @@ export function noteToTask(notes: Note[], cards: KanbanCard[], id: string, colum
     inResults: false,
     hashtags: [...note.hashtags],
     freeIds: [...new Set(free.filter((item) => item !== "mission" && item !== id))],
+    fromCard: originOf(note, rings),
   }
   const rewired = rewireAll(
     notes.filter((item) => item.id !== id),
@@ -290,7 +306,7 @@ export function taskToNote(notes: Note[], cards: KanbanCard[], id: string): Chan
     y: bottom + 40,
     rotation: 0,
     z: maxZ + 1,
-    mission: null,
+    mission: card.fromCard?.choice ?? null,
     labels: {},
     task: null,
     details: hasDetails ? { title: card.title, since: card.since, due: card.due, owner: card.owner } : null,

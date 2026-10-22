@@ -81,7 +81,7 @@ export function CardSearch() {
       setConfirmBack(true)
       return
     }
-    apply(noteToTask(notes, cards, chosen.ref.id, columnsByBoard.all))
+    apply(noteToTask(notes, cards, chosen.ref.id, columnsByBoard.all, rings))
   }
 
   function convertBack() {

@@ -82,6 +82,30 @@ export type KanbanCard = {
   freeIds?: string[]
   /** The day to ask again, yyyy-mm-dd. Used only in "In progress, their move". It never moves the card. */
   remind?: string
+  /** Set when the task was made from a whiteboard card. It keeps the marks the card had. */
+  fromCard?: CardOrigin
+  /** The day the task moved into Done, yyyy-mm-dd. Missing for tasks finished before dates were kept. */
+  doneAt?: string
+}
+
+/** The marks a whiteboard card carried when it became a task. */
+export type CardOrigin = {
+  /** Want or Must, or null when the card sat in neither zone. */
+  zone: "want" | "must" | null
+  /** Keep or Release, or null when the card was not marked. */
+  choice: "keep" | "release" | null
+  /** The id of the goal ring the card sat on, or null when it was on none. */
+  ringId: string | null
+}
+
+export function isCardOrigin(value: unknown): value is CardOrigin {
+  if (typeof value !== "object" || value === null) return false
+  const origin = value as Record<string, unknown>
+  return (
+    (origin.zone === null || origin.zone === "want" || origin.zone === "must") &&
+    (origin.choice === null || origin.choice === "keep" || origin.choice === "release") &&
+    (origin.ringId === null || typeof origin.ringId === "string")
+  )
 }
 
 /** The one column whose tasks have a Remind date. */
@@ -325,8 +349,60 @@ function withRemind(cards: KanbanCard[]): KanbanCard[] {
   })
 }
 
+/**
+ * Sample tasks made from a whiteboard card, with the marks the card had, so the Dashboard flow is not empty.
+ * Copies of one task on several boards share a title, so each copy carries the same marks.
+ */
+const SAMPLE_ORIGIN: Record<string, CardOrigin> = {
+  a11: { zone: "want", choice: "keep", ringId: "tasks" },
+  w7: { zone: "want", choice: "keep", ringId: "tasks" },
+  d6: { zone: "want", choice: "keep", ringId: "tasks" },
+  m4: { zone: "want", choice: "keep", ringId: "project" },
+  y3: { zone: "want", choice: "keep", ringId: "life" },
+  a4: { zone: "want", choice: "keep", ringId: "needs" },
+  a10: { zone: "must", choice: "keep", ringId: null },
+  w6: { zone: "must", choice: "keep", ringId: null },
+  d4: { zone: "must", choice: "keep", ringId: null },
+  a12: { zone: "must", choice: "release", ringId: null },
+  a5: { zone: "must", choice: null, ringId: null },
+  a19: { zone: "must", choice: "keep", ringId: null },
+  w12: { zone: "must", choice: "keep", ringId: null },
+  a20: { zone: "must", choice: null, ringId: null },
+  w11: { zone: "must", choice: null, ringId: null },
+  d9: { zone: null, choice: "keep", ringId: null },
+}
+
+function withOrigin(cards: KanbanCard[]): KanbanCard[] {
+  return cards.map((item) => {
+    const fromCard = SAMPLE_ORIGIN[item.id]
+    return fromCard ? { ...item, fromCard } : item
+  })
+}
+
+/** Sample finish days for the tasks already in Done. */
+const SAMPLE_DONE_AT: Record<string, string> = {
+  a19: "2026-10-09",
+  a20: "2026-10-10",
+  a21: "2026-10-11",
+  w11: "2026-10-10",
+  w12: "2026-10-09",
+  d9: "2026-10-22",
+  d10: "2026-10-20",
+  m5: "2026-10-05",
+  m6: "2026-10-08",
+  y6: "2026-07-20",
+  y7: "2026-09-30",
+}
+
+function withDoneAt(cards: KanbanCard[]): KanbanCard[] {
+  return cards.map((item) => {
+    const doneAt = SAMPLE_DONE_AT[item.id]
+    return doneAt ? { ...item, doneAt } : item
+  })
+}
+
 export function defaultCards(): KanbanCard[] {
-  return withRemind(withGoals(withSchedule([
+  return withDoneAt(withOrigin(withRemind(withGoals(withSchedule([
     card("a1", "all", "backlog", "Sort the photo archive into years", "home", "2026-11-29", "Me"),
     card("a2", "all", "backlog", "Draft the savings plan for next spring", "money", "2026-12-05", "Me"),
     card("a3", "all", "backlog", "Find a weekly pottery class", "learning", "2026-11-14", "Me"),
@@ -387,7 +463,7 @@ export function defaultCards(): KanbanCard[] {
     card("d8", "day", "theirs", "Wait for Dana's tax draft", "money", "2026-10-13", "Dana"),
     card("d9", "day", "done", "Water the plants", "home", "2026-10-13", "Me"),
     card("d10", "day", "done", "Morning pages", "freedom", "2026-10-13", "Me"),
-  ])))
+  ])))))
 }
 
 /** Format HH:mm as "9:00 AM". */
