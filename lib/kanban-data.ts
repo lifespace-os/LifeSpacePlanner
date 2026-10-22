@@ -80,7 +80,12 @@ export type KanbanCard = {
   hashtags?: string[]
   /** Free lines to other cards. They set no ring and are not a path to the mission. */
   freeIds?: string[]
+  /** The day to ask again, yyyy-mm-dd. Used only in "In progress, their move". It never moves the card. */
+  remind?: string
 }
+
+/** The one column whose tasks have a Remind date. */
+export const REMIND_COLUMN_ID = "theirs"
 
 /** A card has a path to the mission when it holds the goal above or the second line to it. Saved state only, never a draft. */
 export function hasMissionPath(card: KanbanCard) {
@@ -129,6 +134,7 @@ export type CardDraft = {
   secondLine: boolean
   steps: CardStep[]
   repeat: CardRepeat
+  remind: string
 }
 
 export function draftOf(card: KanbanCard): CardDraft {
@@ -142,6 +148,7 @@ export function draftOf(card: KanbanCard): CardDraft {
     secondLine: card.secondLine,
     steps: card.steps ?? [],
     repeat: card.repeat ?? ONCE,
+    remind: card.remind ?? "",
   }
 }
 
@@ -154,6 +161,7 @@ export function sameDraft(a: CardDraft, b: CardDraft) {
     a.endTime === b.endTime &&
     a.missionLink === b.missionLink &&
     a.secondLine === b.secondLine &&
+    a.remind === b.remind &&
     sameRepeat(a.repeat, b.repeat) &&
     a.steps.length === b.steps.length &&
     a.steps.every((step, index) => {
@@ -302,8 +310,23 @@ function withSchedule(cards: KanbanCard[]): KanbanCard[] {
   })
 }
 
+/** Sample Remind dates for the waiting tasks, so the board shows them from the first load. */
+const SAMPLE_REMIND: Record<string, string> = {
+  a15: "2026-10-15",
+  w9: "2026-10-15",
+  a16: "2026-10-19",
+  d8: "2026-10-14",
+}
+
+function withRemind(cards: KanbanCard[]): KanbanCard[] {
+  return cards.map((item) => {
+    const remind = SAMPLE_REMIND[item.id]
+    return remind ? { ...item, remind } : item
+  })
+}
+
 export function defaultCards(): KanbanCard[] {
-  return withGoals(withSchedule([
+  return withRemind(withGoals(withSchedule([
     card("a1", "all", "backlog", "Sort the photo archive into years", "home", "2026-11-29", "Me"),
     card("a2", "all", "backlog", "Draft the savings plan for next spring", "money", "2026-12-05", "Me"),
     card("a3", "all", "backlog", "Find a weekly pottery class", "learning", "2026-11-14", "Me"),
@@ -364,7 +387,7 @@ export function defaultCards(): KanbanCard[] {
     card("d8", "day", "theirs", "Wait for Dana's tax draft", "money", "2026-10-13", "Dana"),
     card("d9", "day", "done", "Water the plants", "home", "2026-10-13", "Me"),
     card("d10", "day", "done", "Morning pages", "freedom", "2026-10-13", "Me"),
-  ]))
+  ])))
 }
 
 /** Format HH:mm as "9:00 AM". */

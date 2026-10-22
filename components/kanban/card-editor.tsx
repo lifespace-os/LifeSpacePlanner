@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react"
 import { X } from "lucide-react"
 import {
+  REMIND_COLUMN_ID,
   draftIssue,
   type CardDraft,
   type CardRepeat,
@@ -203,6 +204,26 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
                 </div>
               </fieldset>
             </div>
+
+            {card.columnId === REMIND_COLUMN_ID && (
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div className="min-w-0">
+                  <label htmlFor={`${id}-remind`} className="mb-1.5 block text-sm font-medium text-ink">
+                    Remind
+                  </label>
+                  <input
+                    id={`${id}-remind`}
+                    type="date"
+                    value={draft.remind}
+                    onChange={(event) => onChange({ remind: event.target.value })}
+                    className={FIELD}
+                  />
+                </div>
+                <p className="text-xs leading-relaxed text-ink-soft sm:self-end sm:pb-2">
+                  The day to ask again. The card stays in this column.
+                </p>
+              </div>
+            )}
 
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium text-ink">Links to the mission</legend>

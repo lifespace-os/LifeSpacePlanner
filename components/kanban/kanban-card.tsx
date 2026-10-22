@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react"
 import clsx from "clsx"
-import { ArrowRight, Check, Clock, Ellipsis, Undo2 } from "lucide-react"
+import { ArrowRight, BellRing, Check, Clock, Ellipsis, Undo2 } from "lucide-react"
 import { SetShape } from "@/components/whiteboard/label-chip"
 import { getLabel } from "@/lib/board-data"
 import {
   KANBAN_BOARDS,
+  REMIND_COLUMN_ID,
   formatDue,
   formatTimeRange,
   initials,
@@ -193,6 +194,17 @@ export function KanbanCardView({
               <span className="sr-only">Time </span>
               {timeRange}
             </span>
+          </p>
+        )}
+
+        {!inResults && card.columnId === REMIND_COLUMN_ID && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-soft">
+            <BellRing aria-hidden="true" className="size-3.5 shrink-0" />
+            {card.remind ? (
+              <time dateTime={card.remind}>Remind {formatDue(card.remind)}</time>
+            ) : (
+              <span className="italic">No remind date</span>
+            )}
           </p>
         )}
 

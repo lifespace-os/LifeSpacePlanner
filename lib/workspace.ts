@@ -236,6 +236,7 @@ function isCard(value: unknown): boolean {
     BOARD_IDS.some((id) => id === value.boardId) &&
     Array.isArray(value.goalIds) &&
     (value.steps === undefined || (Array.isArray(value.steps) && value.steps.every(isStep))) &&
+    (value.remind === undefined || typeof value.remind === "string") &&
     (value.repeat === undefined || isRepeat(value.repeat)) &&
     (value.occurrence === undefined || typeof value.occurrence === "number") &&
   (value.hashtags === undefined || (Array.isArray(value.hashtags) && value.hashtags.every((tag) => typeof tag === "string"))) &&

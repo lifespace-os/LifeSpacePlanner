@@ -84,6 +84,7 @@ export function nextCopy(card: KanbanCard, today: string, id: string): KanbanCar
     inResults: false,
     since: card.since ? addDays(card.since, shift) : "",
     due: card.due ? addDays(card.due, shift) : card.since ? "" : next,
+    remind: card.remind ? addDays(card.remind, shift) : undefined,
     steps: card.steps?.map((step) => ({ ...step, done: false })),
     repeat: copyRepeat,
     occurrence: (card.occurrence ?? 0) + 1,
