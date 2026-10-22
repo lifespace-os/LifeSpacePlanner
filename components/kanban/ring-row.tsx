@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import clsx from "clsx"
+import { useLanguage } from "@/components/language-provider"
 import { getCardColor, getGoalLevel, type GoalRing, type Note } from "@/lib/board-data"
 import { goalRingOf } from "@/lib/board-data"
 
@@ -16,25 +17,25 @@ type RingRowProps = {
 
 /** A row of the Map's ring cards. They are not kanban cards and never sit in a column. */
 export function RingRow({ cards, rings, focusId, taskCounts, onPick }: RingRowProps) {
+  const { t } = useLanguage()
+
   if (cards.length === 0) {
     return (
       <p className="mx-6 mb-3 text-sm text-ink-soft">
-        No cards on a ring yet. Give a card a level in Goals on the{" "}
+        {t("ringRow.emptyBefore")}{" "}
         <Link href="/" className="font-medium text-ink underline underline-offset-2 hover:text-accent">
-          Whiteboard
+          {t("nav.whiteboard")}
         </Link>
-        .
+        {t("ringRow.emptyAfter")}
       </p>
     )
   }
 
   return (
-    <section aria-label="Ring cards" className="mx-6 mb-3">
+    <section aria-label={t("ringRow.label")} className="mx-6 mb-3">
       <div className="mb-1.5 flex items-baseline justify-between gap-4">
-        <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-soft">Ring cards</h2>
-        <p className="text-xs text-ink-soft">
-          {focusId ? "Press the card again, or Esc, to bring the board back." : "Press a card to see it and everything below it."}
-        </p>
+        <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-ink-soft">{t("ringRow.label")}</h2>
+        <p className="text-xs text-ink-soft">{focusId ? t("ringRow.hintOn") : t("ringRow.hintOff")}</p>
       </div>
       <ul className="flex gap-2 overflow-x-auto pb-1">
         {cards.map((note) => {
@@ -57,10 +58,10 @@ export function RingRow({ cards, rings, focusId, taskCounts, onPick }: RingRowPr
                 )}
               >
                 <span className="text-[10px] font-medium uppercase tracking-[0.12em] opacity-70">{level}</span>
-                <span className="line-clamp-2 text-pretty text-sm font-medium leading-snug">{note.text || "Untitled card"}</span>
+                <span className="line-clamp-2 text-pretty text-sm font-medium leading-snug">{note.text || t("ringRow.untitled")}</span>
                 <span
                   data-task-progress
-                  aria-label={`${done} of ${total} tasks finished`}
+                  aria-label={t("ringRow.progress", { done, total })}
                   className="text-xs font-medium tabular-nums opacity-80"
                 >
                   {done} / {total}

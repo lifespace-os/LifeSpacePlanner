@@ -42,7 +42,7 @@ export function placeLabel(
   t: Translate,
   place: { boardId: KanbanBoardId; column: Pick<KanbanColumn, "id" | "name"> | null } | null,
 ) {
-  if (!place) return t("search.place.whiteboard")
+  if (!place) return t("search.whiteboard")
   const board = boardLabel(t, place.boardId)
   return place.column ? `${board} · ${columnLabel(t, place.column)}` : board
 }

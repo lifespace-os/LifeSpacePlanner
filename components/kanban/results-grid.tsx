@@ -1,5 +1,6 @@
 "use client"
 
+import { useLanguage } from "@/components/language-provider"
 import type { KanbanCard } from "@/lib/kanban-data"
 import { KanbanCardView } from "./kanban-card"
 
@@ -18,19 +19,21 @@ const noop = () => {}
 
 /** The same kanban cards as a grid. No columns and no ring row. */
 export function ResultsGrid({ cards, total, highlightFor, boardNameOf, onOpen, onReturn }: ResultsGridProps) {
+  const { t } = useLanguage()
+
   return (
     <section
       id="results-panel"
-      aria-label="Results"
+      aria-label={t("resultsGrid.label")}
       className="min-h-0 flex-1 overflow-y-auto px-6 pb-6"
     >
       {total === 0 ? (
         <p className="max-w-md text-pretty text-sm text-ink-soft">
-          Nothing on Results yet. Open a board and use Move to Results on a card in Done, or move everything in Done at once.
+          {t("resultsGrid.empty")}
         </p>
       ) : cards.length === 0 ? (
         <p className="max-w-md text-pretty text-sm text-ink-soft">
-          The filter leaves none of the {total} {total === 1 ? "card" : "cards"} on Results. Clear it to see them.
+          {t(total === 1 ? "resultsGrid.filtered.one" : "resultsGrid.filtered.other", { count: total })}
         </p>
       ) : (
         <ul className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] items-start gap-3">

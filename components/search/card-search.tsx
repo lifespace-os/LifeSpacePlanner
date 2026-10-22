@@ -3,6 +3,8 @@
 import { useId, useMemo, useState } from "react"
 import { useGoals } from "@/components/goals-provider"
 import { useKanban } from "@/components/kanban/kanban-provider"
+import { useLanguage } from "@/components/language-provider"
+import { placeLabel, searchMessage } from "@/lib/kanban-names"
 import { ConfirmDialog } from "@/components/settings/confirm-dialog"
 import { CardWindow, type Feedback } from "@/components/search/card-window"
 import type { IkigaiCircleId } from "@/lib/board-data"
@@ -32,6 +34,7 @@ function SearchIcon() {
 
 /** A search field for the header, and the window it opens. Finds whiteboard cards and kanban tasks by text or hashtag. */
 export function CardSearch() {
+  const { t, tn } = useLanguage()
   const { notes, setNotes, rings } = useGoals()
   const { cards, setCards, columnsByBoard, openId, closeCard, revertDraft } = useKanban()
   const [query, setQuery] = useState("")
@@ -60,13 +63,13 @@ export function CardSearch() {
 
   function apply(change: Change) {
     if (!change.ok) {
-      setFeedback({ text: change.message, error: true })
+      setFeedback({ text: searchMessage(t, change.message), error: true })
       return false
     }
     setNotes(change.notes)
     setCards(change.cards)
     setChosenRef(change.ref)
-    setFeedback({ text: change.message, error: false })
+    setFeedback({ text: searchMessage(t, change.message), error: false })
     return true
   }
 
@@ -97,12 +100,12 @@ export function CardSearch() {
         <input
           type="search"
           role="combobox"
-          aria-label="Search cards"
+          aria-label={t("search.label")}
           aria-expanded={dropdownShown && dropdown.length > 0}
           aria-controls={listId}
           aria-activedescendant={dropdownShown && dropdown[active] ? `${listId}-${active}` : undefined}
           aria-autocomplete="list"
-          placeholder="Search cards or #tag"
+          placeholder={t("search.placeholder")}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value)
@@ -130,7 +133,7 @@ export function CardSearch() {
         />
         <button
           type="button"
-          aria-label="Open card search window"
+          aria-label={t("search.openWindow")}
           onClick={() => openWindow(null)}
           className="flex size-8 items-center justify-center rounded-md border border-line bg-card text-ink-soft transition-colors hover:bg-line/40 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
@@ -142,9 +145,9 @@ export function CardSearch() {
             className="absolute top-full left-0 z-30 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-md border border-line bg-board shadow-lg"
           >
             {dropdown.length === 0 ? (
-              <p className="px-3 py-2 text-sm text-ink-soft">No card matches.</p>
+              <p className="px-3 py-2 text-sm text-ink-soft">{t("search.noMatch")}</p>
             ) : (
-              <ul id={listId} role="listbox" aria-label="Matching cards" className="max-h-80 overflow-y-auto py-1">
+              <ul id={listId} role="listbox" aria-label={t("search.matching")} className="max-h-80 overflow-y-auto py-1">
                 {dropdown.map((hit, index) => (
                   <li
                     key={`${hit.ref.kind}-${hit.ref.id}`}
@@ -155,8 +158,8 @@ export function CardSearch() {
                     onMouseEnter={() => setActive(index)}
                     className="flex cursor-pointer flex-col gap-0.5 px-3 py-2 aria-selected:bg-line/50"
                   >
-                    <span className="text-[11px] tracking-wide text-ink-soft uppercase">{hit.place}</span>
-                    <span className="line-clamp-1 text-sm text-ink">{hit.text}</span>
+                    <span className="text-[11px] tracking-wide text-ink-soft uppercase">{placeLabel(t, hit.place)}</span>
+                    <span className="line-clamp-1 text-sm text-ink">{hit.text || t("search.blankCard")}</span>
                   </li>
                 ))}
               </ul>
@@ -167,7 +170,7 @@ export function CardSearch() {
                 onClick={() => openWindow(null)}
                 className="w-full border-t border-line px-3 py-2 text-left text-xs text-ink-soft hover:bg-line/40"
               >
-                {hits.length - DROPDOWN_LIMIT} more. Open the window to see them all.
+                {t("search.more", { count: hits.length - DROPDOWN_LIMIT })}
               </button>
             ) : null}
           </div>
@@ -196,15 +199,12 @@ export function CardSearch() {
 
       <ConfirmDialog
         open={confirmBack}
-        title="Turn this task back into a whiteboard card?"
-        confirmLabel="Turn back into a card"
+        title={t("search.confirmTitle")}
+        confirmLabel={t("search.confirmLabel")}
         onConfirm={convertBack}
         onCancel={() => setConfirmBack(false)}
       >
-        <p>
-          The task leaves the Kanban board and returns to the Whiteboard as a plain card below the others. Its dates and
-          owner are kept. Its steps, repeat rule, times, and column are dropped. Goal lines become plain lines.
-        </p>
+        <p>{t("search.confirmBody")}</p>
       </ConfirmDialog>
     </>
   )
