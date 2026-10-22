@@ -18,6 +18,11 @@
   --color-release: var(--t-release);
   --color-link: var(--t-link);
 
+  /* On a dark theme a dark shadow cannot be seen, so the card hover is a light halo in the theme's ink color. */
+  --shadow-halo:
+    0 0 0 1px color-mix(in srgb, var(--t-ink) 55%, transparent),
+    0 0 14px 2px color-mix(in srgb, var(--t-ink) 32%, transparent);
+
   /* Whiteboard card colors never change with the theme, so the text on them has a fixed ink. */
   --color-note: #f7e8a4;
   --color-note-edge: #e6d27c;

@@ -43,7 +43,7 @@ export function TaskChip({ task, compact = false, draggingId, onOpen, onDragStar
       className={clsx(
         "flex items-start gap-1.5 rounded-md border border-line bg-board px-2 py-1 shadow-sm",
         task.done ? "bg-card/70" : "cursor-grab active:cursor-grabbing",
-        draggingId === null && "transition-shadow hover:shadow-md",
+        draggingId === null && "transition-shadow hover:shadow-md dark-theme:hover:shadow-halo",
         draggingId === task.id && "opacity-40",
       )}
     >

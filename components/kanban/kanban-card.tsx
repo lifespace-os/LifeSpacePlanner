@@ -132,7 +132,8 @@ export function KanbanCardView({
             : undefined
         }
         className={clsx(
-          "group relative rounded-md border border-line bg-card px-3 py-2.5 shadow-sm transition-shadow hover:shadow-md",
+          "group relative rounded-md border border-line bg-card px-3 py-2.5 shadow-sm transition-shadow",
+          !dragging && "hover:shadow-md dark-theme:hover:shadow-halo",
           inResults ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
           done && "bg-card/70",
         )}
