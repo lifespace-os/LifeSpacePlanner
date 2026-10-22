@@ -52,7 +52,7 @@ export function RingRow({ cards, rings, focusId, taskCounts, onPick }: RingRowPr
                 style={{ backgroundColor: color.fill, borderColor: color.edge }}
                 className={clsx(
                   "flex h-full w-52 flex-col gap-1 rounded-md border px-3 py-2 text-left shadow-sm transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                  color.dark ? "text-board" : "text-ink",
+                  color.dark ? "text-paper-light" : "text-paper-ink",
                   selected && "outline-2 outline-offset-2 outline-accent",
                 )}
               >

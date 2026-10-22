@@ -5,7 +5,9 @@ import { GoalsProvider } from "@/components/goals-provider"
 import { KanbanProvider } from "@/components/kanban/kanban-provider"
 import { MissionProvider } from "@/components/mission-provider"
 import { NudgeRunner } from "@/components/nudge-runner"
+import { ThemeApplier } from "@/components/theme-applier"
 import { WorkspaceProvider } from "@/components/workspace-provider"
+import { themeCss } from "@/lib/themes"
 import "./globals.css"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" })
@@ -18,14 +20,17 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#ece6da",
-  colorScheme: "light",
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} ${newsreader.variable}`}>
+    <html lang="en" className={`${geist.variable} ${newsreader.variable} bg-desk`} suppressHydrationWarning>
+      <head>
+        <style id="theme-variables" dangerouslySetInnerHTML={{ __html: themeCss() }} />
+      </head>
       <body className="min-h-dvh font-sans antialiased" suppressHydrationWarning>
         <WorkspaceProvider>
+          <ThemeApplier />
           <MissionProvider>
             <GoalsProvider>
               <KanbanProvider>

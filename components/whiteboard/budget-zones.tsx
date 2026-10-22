@@ -16,12 +16,12 @@ export const BUDGET_COPY = {
   investment: {
     title: "Investment",
     caption: "Spending that builds something",
-    tint: "bg-[#7fbf9a]/20 border-[#4f9a72]/60 text-[#2f6d4d]",
+    tint: "bg-[#7fbf9a]/20 border-[#4f9a72]/60 text-[#2f6d4d] dark-theme:text-ink",
   },
   expense: {
     title: "Expense",
     caption: "Spending that is used up",
-    tint: "bg-[#e0a07f]/20 border-[#c0704a]/60 text-[#8a4a2a]",
+    tint: "bg-[#e0a07f]/20 border-[#c0704a]/60 text-[#8a4a2a] dark-theme:text-ink",
   },
 } as const
 

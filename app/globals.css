@@ -1,25 +1,30 @@
 @import "tailwindcss";
 
+@custom-variant dark-theme (&:where([data-theme="dusk"] *, [data-theme="evening"] *, [data-theme="night"] *, [data-theme="late-night"] *));
+
 @theme inline {
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
   --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
 
-  --color-desk: #ece6da;
-  --color-board: #faf7f0;
-  --color-ink: #23272b;
-  --color-ink-soft: #5f5b53;
-  --color-line: #d8cfbf;
-  --color-accent: #2f5d50;
-  --color-accent-soft: #dfe9e3;
+  /* Interface colors follow the chosen theme. The --t-* values come from lib/themes.ts. */
+  --color-desk: var(--t-desk);
+  --color-board: var(--t-board);
+  --color-ink: var(--t-ink);
+  --color-ink-soft: var(--t-ink-soft);
+  --color-line: var(--t-line);
+  --color-accent: var(--t-accent);
+  --color-accent-soft: var(--t-accent-soft);
+  --color-card: var(--t-card);
+  --color-release: var(--t-release);
+  --color-link: var(--t-link);
+
+  /* Whiteboard card colors never change with the theme, so the text on them has a fixed ink. */
   --color-note: #f7e8a4;
   --color-note-edge: #e6d27c;
-  --color-card: #fffdf8;
-  --color-release: #a8432f;
   --color-tie: #9a7226;
-}
-
-html {
-  color-scheme: light;
+  --color-paper-ink: #23272b;
+  --color-paper-soft: #5f5b53;
+  --color-paper-light: #faf7f0;
 }
 
 body {
@@ -29,7 +34,7 @@ body {
 
 .board-grain {
   background-color: var(--color-board);
-  background-image: radial-gradient(rgba(35, 39, 43, 0.07) 1px, transparent 1px);
+  background-image: radial-gradient(var(--t-board-dot) 1px, transparent 1px);
   background-size: 22px 22px;
 }
 
@@ -38,8 +43,8 @@ body {
     to bottom,
     transparent 0,
     transparent 23px,
-    rgba(59, 110, 165, 0.12) 23px,
-    rgba(59, 110, 165, 0.12) 24px
+    var(--t-task-rule) 23px,
+    var(--t-task-rule) 24px
   );
 }
 

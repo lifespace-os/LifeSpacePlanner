@@ -28,6 +28,7 @@ import {
 } from "@/lib/kanban-data"
 import { isReviews, type WeeklyReviews } from "@/lib/dashboard"
 import { isNudge, type WorkspaceNudge } from "@/lib/nudge"
+import { isThemeId, type ThemeId } from "@/lib/themes"
 import { isViewHref, type ViewHref } from "@/lib/views"
 
 /** One address for the workspace. A later server can answer the same path. */
@@ -75,6 +76,8 @@ export type WorkspaceDoc = {
   nudge?: WorkspaceNudge
   /** The weekly reviews, by the Monday of their week. Absent until one is saved. */
   reviews?: WeeklyReviews
+  /** The interface theme. Absent means Morning paper. */
+  theme?: ThemeId
 }
 
 export type WorkspaceSliceKey =
@@ -87,6 +90,7 @@ export type WorkspaceSliceKey =
   | "lastView"
   | "nudge"
   | "reviews"
+  | "theme"
 
 export const SAMPLE_MISSION = "I live strong and healthy, close to the people I love, with time left for what I enjoy."
 
@@ -136,6 +140,7 @@ export function parseWorkspace(value: unknown): { ok: true; doc: WorkspaceDoc } 
   if (value.lastView !== undefined && !isViewHref(value.lastView)) return fail("The remembered view in the file is not valid.")
   if (value.nudge !== undefined && !isNudge(value.nudge)) return fail("The daily nudge times in the file are not valid.")
   if (value.reviews !== undefined && !isReviews(value.reviews)) return fail("The weekly reviews in the file are not valid.")
+  if (value.theme !== undefined && !isThemeId(value.theme)) return fail("The theme in the file is not one of the seven themes.")
   return { ok: true, doc: value as WorkspaceDoc }
 }
 

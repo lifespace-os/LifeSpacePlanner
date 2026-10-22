@@ -246,7 +246,7 @@ export const NoteCard = memo(function NoteCard({
         "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-board",
         editing ? "cursor-text" : dragging ? "cursor-grabbing" : "cursor-grab",
         isTask ? "rounded-md border border-line border-t-4 border-t-accent bg-card" : "rounded-sm border-b-2",
-        !isTask && (color.dark ? "text-board" : "text-ink"),
+        !isTask && (color.dark ? "text-paper-light" : "text-paper-ink"),
         dragging || editing
           ? "shadow-[0_18px_30px_-12px_rgba(35,39,43,0.45)]"
           : "shadow-[0_1px_1px_rgba(35,39,43,0.08),0_6px_14px_-8px_rgba(35,39,43,0.35)] hover:shadow-[0_2px_3px_rgba(35,39,43,0.12),0_12px_22px_-10px_rgba(35,39,43,0.5)]",

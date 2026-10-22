@@ -14,7 +14,11 @@ import { AreaFrame } from "./area-frame"
 
 const ZONE_COPY = {
   want: { title: "Want", caption: "Things you choose", tint: "bg-accent-soft/50 border-accent/40 text-accent" },
-  must: { title: "Must", caption: "Things you owe", tint: "bg-[#f4e3d7]/60 border-[#b9773a]/45 text-[#8a5524]" },
+  must: {
+    title: "Must",
+    caption: "Things you owe",
+    tint: "bg-[#f4e3d7]/60 border-[#b9773a]/45 text-[#8a5524] dark-theme:bg-[#f4e3d7]/12 dark-theme:text-ink",
+  },
 } as const
 
 export function SortZones({

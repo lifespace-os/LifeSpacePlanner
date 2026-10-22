@@ -1,5 +1,6 @@
 "use client"
 
+import { Check } from "lucide-react"
 import { useEffect, useId, useRef, useState } from "react"
 import { ToggleSwitch } from "@/components/kanban/toggle-switch"
 import { ConfirmDialog } from "@/components/settings/confirm-dialog"
@@ -12,6 +13,7 @@ import {
   withTime,
   type NudgeKind,
 } from "@/lib/nudge"
+import { DEFAULT_THEME, THEMES, type Theme, type ThemeId } from "@/lib/themes"
 import {
   DEFAULT_LIFE,
   LIFE_YEARS_MAX,
@@ -38,6 +40,7 @@ export function SettingsScreen() {
     <main className="mx-auto w-full max-w-2xl px-6 py-10">
       <h1 className="font-serif text-4xl font-medium tracking-tight text-balance">Settings</h1>
       <div className="mt-8 flex flex-col gap-10">
+        <ThemeSection />
         <SampleStorySection />
         <BackupSection />
         <LifeSection />
@@ -58,6 +61,128 @@ function SectionShell({ id, title, children }: { id: string; title: string; chil
       </h2>
       {children}
     </section>
+  )
+}
+
+const THEME_GROUPS: { mode: Theme["mode"]; title: string }[] = [
+  { mode: "light", title: "Light" },
+  { mode: "dark", title: "Dark" },
+]
+
+function ThemeSection() {
+  const headingId = useId()
+  const { doc, report } = useWorkspace()
+  const current: ThemeId = doc.theme ?? DEFAULT_THEME
+  const optionRefs = useRef(new Map<ThemeId, HTMLButtonElement>())
+
+  function choose(id: ThemeId) {
+    report("theme", id)
+  }
+
+  function move(from: number, step: number) {
+    const next = THEMES[(from + step + THEMES.length) % THEMES.length]
+    choose(next.id)
+    optionRefs.current.get(next.id)?.focus()
+  }
+
+  function onKeyDown(event: React.KeyboardEvent, index: number) {
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      event.preventDefault()
+      move(index, 1)
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      event.preventDefault()
+      move(index, -1)
+    }
+  }
+
+  return (
+    <SectionShell id={headingId} title="Theme">
+      <p className="text-sm text-ink-soft">
+        Changes the colors of the app. Whiteboard card colors stay the same, and the Dashboard export is always a light
+        sheet.
+      </p>
+      <div role="radiogroup" aria-labelledby={headingId} className="flex flex-col gap-4">
+        {THEME_GROUPS.map((group) => (
+          <div key={group.mode} className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium text-ink-soft">{group.title}</h3>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {THEMES.map((theme, index) =>
+                theme.mode !== group.mode ? null : (
+                  <ThemeOption
+                    key={theme.id}
+                    theme={theme}
+                    selected={theme.id === current}
+                    onSelect={() => choose(theme.id)}
+                    onKeyDown={(event) => onKeyDown(event, index)}
+                    buttonRef={(node) => {
+                      if (node) optionRefs.current.set(theme.id, node)
+                      else optionRefs.current.delete(theme.id)
+                    }}
+                  />
+                ),
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </SectionShell>
+  )
+}
+
+function ThemeOption({
+  theme,
+  selected,
+  onSelect,
+  onKeyDown,
+  buttonRef,
+}: {
+  theme: Theme
+  selected: boolean
+  onSelect: () => void
+  onKeyDown: (event: React.KeyboardEvent) => void
+  buttonRef: (node: HTMLButtonElement | null) => void
+}) {
+  const c = theme.colors
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      tabIndex={selected ? 0 : -1}
+      onClick={onSelect}
+      onKeyDown={onKeyDown}
+      className={`flex flex-col gap-2 rounded-lg border bg-card p-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+        selected ? "border-accent ring-2 ring-accent" : "border-line hover:border-ink-soft"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className="flex h-16 items-stretch gap-1.5 rounded-md p-1.5"
+        style={{ background: c.desk }}
+      >
+        <span
+          className="flex flex-1 flex-col justify-between rounded-[5px] border p-1.5"
+          style={{ background: c.board, borderColor: c.line }}
+        >
+          <span className="text-xs leading-none font-semibold" style={{ color: c.ink }}>
+            Aa
+          </span>
+          <span className="h-1.5 w-8 rounded-full" style={{ background: c.accent }} />
+        </span>
+        <span
+          className="flex w-6 flex-col gap-1 rounded-[5px] border p-1"
+          style={{ background: c.card, borderColor: c.line }}
+        >
+          <span className="h-1 rounded-full" style={{ background: c.inkSoft }} />
+          <span className="h-1 rounded-full" style={{ background: c.accentSoft }} />
+        </span>
+      </span>
+      <span className="flex items-center justify-between gap-2 px-0.5 text-sm text-ink">
+        {theme.name}
+        {selected && <Check aria-hidden="true" className="size-4 shrink-0 text-accent" />}
+      </span>
+    </button>
   )
 }
 
@@ -163,6 +288,7 @@ function BackupSection() {
       life: incoming.life ?? doc.life,
       lastView: incoming.lastView ?? doc.lastView,
       nudge: incoming.nudge ?? doc.nudge,
+      theme: incoming.theme ?? doc.theme,
     })
     setBusy(false)
     setIncoming(null)

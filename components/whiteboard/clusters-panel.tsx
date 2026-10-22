@@ -129,7 +129,7 @@ export function ClustersPanel({
           </button>
         </div>
         {error ? (
-          <p id={errorId} role="alert" className="mt-1.5 text-sm text-[#8d3f4a]">
+          <p id={errorId} role="alert" className="mt-1.5 text-sm text-release">
             {error}
           </p>
         ) : null}

@@ -231,7 +231,7 @@ export function LabelsPanel({
           </button>
         </div>
         {error ? (
-          <p id={errorId} role="alert" className="mt-1.5 text-sm text-[#8d3f4a]">
+          <p id={errorId} role="alert" className="mt-1.5 text-sm text-release">
             {error}
           </p>
         ) : null}
@@ -355,7 +355,7 @@ function SectorRow({
       </div>
       <p className="truncate px-10 text-xs text-ink-soft">#{tag}</p>
       {error ? (
-        <p role="alert" className="px-10 pt-0.5 text-sm text-[#8d3f4a]">
+        <p role="alert" className="px-10 pt-0.5 text-sm text-release">
           {error}
         </p>
       ) : null}
