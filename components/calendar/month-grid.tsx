@@ -3,12 +3,13 @@
 import clsx from "clsx"
 import { DropCell } from "@/components/calendar/drop-cell"
 import { TaskChip, type ChipHandlers } from "@/components/calendar/task-chip"
+import { useLanguage } from "@/components/language-provider"
 import {
-  WEEKDAY_NAMES,
   coversDay,
   longDate,
   monthWeeks,
   sortForDay,
+  weekdayNames,
   type CalendarTask,
   type DropSlot,
 } from "@/lib/calendar"
@@ -26,12 +27,13 @@ type Props = ChipHandlers & {
 
 /** Month: the same tasks on a date grid. A drop writes the date and keeps the task's times. */
 export function MonthGrid({ year, month, today, tasks, onOpenDay, onDropTask, ...chip }: Props) {
+  const { t, tn, locale } = useLanguage()
   const monthKey = `${year}-${String(month).padStart(2, "0")}`
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-card">
       <div className="min-w-[44rem]">
         <div className="grid grid-cols-7 border-b border-line">
-          {WEEKDAY_NAMES.map((name) => (
+          {weekdayNames(locale).map((name) => (
             <p key={name} className="px-2 py-2 text-xs uppercase tracking-[0.14em] text-ink-soft">
               {name}
             </p>
@@ -55,7 +57,7 @@ export function MonthGrid({ year, month, today, tasks, onOpenDay, onDropTask, ..
                 >
                   <button
                     type="button"
-                    aria-label={`${longDate(day)}, open the day`}
+                    aria-label={t("calendar.openDay", { date: longDate(day, locale) })}
                     onClick={() => onOpenDay(day)}
                     className={clsx(
                       "flex size-7 items-center justify-center self-start rounded-full font-serif text-base hover:bg-line/50 focus-visible:outline-2 focus-visible:outline-accent",
@@ -73,7 +75,7 @@ export function MonthGrid({ year, month, today, tasks, onOpenDay, onDropTask, ..
                       onClick={() => onOpenDay(day)}
                       className="self-start rounded px-1 text-xs text-ink-soft underline-offset-2 hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-accent"
                     >
-                      {hidden} more
+                      {t("calendar.more", { count: hidden })}
                     </button>
                   )}
                 </DropCell>

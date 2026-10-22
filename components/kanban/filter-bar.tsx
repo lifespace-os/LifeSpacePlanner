@@ -3,6 +3,8 @@
 import { useMemo, type Dispatch, type SetStateAction } from "react"
 import clsx from "clsx"
 import { SetShape } from "@/components/whiteboard/label-chip"
+import { useLanguage } from "@/components/language-provider"
+import type { MessageKey } from "@/lib/i18n"
 import type { GoalRing, Note } from "@/lib/board-data"
 import type { KanbanCard } from "@/lib/kanban-data"
 import {
@@ -33,12 +35,10 @@ const chip =
 const chipOff = "border-line bg-card text-ink hover:border-ink-soft"
 const chipOn = "border-ink bg-ink text-board"
 
-function ringName(id: FilterRingId) {
-  return FILTER_RINGS.find((ring) => ring.id === id)?.name ?? id
-}
-
 /** One filter in three steps: a ring, a hashtag of the cards from that ring outward, then a label of one project's tasks. */
 export function FilterBar({ filter, onChange, notes, rings, boardCards, shown }: FilterBarProps) {
+  const { t, tn } = useLanguage()
+  const ringName = (id: FilterRingId) => t(`filter.ring.${id}` as MessageKey)
   const hashtags = useMemo(() => (filter.ring ? ringHashtags(filter.ring, notes, rings) : []), [filter.ring, notes, rings])
 
   const tagCounts = useMemo(() => {
@@ -66,13 +66,13 @@ export function FilterBar({ filter, onChange, notes, rings, boardCards, shown }:
   const pickLabel = (id: string) => onChange((current) => ({ ...current, label: current.label === id ? null : id }))
 
   const isProject = filter.ring === "project"
-  const tagHeading = isProject ? "Project" : "Hashtag"
+  const tagHeading = t(isProject ? "filter.tagHeading.project" : "filter.tagHeading.hashtag")
 
   return (
-    <section aria-label="Filter" className="mx-6 mb-3 rounded-lg border border-line bg-desk/60 px-4 py-3">
+    <section aria-label={t("filter.label")} className="mx-6 mb-3 rounded-lg border border-line bg-desk/60 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 className="w-24 shrink-0 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-soft">Ring</h2>
-        <div role="group" aria-label="Ring" className="flex flex-wrap gap-1.5">
+        <h2 className="w-24 shrink-0 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-soft">{t("filter.ring")}</h2>
+        <div role="group" aria-label={t("filter.ring")} className="flex flex-wrap gap-1.5">
           {FILTER_RINGS.map((ring) => (
             <button
               key={ring.id}
@@ -81,21 +81,21 @@ export function FilterBar({ filter, onChange, notes, rings, boardCards, shown }:
               onClick={() => pickRing(ring.id)}
               className={clsx(chip, filter.ring === ring.id ? chipOn : chipOff)}
             >
-              {ring.name}
+              {ringName(ring.id)}
             </button>
           ))}
         </div>
         {isFiltering(filter) && (
           <div className="ml-auto flex items-center gap-3 text-sm text-ink-soft">
             <span aria-live="polite">
-              {shown} of {boardCards.length} {boardCards.length === 1 ? "task" : "tasks"}
+              {tn("filter.shownOf", boardCards.length, { shown })}
             </span>
             <button
               type="button"
               onClick={() => onChange(NO_FILTER)}
               className="rounded-md px-1.5 py-0.5 font-medium text-ink underline underline-offset-2 hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
-              Clear filter
+              {t("filter.clear")}
             </button>
           </div>
         )}
@@ -106,7 +106,9 @@ export function FilterBar({ filter, onChange, notes, rings, boardCards, shown }:
           <h2 className="w-24 shrink-0 pt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-soft">{tagHeading}</h2>
           {hashtags.length === 0 ? (
             <p className="pt-0.5 text-sm text-ink-soft">
-              No hashtags yet on {isProject ? "project goals" : `the cards from ${ringName(filter.ring)} outward`}. The ring alone still filters.
+              {t("filter.noHashtags", {
+                scope: isProject ? t("filter.scope.project") : t("filter.scope.ring", { ring: ringName(filter.ring) }),
+              })}
             </p>
           ) : (
             <div role="group" aria-label={tagHeading} className="flex min-w-0 flex-1 flex-wrap gap-1.5">
@@ -134,9 +136,9 @@ export function FilterBar({ filter, onChange, notes, rings, boardCards, shown }:
 
       {labelsOpen(filter) && (
         <div className="mt-2.5 flex flex-wrap items-start gap-x-3 gap-y-2">
-          <h2 className="w-24 shrink-0 pt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-soft">Labels</h2>
+          <h2 className="w-24 shrink-0 pt-1 text-[11px] font-medium uppercase tracking-[0.18em] text-ink-soft">{t("filter.labels")}</h2>
           {labelGroups.length === 0 ? (
-            <p className="pt-0.5 text-sm text-ink-soft">The tasks of this project carry no labels.</p>
+            <p className="pt-0.5 text-sm text-ink-soft">{t("filter.noLabels")}</p>
           ) : (
             <div className="flex min-w-0 flex-1 flex-col gap-2">
               {labelGroups.map(({ group, labels }) => (
@@ -161,9 +163,7 @@ export function FilterBar({ filter, onChange, notes, rings, boardCards, shown }:
                   })}
                 </div>
               ))}
-              <p className="text-xs text-ink-soft">
-                A label lights the cards in its color while the filter lasts. The cards keep their own label.
-              </p>
+              <p className="text-xs text-ink-soft">{t("filter.labelNote")}</p>
             </div>
           )}
         </div>

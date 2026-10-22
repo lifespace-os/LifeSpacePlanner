@@ -2,12 +2,7 @@ import { formatTimeRange, resultKey, type KanbanBoardId, type KanbanCard, type K
 
 export type CalendarMode = "day" | "week" | "month" | "year"
 
-export const CALENDAR_MODES: { id: CalendarMode; name: string }[] = [
-  { id: "day", name: "Day" },
-  { id: "week", name: "Week" },
-  { id: "month", name: "Month" },
-  { id: "year", name: "Year" },
-]
+export const CALENDAR_MODES: { id: CalendarMode }[] = [{ id: "day" }, { id: "week" }, { id: "month" }, { id: "year" }]
 
 const DAY_MS = 86_400_000
 const TIME_PATTERN = /^\d{2}:\d{2}$/
@@ -58,46 +53,54 @@ export function monthWeeks(year: number, month: number) {
   return weeks
 }
 
-export const WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+const DEFAULT_LOCALE = "en-US"
 
-function format(iso: string, options: Intl.DateTimeFormatOptions) {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { ...options, timeZone: "UTC" })
+function format(iso: string, options: Intl.DateTimeFormatOptions, locale: string) {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, { ...options, timeZone: "UTC" })
 }
 
-export function longDate(iso: string) {
-  return format(iso, { weekday: "long", month: "long", day: "numeric", year: "numeric" })
+/** Short weekday names, Monday first, in the language's own words. */
+export function weekdayNames(locale: string = DEFAULT_LOCALE) {
+  return weekDays("2024-01-01").map((day) => format(day, { weekday: "short" }, locale))
 }
 
-export function shortDate(iso: string) {
-  return format(iso, { weekday: "short", month: "short", day: "numeric" })
+export function longDate(iso: string, locale: string = DEFAULT_LOCALE) {
+  return format(iso, { weekday: "long", month: "long", day: "numeric", year: "numeric" }, locale)
 }
 
-export function monthName(iso: string) {
-  return format(iso, { month: "long" })
+export function weekdayLong(iso: string, locale: string = DEFAULT_LOCALE) {
+  return format(iso, { weekday: "long" }, locale)
 }
 
-export function hourLabel(hour: number) {
-  if (hour === 0) return "12 AM"
-  if (hour < 12) return `${hour} AM`
-  if (hour === 12) return "12 PM"
-  return `${hour - 12} PM`
+export function shortDate(iso: string, locale: string = DEFAULT_LOCALE) {
+  return format(iso, { weekday: "short", month: "short", day: "numeric" }, locale)
+}
+
+export function monthName(iso: string, locale: string = DEFAULT_LOCALE) {
+  return format(iso, { month: "long" }, locale)
+}
+
+export function hourLabel(hour: number, locale: string = DEFAULT_LOCALE) {
+  return new Intl.DateTimeFormat(locale, { hour: "numeric", timeZone: "UTC" }).format(Date.UTC(2000, 0, 1, hour))
 }
 
 /** The heading over the grid for the day, week, month, or year being shown. */
-export function rangeTitle(mode: CalendarMode, focus: string) {
-  if (mode === "day") return longDate(focus)
+export function rangeTitle(mode: CalendarMode, focus: string, locale: string = DEFAULT_LOCALE) {
+  if (mode === "day") return longDate(focus, locale)
   if (mode === "year") return focus.slice(0, 4)
-  if (mode === "month") return format(focus, { month: "long", year: "numeric" })
+  if (mode === "month") return format(focus, { month: "long", year: "numeric" }, locale)
   const days = weekDays(focus)
   const first = days[0]!
   const last = days[6]!
+  const monthDay = { month: "short", day: "numeric" } as const
   if (first.slice(0, 4) !== last.slice(0, 4)) {
-    return `${format(first, { month: "short", day: "numeric", year: "numeric" })} – ${format(last, { month: "short", day: "numeric", year: "numeric" })}`
+    const withYear = { ...monthDay, year: "numeric" } as const
+    return `${format(first, withYear, locale)} – ${format(last, withYear, locale)}`
   }
   if (first.slice(0, 7) !== last.slice(0, 7)) {
-    return `${format(first, { month: "short", day: "numeric" })} – ${format(last, { month: "short", day: "numeric" })}, ${last.slice(0, 4)}`
+    return `${format(first, monthDay, locale)} – ${format(last, monthDay, locale)}, ${last.slice(0, 4)}`
   }
-  return `${format(first, { month: "short", day: "numeric" })} – ${format(last, { day: "numeric" })}, ${last.slice(0, 4)}`
+  return `${format(first, monthDay, locale)} – ${format(last, { day: "numeric" }, locale)}, ${last.slice(0, 4)}`
 }
 
 /** Where the arrows take the grid: a day, a week, a month, or a year at a time. */
@@ -229,7 +232,12 @@ export function samePatch(card: KanbanCard, patch: SchedulePatch) {
 }
 
 /** "Tue, Oct 20, 9:00 AM – 10:00 AM" for the line that tells the person what a drop wrote. */
-export function describeDrop(day: string, patch: SchedulePatch) {
-  const range = formatTimeRange(patch.startTime, patch.endTime)
-  return range ? `${shortDate(day)}, ${range}` : shortDate(day)
+export function describeDrop(
+  day: string,
+  patch: SchedulePatch,
+  locale: string = DEFAULT_LOCALE,
+  words?: Parameters<typeof formatTimeRange>[3],
+) {
+  const range = formatTimeRange(patch.startTime, patch.endTime, locale, words)
+  return range ? `${shortDate(day, locale)}, ${range}` : shortDate(day, locale)
 }

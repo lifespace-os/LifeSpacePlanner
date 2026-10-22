@@ -1,3 +1,4 @@
+import { useLanguage } from "@/components/language-provider"
 import type { LabelShareGroup, LabelShareSlice } from "@/lib/label-shares"
 
 const SIZE = 200
@@ -20,6 +21,7 @@ function arcPath(start: number, end: number) {
 }
 
 function Ring({ slices, cards }: { slices: LabelShareSlice[]; cards: number }) {
+  const { tn } = useLanguage()
   const drawn = slices.filter((slice) => slice.count > 0)
   const total = drawn.reduce((sum, slice) => sum + slice.count, 0)
   const gap = drawn.length > 1 ? GAP : 0
@@ -46,13 +48,14 @@ function Ring({ slices, cards }: { slices: LabelShareSlice[]; cards: number }) {
         {cards}
       </text>
       <text x={C} y={C + 20} textAnchor="middle" dominantBaseline="central" fontSize={12} className="fill-ink-soft">
-        {cards === 1 ? "card" : "cards"}
+        {tn("dashboard.cards", cards).replace(/^\d+\s*/, "")}
       </text>
     </svg>
   )
 }
 
 export function LabelsTile({ groups }: { groups: LabelShareGroup[] }) {
+  const { t, tn } = useLanguage()
   return (
     <div className="grid gap-6 rounded-xl border border-line bg-card p-4 md:p-6 lg:grid-cols-3">
       {groups.map((group) => (
@@ -67,12 +70,14 @@ export function LabelsTile({ groups }: { groups: LabelShareGroup[] }) {
                   className={`size-3 shrink-0 rounded-full ${slice.color ? "" : "bg-ink-soft/30"}`}
                   style={slice.color ? { backgroundColor: slice.color } : undefined}
                 />
-                <span className="min-w-0 flex-1 truncate">{slice.name}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {slice.id === "none" ? t("dashboard.labels.none") : slice.name}
+                </span>
                 <span className="tabular-nums">
-                  {slice.percent}%<span className="sr-only"> of the ring, </span>
+                  {slice.percent}%<span className="sr-only">{t("dashboard.labels.ofRing")}</span>
                   <span aria-hidden="true"> · </span>
                   {slice.count}
-                  <span className="sr-only">{slice.count === 1 ? " card" : " cards"}</span>
+                  <span className="sr-only"> {tn("dashboard.cards", slice.count).replace(/^\d+\s*/, "")}</span>
                 </span>
               </li>
             ))}

@@ -13,6 +13,8 @@ import { graphTile, mapTile } from "@/lib/map-tile"
 import type { MissionCounts } from "@/lib/mission-counts"
 import { todayIso } from "@/lib/repeat"
 import type { WheelsData } from "@/lib/wheels"
+import { useLanguage } from "@/components/language-provider"
+import type { MessageKey } from "@/lib/i18n"
 
 type Props = {
   notes: Note[]
@@ -27,20 +29,21 @@ type Props = {
   life: LifeGrid | null
 }
 
-const PARTS: { id: SheetPart; name: string; hint?: string }[] = [
-  { id: "counts", name: "Counts" },
-  { id: "flow", name: "Flow" },
-  { id: "mission", name: "Mission" },
-  { id: "map", name: "Map", hint: "The rings and the Graph" },
-  { id: "wheels", name: "Wheels" },
-  { id: "labels", name: "Labels" },
-  { id: "life", name: "Life in weeks", hint: "The view, not a Dashboard tile" },
+const PARTS: { id: SheetPart; name: MessageKey; hint?: MessageKey }[] = [
+  { id: "counts", name: "dashboard.export.part.counts" },
+  { id: "flow", name: "dashboard.flow.title" },
+  { id: "mission", name: "dashboard.mission.title" },
+  { id: "map", name: "dashboard.map.title", hint: "dashboard.export.part.mapHint" },
+  { id: "wheels", name: "dashboard.wheels.title" },
+  { id: "labels", name: "dashboard.labels.title" },
+  { id: "life", name: "dashboard.life.title", hint: "dashboard.export.part.lifeHint" },
 ]
 
 const button =
   "rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
 
 export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission, wheels, labels, life }: Props) {
+  const { t, lang } = useLanguage()
   const dialog = useRef<HTMLDialogElement>(null)
   const titleId = useId()
   const [picked, setPicked] = useState<Set<SheetPart>>(new Set(["counts", "flow", "mission", "map", "wheels", "labels"]))
@@ -79,7 +82,7 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
           labels,
           life,
         },
-        { parts: chosen.map((part) => part.id), tagNames, date, format },
+        { parts: chosen.map((part) => part.id), tagNames, date, format, language: lang },
       )
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
@@ -91,7 +94,7 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
       setTimeout(() => URL.revokeObjectURL(url), 10_000)
       dialog.current?.close()
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "The sheet could not be built.")
+      setError(reason instanceof Error ? reason.message : t("dashboard.export.failed"))
     } finally {
       setBusy(false)
     }
@@ -104,7 +107,7 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
         onClick={() => dialog.current?.showModal()}
         className={clsx(button, "border border-line bg-card text-ink hover:bg-accent-soft")}
       >
-        Export
+        {t("dashboard.export.button")}
       </button>
 
       <dialog
@@ -117,11 +120,11 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
       >
         <div className="flex max-h-[88vh] flex-col gap-5 overflow-y-auto p-5">
           <h2 id={titleId} className="font-serif text-2xl font-medium">
-            Export the Dashboard
+            {t("dashboard.export.title")}
           </h2>
 
           <fieldset className="flex flex-col gap-2.5">
-            <legend className="mb-1 text-sm text-ink-soft">Pictures to include</legend>
+            <legend className="mb-1 text-sm text-ink-soft">{t("dashboard.export.pictures")}</legend>
             {PARTS.map((part) => {
               const unavailable = part.id === "life" && !life
               return (
@@ -134,15 +137,15 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
                     className="mt-0.5 size-4 accent-accent"
                   />
                   <span className="flex flex-col">
-                    <span className="text-sm text-pretty">{part.name}</span>
-                    {part.hint && !unavailable ? <span className="text-xs text-ink-soft">{part.hint}</span> : null}
+                    <span className="text-sm text-pretty">{t(part.name)}</span>
+                    {part.hint && !unavailable ? <span className="text-xs text-ink-soft">{t(part.hint)}</span> : null}
                     {unavailable ? (
                       <span className="text-xs text-ink-soft">
-                        Enter your date of birth and years in{" "}
+                        {t("dashboard.export.lifeBefore")}{" "}
                         <Link href="/settings" className="underline underline-offset-2">
-                          Settings
+                          {t("dashboard.export.settings")}
                         </Link>{" "}
-                        first.
+                        {t("dashboard.export.lifeAfter")}
                       </span>
                     ) : null}
                   </span>
@@ -153,7 +156,7 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
 
           <div className="flex flex-col gap-2">
             <span id={`${titleId}-format`} className="text-sm text-ink-soft">
-              File
+              {t("dashboard.export.file")}
             </span>
             <div role="radiogroup" aria-labelledby={`${titleId}-format`} className="grid grid-cols-2 gap-1 rounded-lg border border-line p-1">
               {(["image", "pdf"] as const).map((id) => (
@@ -168,7 +171,7 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
                     format === id ? "bg-accent text-card" : "text-ink hover:bg-accent-soft",
                   )}
                 >
-                  {id === "image" ? "Image" : "PDF"}
+                  {id === "image" ? t("dashboard.export.image") : t("dashboard.export.pdf")}
                 </button>
               ))}
             </div>
@@ -176,7 +179,7 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
 
           <div className="flex items-center justify-between gap-4">
             <span id={`${titleId}-names`} className="text-sm">
-              Show tag names
+              {t("dashboard.export.tagNames")}
             </span>
             <button
               type="button"
@@ -199,11 +202,11 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
             </button>
           </div>
           <p className="-mt-3 text-xs text-ink-soft text-pretty">
-            When off, slices and sectors keep their colors and lose their names.
+            {t("dashboard.export.tagNamesNote")}
           </p>
 
           <p role="status" className="min-h-5 text-sm text-ink-soft">
-            {busy ? "Building the sheet\u2026" : error}
+            {busy ? t("dashboard.export.building") : error}
           </p>
 
           <div className="flex justify-end gap-2">
@@ -212,7 +215,7 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
               onClick={() => dialog.current?.close()}
               className={clsx(button, "border border-line text-ink hover:bg-accent-soft")}
             >
-              Cancel
+              {t("dashboard.export.cancel")}
             </button>
             <button
               type="button"
@@ -220,7 +223,7 @@ export function ExportDialog({ notes, rings, spots, boxes, counts, flow, mission
               disabled={busy || chosen.length === 0}
               className={clsx(button, "bg-ink text-board")}
             >
-              Export
+              {t("dashboard.export.button")}
             </button>
           </div>
         </div>

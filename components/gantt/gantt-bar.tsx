@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react"
 import clsx from "clsx"
+import { useLanguage } from "@/components/language-provider"
 import { daysBetween, type CalendarTask } from "@/lib/calendar"
 import { DAY_WIDTH, describeShape, movePatch, shapeOf, stretchPatch, type DatePatch } from "@/lib/gantt"
 
@@ -18,6 +19,7 @@ type Drag = { originX: number; days: number; moved: boolean }
 /** One task on the chart: a bar to move, or a point to stretch into a bar. Finished tasks are drawn but not dragged. */
 export function GanttBar({ task, start, onOpen, onSchedule }: Props) {
   const { card } = task
+  const { t, locale } = useLanguage()
   const shape = shapeOf(card)
   const [drag, setDrag] = useState<Drag | null>(null)
   const dragging = useRef(false)
@@ -30,12 +32,8 @@ export function GanttBar({ task, start, onOpen, onSchedule }: Props) {
   const asPoint = shape.kind === "point" && days === 0
   const left = daysBetween(start, from) * DAY_WIDTH
   const width = (daysBetween(from, to) + 1) * DAY_WIDTH - 4
-  const label = `${card.title}, ${describeShape(shape)}.${task.done ? " Finished." : ""}`
-  const hint = task.done
-    ? ""
-    : shape.kind === "bar"
-      ? " Drag or press the arrow keys to move it."
-      : " Drag or press the arrow keys to stretch it into a bar."
+  const label = `${card.title}, ${describeShape(shape, t, locale)}.${task.done ? t("gantt.finishedSr") : ""}`
+  const hint = task.done ? "" : ` ${t(shape.kind === "bar" ? "gantt.dragMove" : "gantt.dragStretch")}`
 
   const finish = (commit: boolean) => {
     const current = drag

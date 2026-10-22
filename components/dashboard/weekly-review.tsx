@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
+import { useLanguage } from "@/components/language-provider"
 import { useWorkspace } from "@/components/workspace-provider"
 import { shortDate } from "@/lib/calendar"
 import {
@@ -14,6 +15,7 @@ import {
   type TaskState,
   type WeeklyReview as Review,
 } from "@/lib/dashboard"
+import type { MessageKey } from "@/lib/i18n"
 
 type Draft = Omit<Review, "savedAt">
 
@@ -24,25 +26,28 @@ const sameDraft = (a: Draft, b: Draft) => REVIEW_FIELDS.every((field) => a[field
 
 export function WeeklyReview({ today, tasks }: { today: string; tasks: TaskState[] }) {
   const [week, setWeek] = useState(weekStart(today))
+  const { t, locale } = useLanguage()
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          aria-label="Previous week"
+          aria-label={t("dashboard.review.prev")}
           onClick={() => setWeek(shiftWeek(week, -1))}
           className="flex size-9 items-center justify-center rounded-md border border-line bg-card text-ink-soft transition-colors hover:bg-line/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <ChevronLeft className="size-4" />
         </button>
         <p className="min-w-44 text-center text-sm font-medium text-ink tabular-nums">
-          {shortDate(week)} to {shortDate(weekEnd(week))}
-          {week === weekStart(today) && <span className="font-normal text-ink-soft"> (this week)</span>}
+          {t("dashboard.review.range", { from: shortDate(week, locale), to: shortDate(weekEnd(week), locale) })}
+          {week === weekStart(today) && (
+            <span className="font-normal text-ink-soft"> {t("dashboard.review.thisWeek")}</span>
+          )}
         </p>
         <button
           type="button"
-          aria-label="Next week"
+          aria-label={t("dashboard.review.next")}
           onClick={() => setWeek(shiftWeek(week, 1))}
           className="flex size-9 items-center justify-center rounded-md border border-line bg-card text-ink-soft transition-colors hover:bg-line/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
@@ -56,6 +61,7 @@ export function WeeklyReview({ today, tasks }: { today: string; tasks: TaskState
 
 function ReviewForm({ week, tasks }: { week: string; tasks: TaskState[] }) {
   const { doc, report } = useWorkspace()
+  const { t, tn, locale } = useLanguage()
   const id = useId()
   const reviews = doc.reviews ?? {}
   const saved = reviews[week]
@@ -68,13 +74,13 @@ function ReviewForm({ week, tasks }: { week: string; tasks: TaskState[] }) {
 
   const save = () => {
     report("reviews", { ...reviews, [week]: { ...draft, savedAt: new Date().toISOString() } })
-    setStatus(`Saved the review for the week of ${shortDate(week)}.`)
+    setStatus(t("dashboard.review.saved", { date: shortDate(week, locale) }))
   }
 
   const addFinished = () => {
     const lines = finished.map((title) => `- ${title}`).join("\n")
     setDraft((current) => ({ ...current, finished: current.finished.trim() ? `${current.finished.trim()}\n${lines}` : lines }))
-    setStatus("Added the tasks finished this week.")
+    setStatus(t("dashboard.review.addedFinished"))
   }
 
   return (
@@ -89,7 +95,7 @@ function ReviewForm({ week, tasks }: { week: string; tasks: TaskState[] }) {
         <div key={field.id} className="flex flex-col gap-1.5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <label htmlFor={`${id}-${field.id}`} className="text-sm font-medium text-ink">
-              {field.label}
+              {t(`dashboard.review.field.${field.id}` as MessageKey)}
             </label>
             {field.id === "finished" && finished.length > 0 && (
               <button
@@ -97,7 +103,7 @@ function ReviewForm({ week, tasks }: { week: string; tasks: TaskState[] }) {
                 onClick={addFinished}
                 className="rounded text-xs text-accent underline underline-offset-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               >
-                Add the {finished.length} finished {finished.length === 1 ? "task" : "tasks"}
+                {tn("dashboard.review.addFinished", finished.length)}
               </button>
             )}
           </div>
@@ -110,7 +116,7 @@ function ReviewForm({ week, tasks }: { week: string; tasks: TaskState[] }) {
             className="w-full resize-y rounded-md border border-line bg-card px-3 py-2 text-sm leading-relaxed text-ink placeholder:text-ink-soft focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
           />
           <p id={`${id}-${field.id}-hint`} className="text-xs text-ink-soft">
-            {field.hint}
+            {t(`dashboard.review.field.${field.id}Hint` as MessageKey)}
           </p>
         </div>
       ))}
@@ -121,11 +127,15 @@ function ReviewForm({ week, tasks }: { week: string; tasks: TaskState[] }) {
           disabled={!dirty || blank}
           className="h-9 rounded-md bg-accent px-4 text-sm font-medium text-card transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
         >
-          Save review
+          {t("dashboard.review.save")}
         </button>
         <p className="text-sm text-ink-soft">
-          {saved ? `Last saved ${new Date(saved.savedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}.` : "Not saved yet."}
-          {dirty && saved ? " You have changes that are not saved." : ""}
+          {saved
+            ? t("dashboard.review.lastSaved", {
+                date: new Date(saved.savedAt).toLocaleDateString(locale, { month: "short", day: "numeric" }),
+              })
+            : t("dashboard.review.notSaved")}
+          {dirty && saved ? ` ${t("dashboard.review.unsaved")}` : ""}
         </p>
       </div>
       <p role="status" className="min-h-5 text-sm text-ink-soft">

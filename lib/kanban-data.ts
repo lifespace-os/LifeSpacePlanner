@@ -1,3 +1,5 @@
+import type { MessageKey } from "@/lib/i18n"
+
 export type KanbanBoardId = "all" | "year" | "month" | "week" | "day"
 
 /** Used to pick a matching column when a card moves to another board. */
@@ -196,19 +198,19 @@ export function sameDraft(a: CardDraft, b: CardDraft) {
 }
 
 /** Why a draft cannot be saved, or null when it can. */
-export function draftIssue(draft: CardDraft): string | null {
-  if (!draft.title.trim()) return "Write the task before saving."
+export function draftIssue(draft: CardDraft): MessageKey | null {
+  if (!draft.title.trim()) return "issue.writeTask"
   if (draft.since && draft.due) {
     const start = `${draft.since}T${draft.startTime || "00:00"}`
     const end = `${draft.due}T${draft.endTime || "23:59"}`
-    if (end < start) return "The end comes before the start."
+    if (end < start) return "issue.endBeforeStart"
   }
   const { repeat } = draft
   if (repeat.mode === "times" && !(Number.isInteger(repeat.times) && repeat.times >= 1 && repeat.times <= 365)) {
-    return "Repeat between 1 and 365 times."
+    return "issue.repeatRange"
   }
   if (repeat.mode !== "once" && repeat.rhythm === "weekly" && repeat.weekdays.length === 0) {
-    return "Choose at least one day of the week."
+    return "issue.chooseDay"
   }
   return null
 }

@@ -1,5 +1,6 @@
 import { BUILT_IN_RINGS, getGoalLevel, goalLevelOf, goalRingOf, type Note } from "@/lib/board-data"
 import { addDays, daysBetween, monthName, shortDate, weekDays } from "@/lib/calendar"
+import type { Translate } from "@/lib/i18n"
 import type { KanbanCard } from "@/lib/kanban-data"
 
 export const DAY_WIDTH = 28
@@ -41,25 +42,29 @@ export function chartRange(days: string[], today: string) {
   return { start, count }
 }
 
-export function monthSpans(start: string, count: number) {
+export function monthSpans(start: string, count: number, locale = "en-US") {
   const spans: { key: string; label: string; offset: number; days: number }[] = []
   for (let offset = 0; offset < count; offset += 1) {
     const day = addDays(start, offset)
     const key = day.slice(0, 7)
     const last = spans[spans.length - 1]
     if (last?.key === key) last.days += 1
-    else spans.push({ key, label: `${monthName(day)} ${day.slice(0, 4)}`, offset, days: 1 })
+    else spans.push({ key, label: `${monthName(day, locale)} ${day.slice(0, 4)}`, offset, days: 1 })
   }
   return spans
 }
 
-export function describeShape(shape: TaskShape) {
-  if (shape.kind === "bar") return shape.from === shape.to ? shortDate(shape.from) : `${shortDate(shape.from)} to ${shortDate(shape.to)}`
-  if (shape.kind === "point") return `ends ${shortDate(shape.day)}`
-  return "no end date"
+export function describeShape(shape: TaskShape, t: Translate, locale = "en-US") {
+  if (shape.kind === "bar") {
+    if (shape.from === shape.to) return shortDate(shape.from, locale)
+    return t("gantt.shape.range", { from: shortDate(shape.from, locale), to: shortDate(shape.to, locale) })
+  }
+  if (shape.kind === "point") return t("gantt.shape.point", { day: shortDate(shape.day, locale) })
+  return t("gantt.shape.none")
 }
 
-export type GoalRow = { id: string; levelName: string; text: string; taskCount: number }
+/** `levelTag` and an empty `text` are translated by the screen: the tag names a goal level, the empty text means no title. */
+export type GoalRow = { id: string; levelTag: string | null; text: string; taskCount: number }
 
 export type LadderSection = { id: string; name: string; rows: GoalRow[] }
 
@@ -72,8 +77,8 @@ export function ladderSections(notes: Note[], taskCounts: Map<string, number>): 
       .sort((a, b) => order(a) - order(b) || a.z - b.z)
       .map((note) => ({
         id: note.id,
-        levelName: getGoalLevel(goalLevelOf(note))?.name ?? ring.name,
-        text: note.text.trim() || note.task?.title || "Untitled card",
+        levelTag: getGoalLevel(goalLevelOf(note))?.tag ?? null,
+        text: note.text.trim() || note.task?.title || "",
         taskCount: taskCounts.get(note.id) ?? 0,
       }))
     return { id: ring.id, name: ring.name, rows }

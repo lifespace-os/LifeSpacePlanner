@@ -1,4 +1,6 @@
+import { useLanguage } from "@/components/language-provider"
 import { percent, type Flow } from "@/lib/dashboard"
+import type { MessageKey } from "@/lib/i18n"
 
 const COLUMN = 100
 const BAR = 36
@@ -6,6 +8,7 @@ const HEIGHT = 120
 
 /** The band diagram. The bands are drawn once; the words under them are a list, so a reader gets the same numbers. */
 export function FlowDiagram({ flow }: { flow: Flow }) {
+  const { t, tn } = useLanguage()
   const { steps } = flow
   const width = COLUMN * steps.length
   const barHeight = (share: number) => Math.max(share * HEIGHT, steps[0]!.count > 0 ? 3 : 0)
@@ -56,10 +59,14 @@ export function FlowDiagram({ flow }: { flow: Flow }) {
         <ol className="mt-3 grid" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
           {steps.map((step) => (
             <li key={step.id} className="flex flex-col items-center gap-0.5 px-1 text-center">
-              <span className="text-xs leading-snug text-ink-soft text-balance">{step.name}</span>
+              <span className="text-xs leading-snug text-ink-soft text-balance">
+                {t(`dashboard.flow.step.${step.id}` as MessageKey)}
+              </span>
               <span className="font-serif text-2xl leading-none tabular-nums text-ink">{step.count}</span>
               <span className="text-xs tabular-nums text-ink-soft">
-                {step.id === "unload" ? "all cards" : `${percent(step.share)} of Unload`}
+                {step.id === "unload"
+                  ? t("dashboard.flow.allCards")
+                  : t("dashboard.flow.ofUnload", { percent: percent(step.share) })}
               </span>
             </li>
           ))}
@@ -69,10 +76,13 @@ export function FlowDiagram({ flow }: { flow: Flow }) {
       <div className="mt-5 flex flex-col gap-3 border-t border-line pt-4 text-sm">
         <div className="flex flex-col gap-1.5">
           <p className="text-ink">
-            <span className="font-medium">Released:</span>{" "}
+            <span className="font-medium">{t("dashboard.flow.released")}</span>{" "}
             <span className="tabular-nums">{flow.released.count}</span>{" "}
             <span className="text-ink-soft">
-              {flow.released.count === 1 ? "card" : "cards"} left the flow here, {percent(flow.released.share)} of Unload.
+              {tn("dashboard.flow.releasedText", flow.released.count, { percent: percent(flow.released.share) }).replace(
+                /^\{count\}\s*/,
+                "",
+              )}
             </span>
           </p>
           <div aria-hidden="true" className="h-2 w-full rounded-full bg-line/60">
@@ -80,10 +90,10 @@ export function FlowDiagram({ flow }: { flow: Flow }) {
           </div>
         </div>
         <p className="text-ink">
-          <span className="font-medium">Effectiveness:</span>{" "}
+          <span className="font-medium">{t("dashboard.flow.effectiveness")}</span>{" "}
           <span className="tabular-nums">{percent(flow.effectiveness)}</span>{" "}
           <span className="text-ink-soft">
-            of Unload reached Results ({results.count} of {unload.count}).
+            {t("dashboard.flow.effectivenessText", { results: results.count, unload: unload.count })}
           </span>
         </p>
       </div>

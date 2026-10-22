@@ -2,14 +2,15 @@
 
 import clsx from "clsx"
 import { DropCell } from "@/components/calendar/drop-cell"
+import { useLanguage } from "@/components/language-provider"
 import { getLabel } from "@/lib/board-data"
 import {
-  WEEKDAY_NAMES,
   coversDay,
   isoOf,
   longDate,
   monthName,
   monthWeeks,
+  weekdayNames,
   type CalendarTask,
   type DropSlot,
 } from "@/lib/calendar"
@@ -28,6 +29,8 @@ type Props = {
 
 /** Year: twelve small months. A day with tasks shows one mark per task, in the task's label color. */
 export function YearGrid({ year, today, tasks, onOpenDay, onOpenMonth, onDropTask }: Props) {
+  const { locale } = useLanguage()
+  const names = weekdayNames(locale)
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
       {MONTHS.map((month) => {
@@ -41,12 +44,12 @@ export function YearGrid({ year, today, tasks, onOpenDay, onOpenMonth, onDropTas
                 onClick={() => onOpenMonth(first)}
                 className="rounded hover:underline focus-visible:outline-2 focus-visible:outline-accent"
               >
-                {monthName(first)}
+                {monthName(first, locale)}
               </button>
             </h3>
             <div className="grid grid-cols-7 text-center text-[11px] uppercase text-ink-soft">
-              {WEEKDAY_NAMES.map((name) => (
-                <span key={name}>{name.slice(0, 2)}</span>
+              {names.map((name, index) => (
+                <span key={index}>{name.slice(0, 2)}</span>
               ))}
             </div>
             {monthWeeks(year, month).map((week) => (
@@ -55,8 +58,8 @@ export function YearGrid({ year, today, tasks, onOpenDay, onOpenMonth, onDropTas
                   if (!day.startsWith(monthKey)) return <div key={day} />
                   const onDay = tasks.filter((task) => coversDay(task, day))
                   const summary = onDay.length
-                    ? `${longDate(day)}: ${onDay.map((task) => task.card.title).join(", ")}`
-                    : longDate(day)
+                    ? `${longDate(day, locale)}: ${onDay.map((task) => task.card.title).join(", ")}`
+                    : longDate(day, locale)
                   return (
                     <DropCell
                       key={day}

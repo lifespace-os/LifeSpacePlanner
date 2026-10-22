@@ -4,14 +4,15 @@ import { Fragment, useEffect, useMemo, useRef } from "react"
 import clsx from "clsx"
 import { DropCell } from "@/components/calendar/drop-cell"
 import { TaskChip, type ChipHandlers } from "@/components/calendar/task-chip"
+import { useLanguage } from "@/components/language-provider"
 import {
-  WEEKDAY_NAMES,
   coversDay,
   hourLabel,
   isTimedOn,
-  longDate,
   slotRange,
   sortForDay,
+  weekdayLong,
+  weekdayNames,
   type CalendarTask,
   type DropSlot,
 } from "@/lib/calendar"
@@ -28,6 +29,8 @@ type Props = ChipHandlers & {
 
 /** Day and Week: each day split into hours, with the tasks that have no time in a list above the hours. */
 export function TimeGrid({ days, today, tasks, onDropTask, ...chip }: Props) {
+  const { t, locale } = useLanguage()
+  const names = useMemo(() => weekdayNames(locale), [locale])
   const scrollRef = useRef<HTMLDivElement>(null)
   const topHour = useRef(DEFAULT_TOP_HOUR)
 
@@ -85,7 +88,7 @@ export function TimeGrid({ days, today, tasks, onDropTask, ...chip }: Props) {
               className="sticky top-0 z-20 flex h-14 items-center justify-center gap-2 border-b border-l border-line bg-card"
             >
               <span className="text-xs uppercase tracking-[0.14em] text-ink-soft">
-                {single ? longDate(day).split(",")[0] : WEEKDAY_NAMES[index]}
+                {single ? weekdayLong(day, locale) : names[index]}
               </span>
               <span
                 className={clsx(
@@ -95,13 +98,13 @@ export function TimeGrid({ days, today, tasks, onDropTask, ...chip }: Props) {
               >
                 {Number(day.slice(8))}
               </span>
-              {isToday && <span className="sr-only">Today</span>}
+              {isToday && <span className="sr-only">{t("common.today")}</span>}
             </div>
           )
         })}
 
         <div className="sticky top-14 z-30 flex min-h-12 items-start justify-end border-b border-line bg-card px-2 pt-2 text-right text-[11px] leading-tight text-ink-soft">
-          No time
+          {t("calendar.noTime")}
         </div>
         {days.map((day) => (
           <DropCell
@@ -123,7 +126,7 @@ export function TimeGrid({ days, today, tasks, onDropTask, ...chip }: Props) {
               data-hour-row={hour}
               className="border-t border-line/70 pr-2 pt-1 text-right text-[11px] leading-tight text-ink-soft"
             >
-              {hourLabel(hour)}
+              {hourLabel(hour, locale)}
             </div>
             {days.map((day) => {
               const key = `${day}|${hour}`

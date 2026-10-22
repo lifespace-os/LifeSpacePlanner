@@ -1,3 +1,5 @@
+import type { IkigaiCircleId } from "@/lib/board-data"
+import { CIRCLE_KEYS, type Msg } from "@/lib/card-search"
 import type { MessageKey, Translate } from "@/lib/i18n"
 import type { KanbanBoardId, KanbanColumn } from "@/lib/kanban-data"
 
@@ -23,4 +25,24 @@ export function columnLabel(t: Translate, column: Pick<KanbanColumn, "id" | "nam
 
 export function boardLabel(t: Translate, boardId: KanbanBoardId) {
   return t(`board.${boardId}` as MessageKey)
+}
+
+/** Puts a search message into the chosen language, with circle and column names translated. */
+export function searchMessage(t: Translate, message: Msg) {
+  const vars: Record<string, string | number> = { ...(message.vars ?? {}) }
+  if (typeof vars.circleId === "string") vars.circle = t(CIRCLE_KEYS[vars.circleId as IkigaiCircleId])
+  if (typeof vars.columnId === "string") {
+    vars.column = columnLabel(t, { id: vars.columnId, name: String(vars.column ?? "") })
+  }
+  return t(message.key, vars)
+}
+
+/** "Whiteboard" for a note, otherwise the board and the column of the task. */
+export function placeLabel(
+  t: Translate,
+  place: { boardId: KanbanBoardId; column: Pick<KanbanColumn, "id" | "name"> | null } | null,
+) {
+  if (!place) return t("search.place.whiteboard")
+  const board = boardLabel(t, place.boardId)
+  return place.column ? `${board} · ${columnLabel(t, place.column)}` : board
 }

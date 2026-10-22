@@ -3,6 +3,7 @@
 import clsx from "clsx"
 import { Check } from "lucide-react"
 import { TASK_DRAG_TYPE } from "@/components/calendar/drop-cell"
+import { useLanguage } from "@/components/language-provider"
 import { SetShape } from "@/components/whiteboard/label-chip"
 import { getLabel } from "@/lib/board-data"
 import type { CalendarTask } from "@/lib/calendar"
@@ -24,7 +25,11 @@ type Props = ChipHandlers & {
 export function TaskChip({ task, compact = false, draggingId, onOpen, onDragStart, onDragEnd }: Props) {
   const { card } = task
   const label = getLabel(card.labelId)
-  const range = formatTimeRange(card.startTime, card.endTime)
+  const { t, locale } = useLanguage()
+  const range = formatTimeRange(card.startTime, card.endTime, locale, {
+    from: (time) => t("time.from", { time }),
+    until: (time) => t("time.until", { time }),
+  })
   return (
     <div
       draggable={!task.done}
@@ -62,7 +67,7 @@ export function TaskChip({ task, compact = false, draggingId, onOpen, onDragStar
       >
         {compact ? (
           <span className="block truncate">
-            {card.startTime && <span className="text-ink-soft">{formatTime(card.startTime)} </span>}
+            {card.startTime && <span className="text-ink-soft">{formatTime(card.startTime, locale)} </span>}
             {card.title}
           </span>
         ) : (

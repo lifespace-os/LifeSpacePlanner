@@ -3,20 +3,12 @@
 import { useMemo, useState } from "react"
 import { GraphView } from "@/components/dashboard/graph-view"
 import { MapView } from "@/components/dashboard/map-view"
+import { useLanguage } from "@/components/language-provider"
 import type { GoalRing, Note } from "@/lib/board-data"
 import type { GraphBox, GraphSpot } from "@/lib/graph-layout"
 import { graphTile, mapTile } from "@/lib/map-tile"
 
 type View = "map" | "graph"
-
-const VIEWS: { id: View; name: string }[] = [
-  { id: "map", name: "Map" },
-  { id: "graph", name: "Graph" },
-]
-
-function cards(count: number) {
-  return `${count} ${count === 1 ? "card" : "cards"}`
-}
 
 export function MapTile({
   notes,
@@ -29,6 +21,12 @@ export function MapTile({
   spots: Record<string, GraphSpot>
   boxes: Record<string, GraphBox>
 }) {
+  const { t, tn } = useLanguage()
+  const cards = (count: number) => tn("dashboard.cards", count)
+  const views: { id: View; name: string }[] = [
+    { id: "map", name: t("dashboard.map.title") },
+    { id: "graph", name: t("dashboard.map.graph") },
+  ]
   const [view, setView] = useState<View>("map")
   const map = useMemo(() => mapTile(notes, rings), [notes, rings])
   const graph = useMemo(() => graphTile(notes, rings, spots, boxes), [notes, rings, spots, boxes])
@@ -37,8 +35,8 @@ export function MapTile({
 
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-line bg-card p-4 md:p-6">
-      <div role="group" aria-label="Show the Map or the Graph" className="flex w-fit gap-1 rounded-lg border border-line p-1">
-        {VIEWS.map((option) => {
+      <div role="group" aria-label={t("dashboard.map.group")} className="flex w-fit gap-1 rounded-lg border border-line p-1">
+        {views.map((option) => {
           const on = view === option.id
           return (
             <button
@@ -62,16 +60,15 @@ export function MapTile({
 
       <p className="text-sm text-ink-soft text-pretty">
         {view === "map"
-          ? `${cards(map.points.length)} on the rings, ${map.threads.length} ${map.threads.length === 1 ? "line" : "lines"} up to a goal.${
-              offRing > 0 ? ` ${cards(offRing)} without a ring hashtag ${offRing === 1 ? "is" : "are"} not on the Map.` : ""
-            }`
-          : `${cards(graph.vertices.length)}, ${graph.links.length} ${graph.links.length === 1 ? "link" : "links"} to a goal${
-              graph.freeLines.length > 0
-                ? `, ${graph.freeLines.length} free ${graph.freeLines.length === 1 ? "line" : "lines"}`
-                : ""
-            }. The large circle is the Mission.${
-              graph.loneCount > 0 ? ` ${cards(graph.loneCount)} with no ring hashtag sit below the frames.` : ""
-            }`}
+          ? `${t("dashboard.map.summary", {
+              cards: cards(map.points.length),
+              lines: tn("dashboard.lines", map.threads.length),
+            })}${offRing > 0 ? ` ${tn("dashboard.map.off", offRing, { cards: cards(offRing) })}` : ""}`
+          : `${t("dashboard.graph.summary", {
+              cards: cards(graph.vertices.length),
+              links: tn("dashboard.links", graph.links.length),
+              free: graph.freeLines.length > 0 ? `, ${tn("dashboard.freeLines", graph.freeLines.length)}` : "",
+            })}${graph.loneCount > 0 ? ` ${t("dashboard.graph.lone", { cards: cards(graph.loneCount) })}` : ""}`}
       </p>
     </div>
   )

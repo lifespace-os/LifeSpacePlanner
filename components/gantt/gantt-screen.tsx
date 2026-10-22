@@ -6,7 +6,9 @@ import { GanttBar } from "@/components/gantt/gantt-bar"
 import { useGoals } from "@/components/goals-provider"
 import { CardEditor } from "@/components/kanban/card-editor"
 import { useKanban } from "@/components/kanban/kanban-provider"
+import { useLanguage } from "@/components/language-provider"
 import { useMission } from "@/components/mission-provider"
+import type { MessageKey } from "@/lib/i18n"
 import { addDays, calendarTasks, daysBetween, shortDate, type CalendarTask } from "@/lib/calendar"
 import {
   DAY_WIDTH,
@@ -36,6 +38,7 @@ export function GanttScreen() {
     useKanban()
   const { notes } = useGoals()
   const { missionText } = useMission()
+  const { t, tn, locale } = useLanguage()
   const [today, setToday] = useState<string | null>(null)
   const [status, setStatus] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -89,19 +92,17 @@ export function GanttScreen() {
   if (!today || !range) return <main aria-busy="true" className="min-h-[calc(100dvh-3.5rem)]" />
 
   const { start, count } = range
-  const months = monthSpans(start, count)
+  const months = monthSpans(start, count, locale)
+  const sectionName = (id: string, name: string) =>
+    id === "needs" || id === "life" || id === "project" ? t(`filter.ring.${id}` as MessageKey) : name
   const todayLeft = LABEL_WIDTH + daysBetween(start, today) * DAY_WIDTH + DAY_WIDTH / 2
   const openCardData = openId ? (cards.find((item) => item.id === openId) ?? null) : null
 
   const schedule = (task: CalendarTask, patch: DatePatch, how: "move" | "stretch") => {
     setCards((previous) => previous.map((item) => (task.ids.includes(item.id) ? { ...item, ...patch } : item)))
     for (const id of task.ids) if (id in drafts) editDraft(id, patch)
-    const result = describeShape(shapeOf(patch))
-    setStatus(
-      how === "move"
-        ? `Moved “${task.card.title}” to ${result}.`
-        : `Stretched “${task.card.title}” into a bar, ${result}.`,
-    )
+    const result = describeShape(shapeOf(patch), t, locale)
+    setStatus(t(how === "move" ? "gantt.moved" : "gantt.stretched", { title: task.card.title, result }))
   }
 
   const labelCell = "sticky left-0 z-10 flex shrink-0 flex-col justify-center border-r border-line px-3 py-1.5"
@@ -110,14 +111,12 @@ export function GanttScreen() {
     <main className="mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-5 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-serif text-3xl font-medium tracking-tight">Gantt</h1>
+          <h1 className="font-serif text-3xl font-medium tracking-tight">{t("gantt.title")}</h1>
           <button type="button" onClick={() => scrollToToday(true)} className={buttonClass}>
-            Today
+            {t("common.today")}
           </button>
         </div>
-        <p className="text-sm text-ink-soft text-pretty">
-          A bar runs from a start date to an end date. A dot has only an end date: drag it to stretch it into a bar.
-        </p>
+        <p className="text-sm text-ink-soft text-pretty">{t("gantt.help")}</p>
       </header>
 
       <p role="status" className="min-h-5 text-sm text-ink-soft">
@@ -127,7 +126,7 @@ export function GanttScreen() {
       <div
         ref={scrollRef}
         role="region"
-        aria-label="Gantt chart"
+        aria-label={t("gantt.chartAria")}
         tabIndex={0}
         className="max-h-[calc(100dvh-14rem)] overflow-auto rounded-xl border border-line bg-card focus-visible:outline-2 focus-visible:outline-accent"
       >
@@ -140,7 +139,7 @@ export function GanttScreen() {
 
           <div className="sticky top-0 z-20 flex border-b border-line bg-card">
             <div className={clsx(labelCell, "top-0 z-30 bg-card")} style={{ width: LABEL_WIDTH }}>
-              <span className="text-xs text-ink-soft">Mission to tasks</span>
+              <span className="text-xs text-ink-soft">{t("gantt.missionToTasks")}</span>
             </div>
             <div className="shrink-0" style={{ width: count * DAY_WIDTH }}>
               <div className="relative h-6 border-b border-line/60">
@@ -162,7 +161,7 @@ export function GanttScreen() {
                   return (
                     <span
                       key={day}
-                      title={shortDate(day)}
+                      title={shortDate(day, locale)}
                       className={clsx(
                         "flex shrink-0 items-center justify-center text-[10px]",
                         day === today ? "font-semibold text-accent" : "text-ink-soft",
@@ -177,11 +176,11 @@ export function GanttScreen() {
             </div>
           </div>
 
-          <SectionHeading name="Mission" />
+          <SectionHeading name={t("gantt.mission")} />
           <div className="flex min-h-9 border-b border-line/60">
             <div className={clsx(labelCell, "bg-card")} style={{ width: LABEL_WIDTH }}>
               <p className={clsx("text-sm text-pretty", missionText ? "font-serif italic text-ink" : "text-ink-soft")}>
-                {missionText ? `\u201C${missionText}\u201D` : "No mission sentence yet."}
+                {missionText ? `\u201C${missionText}\u201D` : t("gantt.noMission")}
               </p>
             </div>
             <div className="shrink-0" style={gridStyle(count)} />
@@ -189,11 +188,11 @@ export function GanttScreen() {
 
           {sections.map((section) => (
             <Fragment key={section.id}>
-              <SectionHeading name={section.name} />
+              <SectionHeading name={sectionName(section.id, section.name)} />
               {section.rows.length === 0 && (
                 <div className="flex min-h-9 border-b border-line/60">
                   <div className={clsx(labelCell, "bg-card")} style={{ width: LABEL_WIDTH }}>
-                    <p className="text-sm text-ink-soft">No cards on this ring yet.</p>
+                    <p className="text-sm text-ink-soft">{t("gantt.noCardsRing")}</p>
                   </div>
                   <div className="shrink-0" style={gridStyle(count)} />
                 </div>
@@ -202,8 +201,8 @@ export function GanttScreen() {
                 <div key={row.id} className="flex min-h-9 border-b border-line/60">
                   <div className={clsx(labelCell, "bg-card")} style={{ width: LABEL_WIDTH }}>
                     <span className="text-[11px] uppercase tracking-wide text-ink-soft">
-                      {row.levelName}
-                      {row.taskCount > 0 && ` · ${row.taskCount} ${row.taskCount === 1 ? "task" : "tasks"}`}
+                      {row.levelTag ? t(`goal.level.${row.levelTag}` as MessageKey) : ""}
+                      {row.taskCount > 0 && ` · ${tn("gantt.taskCount", row.taskCount)}`}
                     </span>
                     <span className="line-clamp-2 text-sm text-pretty text-ink">{row.text}</span>
                   </div>
@@ -213,11 +212,11 @@ export function GanttScreen() {
             </Fragment>
           ))}
 
-          <SectionHeading name="Tasks" />
+          <SectionHeading name={t("gantt.tasks")} />
           {tasks.length === 0 && (
             <div className="flex min-h-9 border-b border-line/60">
               <div className={clsx(labelCell, "bg-card")} style={{ width: LABEL_WIDTH }}>
-                <p className="text-sm text-ink-soft">No tasks yet.</p>
+                <p className="text-sm text-ink-soft">{t("common.noTasks")}</p>
               </div>
               <div className="shrink-0" style={gridStyle(count)} />
             </div>
@@ -236,7 +235,7 @@ export function GanttScreen() {
                 >
                   {task.card.title}
                 </button>
-                <span className="text-[11px] text-ink-soft">{describeShape(shapeOf(task.card))}</span>
+                <span className="text-[11px] text-ink-soft">{describeShape(shapeOf(task.card), t, locale)}</span>
               </div>
               <div className="relative shrink-0" style={gridStyle(count)}>
                 <GanttBar task={task} start={start} onOpen={openCard} onSchedule={schedule} />
@@ -256,7 +255,7 @@ export function GanttScreen() {
           onClose={closeCard}
           onSave={() => {
             if (saveDraft(openCardData.id)) {
-              setStatus("Saved the card.")
+              setStatus(t("common.savedCard"))
               closeCard()
             }
           }}

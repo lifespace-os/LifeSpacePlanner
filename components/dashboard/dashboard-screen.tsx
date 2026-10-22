@@ -11,6 +11,7 @@ import { WeeklyReview } from "@/components/dashboard/weekly-review"
 import { WheelsTile } from "@/components/dashboard/wheels-tile"
 import { useGoals } from "@/components/goals-provider"
 import { useKanban } from "@/components/kanban/kanban-provider"
+import { useLanguage } from "@/components/language-provider"
 import { useWorkspace } from "@/components/workspace-provider"
 import { labelSetLists } from "@/lib/board-data"
 import { finishedCounts, flowOf, goalTaskCounts, taskStates } from "@/lib/dashboard"
@@ -26,6 +27,7 @@ export function DashboardScreen() {
   const { cards, columnsByBoard } = useKanban()
   const { notes, rings } = useGoals()
   const { doc } = useWorkspace()
+  const { t, tn } = useLanguage()
   const [today, setToday] = useState<string | null>(null)
 
   useEffect(() => {
@@ -59,16 +61,16 @@ export function DashboardScreen() {
   }, [doc.life, today])
 
   const tiles: { id: string; name: string; value: number | undefined }[] = [
-    { id: "today", name: "Today", value: counts?.today },
-    { id: "week", name: "This week", value: counts?.week },
-    { id: "month", name: "This month", value: counts?.month },
-    { id: "all", name: "All time", value: counts?.all },
+    { id: "today", name: t("dashboard.range.today"), value: counts?.today },
+    { id: "week", name: t("dashboard.range.week"), value: counts?.week },
+    { id: "month", name: t("dashboard.range.month"), value: counts?.month },
+    { id: "all", name: t("dashboard.range.all"), value: counts?.all },
   ]
 
   return (
     <main className="mx-auto flex w-full max-w-[1100px] flex-col gap-8 px-4 py-5 sm:px-6">
       <header className="flex items-center justify-between gap-4">
-        <h1 className="font-serif text-3xl font-medium tracking-tight">Dashboard</h1>
+        <h1 className="font-serif text-3xl font-medium tracking-tight">{t("dashboard.title")}</h1>
         <ExportDialog
           notes={notes}
           rings={rings}
@@ -85,7 +87,7 @@ export function DashboardScreen() {
 
       <section aria-labelledby="finished-heading" className="flex flex-col gap-3">
         <h2 id="finished-heading" className="font-serif text-xl font-medium">
-          Finished tasks
+          {t("dashboard.finished.title")}
         </h2>
         <ul className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {tiles.map((tile) => (
@@ -96,20 +98,16 @@ export function DashboardScreen() {
           ))}
         </ul>
         <p className="text-sm text-ink-soft text-pretty">
-          Tasks in Done and on Results. Tasks that were only started are not counted.
-          {counts && counts.undated > 0
-            ? ` ${counts.undated} finished before the day was kept, so ${counts.undated === 1 ? "it counts" : "they count"} under All time only.`
-            : ""}
+          {t("dashboard.finished.note")}
+          {counts && counts.undated > 0 ? ` ${tn("dashboard.finished.undated", counts.undated)}` : ""}
         </p>
       </section>
 
       <section aria-labelledby="flow-heading" className="flex flex-col gap-3">
         <h2 id="flow-heading" className="font-serif text-xl font-medium">
-          Flow
+          {t("dashboard.flow.title")}
         </h2>
-        <p className="text-sm text-ink-soft text-pretty">
-          Unload is every card on the Whiteboard plus every task made from a card. A card may skip a step.
-        </p>
+        <p className="text-sm text-ink-soft text-pretty">{t("dashboard.flow.note")}</p>
         <div className="rounded-xl border border-line bg-card p-4">
           <FlowDiagram flow={flow} />
         </div>
@@ -117,55 +115,46 @@ export function DashboardScreen() {
 
       <section aria-labelledby="mission-heading" className="flex flex-col gap-3">
         <h2 id="mission-heading" className="font-serif text-xl font-medium">
-          Mission
+          {t("dashboard.mission.title")}
         </h2>
-        <p className="text-sm text-ink-soft text-pretty">
-          How many cards carry the hashtag of each Ikigai circle, each overlap, and the center. Keep and Release count every card once.
-        </p>
+        <p className="text-sm text-ink-soft text-pretty">{t("dashboard.mission.note")}</p>
         <MissionTile counts={mission} />
       </section>
 
       <section aria-labelledby="map-heading" className="flex flex-col gap-3">
         <h2 id="map-heading" className="font-serif text-xl font-medium">
-          Map
+          {t("dashboard.map.title")}
         </h2>
-        <p className="text-sm text-ink-soft text-pretty">
-          The rings and the Graph as you arranged them on the Whiteboard, without card text. Ring names stay.
-        </p>
+        <p className="text-sm text-ink-soft text-pretty">{t("dashboard.map.note")}</p>
         <MapTile notes={notes} rings={rings} spots={doc.board.graphSpots} boxes={doc.board.graphBoxes} />
       </section>
 
       <section aria-labelledby="wheels-heading" className="flex flex-col gap-3">
         <h2 id="wheels-heading" className="font-serif text-xl font-medium">
-          Wheels
+          {t("dashboard.wheels.title")}
         </h2>
-        <p className="text-sm text-ink-soft text-pretty">
-          The life spheres and Happiness components from the Labels mode, with the same names and colors.
-        </p>
+        <p className="text-sm text-ink-soft text-pretty">{t("dashboard.wheels.note")}</p>
         <WheelsTile data={wheels} />
       </section>
 
       <section aria-labelledby="labels-heading" className="flex flex-col gap-3">
         <h2 id="labels-heading" className="font-serif text-xl font-medium">
-          Labels
+          {t("dashboard.labels.title")}
         </h2>
-        <p className="text-sm text-ink-soft text-pretty">
-          Each slice is one hashtag of its group, with its share of the ring and its card count. Cards and tasks both
-          count; a card without a hashtag of the group is the grey slice.
-        </p>
+        <p className="text-sm text-ink-soft text-pretty">{t("dashboard.labels.note")}</p>
         <LabelsTile groups={labels} />
       </section>
 
       <section aria-labelledby="goals-heading" className="flex flex-col gap-3">
         <h2 id="goals-heading" className="font-serif text-xl font-medium">
-          Goals
+          {t("dashboard.goals.title")}
         </h2>
         <GoalList sections={sections} totals={totals} />
       </section>
 
       <section aria-labelledby="review-heading" className="flex flex-col gap-3">
         <h2 id="review-heading" className="font-serif text-xl font-medium">
-          Weekly review
+          {t("dashboard.review.title")}
         </h2>
         {today ? (
           <div className="rounded-xl border border-line bg-card p-4">

@@ -6,8 +6,10 @@ import { Check } from "lucide-react"
 import { useGoals } from "@/components/goals-provider"
 import { CardEditor } from "@/components/kanban/card-editor"
 import { useKanban } from "@/components/kanban/kanban-provider"
+import { useLanguage } from "@/components/language-provider"
 import { LabelMark } from "@/components/whiteboard/label-chip"
 import { getLabel } from "@/lib/board-data"
+import type { MessageKey } from "@/lib/i18n"
 import { calendarTasks, shortDate } from "@/lib/calendar"
 import { draftOf, sameDraft } from "@/lib/kanban-data"
 import { TODO_SORTS, goalSummary, sortRows, stepsOf, todoRows, type TodoRow, type TodoSort } from "@/lib/todo-list"
@@ -17,6 +19,7 @@ const columns = "md:grid md:grid-cols-[minmax(0,1fr)_8.5rem_minmax(0,15rem)_10re
 export function TodoScreen() {
   const { cards, columnsByBoard, openId, openCard, closeCard, drafts, editDraft, revertDraft, saveDraft } = useKanban()
   const { notes } = useGoals()
+  const { t } = useLanguage()
   const [sort, setSort] = useState<TodoSort>("due")
   const [status, setStatus] = useState("")
 
@@ -29,9 +32,9 @@ export function TodoScreen() {
   return (
     <main className="mx-auto flex w-full max-w-[1100px] flex-col gap-4 px-4 py-5 sm:px-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-serif text-3xl font-medium tracking-tight">Todo list</h1>
-        <div role="group" aria-label="Sort tasks by" className="flex items-center gap-2">
-          <span className="text-sm text-ink-soft">Sort by</span>
+        <h1 className="font-serif text-3xl font-medium tracking-tight">{t("todo.title")}</h1>
+        <div role="group" aria-label={t("todo.sortAria")} className="flex items-center gap-2">
+          <span className="text-sm text-ink-soft">{t("todo.sortBy")}</span>
           <div className="flex overflow-hidden rounded-md border border-line bg-card">
             {TODO_SORTS.map((option) => (
               <button
@@ -40,14 +43,14 @@ export function TodoScreen() {
                 aria-pressed={sort === option.id}
                 onClick={() => {
                   setSort(option.id)
-                  setStatus(`Sorted by ${option.name.toLowerCase()}.`)
+                  setStatus(t("todo.sorted", { sort: t(`todo.sort.${option.id}` as MessageKey).toLowerCase() }))
                 }}
                 className={clsx(
                   "h-9 border-l border-line px-3 text-sm transition-colors first:border-l-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
                   sort === option.id ? "bg-accent-soft font-medium text-ink" : "text-ink-soft hover:bg-line/50",
                 )}
               >
-                {option.name}
+                {t(`todo.sort.${option.id}` as MessageKey)}
               </button>
             ))}
           </div>
@@ -58,18 +61,18 @@ export function TodoScreen() {
         {status}
       </p>
 
-      <section aria-label="Tasks" className="overflow-hidden rounded-xl border border-line bg-card">
+      <section aria-label={t("todo.tasksAria")} className="overflow-hidden rounded-xl border border-line bg-card">
         <div
           aria-hidden="true"
           className={clsx(columns, "hidden border-b border-line bg-accent-soft px-4 py-2 text-xs font-medium text-ink-soft")}
         >
-          <span>Task</span>
-          <span>Due date</span>
-          <span>Goal</span>
-          <span>Label</span>
+          <span>{t("todo.task")}</span>
+          <span>{t("todo.sort.due")}</span>
+          <span>{t("todo.sort.goal")}</span>
+          <span>{t("todo.sort.label")}</span>
         </div>
         {rows.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-ink-soft">No tasks yet.</p>
+          <p className="px-4 py-6 text-sm text-ink-soft">{t("common.noTasks")}</p>
         ) : (
           <ul>
             {rows.map((row) => (
@@ -89,7 +92,7 @@ export function TodoScreen() {
           onClose={closeCard}
           onSave={() => {
             if (saveDraft(openCardData.id)) {
-              setStatus("Saved the card.")
+              setStatus(t("common.savedCard"))
               closeCard()
             }
           }}
@@ -106,13 +109,14 @@ function TaskRow({ row, onOpen }: { row: TodoRow; onOpen: (cardId: string) => vo
   const label = getLabel(card.labelId)
   const goal = goalSummary(row)
   const { steps, done } = stepsOf(card)
-  const empty = <span className="text-ink-soft">None</span>
+  const { t, tn, locale } = useLanguage()
+  const empty = <span className="text-ink-soft">{t("common.none")}</span>
 
   return (
     <li data-task={task.id} className={clsx(columns, "flex flex-col gap-1 border-b border-line/60 px-4 py-3 transition-colors last:border-b-0 hover:bg-line/40")}>
       <div className="min-w-0">
         <div className="flex items-start gap-2">
-          {task.done && <Check aria-label="Done" className="mt-0.5 size-4 shrink-0 text-accent" />}
+          {task.done && <Check aria-label={t("common.done")} className="mt-0.5 size-4 shrink-0 text-accent" />}
           <button
             type="button"
             aria-haspopup="dialog"
@@ -128,9 +132,9 @@ function TaskRow({ row, onOpen }: { row: TodoRow; onOpen: (cardId: string) => vo
         {steps.length > 0 && (
           <div className="mt-1.5 pl-0.5">
             <p className="text-xs text-ink-soft">
-              {done} of {steps.length} {steps.length === 1 ? "step" : "steps"}
+              {tn("todo.steps", steps.length, { done })}
             </p>
-            <ul aria-label={`Steps for ${card.title}`} className="mt-1 flex flex-col gap-0.5">
+            <ul aria-label={t("todo.stepsFor", { title: card.title })} className="mt-1 flex flex-col gap-0.5">
               {steps.map((step) => (
                 <li key={step.id} className="flex items-start gap-1.5 text-xs leading-snug text-ink-soft">
                   <span
@@ -144,7 +148,7 @@ function TaskRow({ row, onOpen }: { row: TodoRow; onOpen: (cardId: string) => vo
                   </span>
                   <span className={clsx("text-pretty", step.done && "line-through decoration-ink-soft/50")}>
                     {step.text}
-                    {step.done && <span className="sr-only"> (done)</span>}
+                    {step.done && <span className="sr-only">{t("common.doneSr")}</span>}
                   </span>
                 </li>
               ))}
@@ -153,9 +157,9 @@ function TaskRow({ row, onOpen }: { row: TodoRow; onOpen: (cardId: string) => vo
         )}
       </div>
 
-      <Cell name="Due date">{card.due ? shortDate(card.due) : empty}</Cell>
-      <Cell name="Goal">{goal ? <span className="text-pretty">{goal}</span> : empty}</Cell>
-      <Cell name="Label">
+      <Cell name={t("todo.sort.due")}>{card.due ? shortDate(card.due, locale) : empty}</Cell>
+      <Cell name={t("todo.sort.goal")}>{goal ? <span className="text-pretty">{goal}</span> : empty}</Cell>
+      <Cell name={t("todo.sort.label")}>
         {label ? (
           <span className="flex items-center gap-1.5">
             <LabelMark shape={label.group.shape} color={label.color} />

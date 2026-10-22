@@ -7,7 +7,8 @@ import {
   type Note,
 } from "@/lib/board-data"
 import { originOf } from "@/lib/dashboard"
-import { KANBAN_BOARDS, type KanbanCard, type KanbanColumn, type KanbanBoardId } from "@/lib/kanban-data"
+import type { MessageKey, MessageVars } from "@/lib/i18n"
+import type { KanbanCard, KanbanColumn, KanbanBoardId } from "@/lib/kanban-data"
 import { newId } from "@/lib/workspace"
 
 /** A whiteboard card is a "note". A kanban card is a "task". */
@@ -15,13 +16,19 @@ export type CardRef = { kind: "note" | "task"; id: string }
 
 export type ColumnsByBoard = Record<KanbanBoardId, KanbanColumn[]>
 
+/** Null for a whiteboard card. A task sits on a board, in a column. */
+export type Place = { boardId: KanbanBoardId; column: Pick<KanbanColumn, "id" | "name"> | null } | null
+
 export type Hit = {
   ref: CardRef
+  /** Empty for a blank whiteboard card; the screen shows its own words for that. */
   text: string
   tags: string[]
-  /** "Whiteboard", or the board and column of the task. */
-  place: string
+  place: Place
 }
+
+/** A message the screen puts into the chosen language. */
+export type Msg = { key: MessageKey; vars?: MessageVars }
 
 export type Detail = Hit & {
   /** The card is joined to the mission, by a free line or by its goal line. */
@@ -30,14 +37,14 @@ export type Detail = Hit & {
 }
 
 export type Change =
-  | { ok: true; notes: Note[]; cards: KanbanCard[]; message: string; ref: CardRef }
-  | { ok: false; message: string }
+  | { ok: true; notes: Note[]; cards: KanbanCard[]; message: Msg; ref: CardRef }
+  | { ok: false; message: Msg }
 
-export const CIRCLE_NAMES: Record<IkigaiCircleId, string> = {
-  love: "Love",
-  "good-at": "Good at",
-  income: "Income",
-  needed: "Needed",
+export const CIRCLE_KEYS: Record<IkigaiCircleId, MessageKey> = {
+  love: "search.circle.love",
+  "good-at": "search.circle.good-at",
+  income: "search.circle.income",
+  needed: "search.circle.needed",
 }
 
 export const SEARCH_LIMIT = 50
@@ -46,14 +53,13 @@ function noteText(note: Note) {
   return note.text.trim() || note.details?.title?.trim() || note.task?.title?.trim() || ""
 }
 
-function placeOfTask(card: KanbanCard, columns: ColumnsByBoard) {
-  const board = KANBAN_BOARDS.find((item) => item.id === card.boardId)?.name ?? "Kanban"
-  const column = columns[card.boardId]?.find((item) => item.id === card.columnId)?.name
-  return column ? `${board} · ${column}` : board
+function placeOfTask(card: KanbanCard, columns: ColumnsByBoard): Place {
+  const column = columns[card.boardId]?.find((item) => item.id === card.columnId)
+  return { boardId: card.boardId, column: column ? { id: column.id, name: column.name } : null }
 }
 
 function noteHit(note: Note): Hit {
-  return { ref: { kind: "note", id: note.id }, text: noteText(note) || "Blank card", tags: note.hashtags, place: "Whiteboard" }
+  return { ref: { kind: "note", id: note.id }, text: noteText(note), tags: note.hashtags, place: null }
 }
 
 function taskHit(card: KanbanCard, columns: ColumnsByBoard): Hit {
@@ -142,11 +148,11 @@ function changeCard(
   }
 }
 
-function addTag(notes: Note[], cards: KanbanCard[], ref: CardRef, tag: string, message: string): Change {
+function addTag(notes: Note[], cards: KanbanCard[], ref: CardRef, tag: string, message: Msg): Change {
   const has = (tags: string[]) => tags.some((item) => item.toLowerCase() === tag.toLowerCase())
   const current = ref.kind === "note" ? notes.find((item) => item.id === ref.id)?.hashtags : cards.find((item) => item.id === ref.id)?.hashtags ?? []
-  if (!current) return { ok: false, message: "That card is gone." }
-  if (has(current)) return { ok: true, notes, cards, ref, message: `Already has #${tag}.` }
+  if (!current) return { ok: false, message: { key: "search.msg.gone" } }
+  if (has(current)) return { ok: true, notes, cards, ref, message: { key: "search.msg.has", vars: { tag } } }
   const next = changeCard(
     notes,
     cards,
@@ -160,22 +166,22 @@ function addTag(notes: Note[], cards: KanbanCard[], ref: CardRef, tag: string, m
 /** Adds a hashtag. A hashtag that places a card on a goal-map ring is refused: rings are set on the Whiteboard. */
 export function addHashtag(notes: Note[], cards: KanbanCard[], ref: CardRef, raw: string, rings: GoalRing[]): Change {
   const tag = normalizeHashtag(raw)
-  if (!tag) return { ok: false, message: "Write a hashtag first." }
+  if (!tag) return { ok: false, message: { key: "search.msg.needTag" } }
   const ringTags = new Set(rings.flatMap((ring) => ring.tags.map((item) => item.toLowerCase())))
   if (ringTags.has(tag.toLowerCase())) {
-    return { ok: false, message: `#${tag} places a card on a goal-map ring. Set rings on the Whiteboard.` }
+    return { ok: false, message: { key: "search.msg.ring", vars: { tag } } }
   }
-  return addTag(notes, cards, ref, tag, `Added #${tag}.`)
+  return addTag(notes, cards, ref, tag, { key: "search.msg.added", vars: { tag } })
 }
 
 /** Links a card to an Ikigai circle. The circle's hashtag is its membership. */
 export function linkCircle(notes: Note[], cards: KanbanCard[], ref: CardRef, circle: IkigaiCircleId): Change {
-  return addTag(notes, cards, ref, circle, `Linked to ${CIRCLE_NAMES[circle]}.`)
+  return addTag(notes, cards, ref, circle, { key: "search.msg.linkedCircle", vars: { circleId: circle } })
 }
 
 /** A whiteboard card gets a free line to the mission. A task gets the second line. Neither sets a ring. */
 export function linkMission(notes: Note[], cards: KanbanCard[], ref: CardRef): Change {
-  if (isOnMission(ref, notes, cards)) return { ok: true, notes, cards, ref, message: "Already linked to the mission." }
+  if (isOnMission(ref, notes, cards)) return { ok: true, notes, cards, ref, message: { key: "search.msg.alreadyMission" } }
   const next = changeCard(
     notes,
     cards,
@@ -183,14 +189,14 @@ export function linkMission(notes: Note[], cards: KanbanCard[], ref: CardRef): C
     (note) => ({ ...note, freeIds: [...(note.freeIds ?? []), "mission"] }),
     (card) => ({ ...card, secondLine: true }),
   )
-  return { ok: true, ...next, ref, message: "Linked to the mission." }
+  return { ok: true, ...next, ref, message: { key: "search.msg.linkedMission" } }
 }
 
 /** A free line from the chosen card to another card, whiteboard or kanban. */
 export function linkCard(notes: Note[], cards: KanbanCard[], ref: CardRef, target: CardRef): Change {
-  if (ref.kind === target.kind && ref.id === target.id) return { ok: false, message: "A card cannot link to itself." }
+  if (ref.kind === target.kind && ref.id === target.id) return { ok: false, message: { key: "search.msg.selfLink" } }
   const already = freeIdsOf(ref, notes, cards).includes(target.id) || freeIdsOf(target, notes, cards).includes(ref.id)
-  if (already) return { ok: true, notes, cards, ref, message: "Already linked." }
+  if (already) return { ok: true, notes, cards, ref, message: { key: "search.msg.alreadyLinked" } }
   const next = changeCard(
     notes,
     cards,
@@ -198,7 +204,7 @@ export function linkCard(notes: Note[], cards: KanbanCard[], ref: CardRef, targe
     (note) => ({ ...note, freeIds: [...(note.freeIds ?? []), target.id] }),
     (card) => ({ ...card, freeIds: [...(card.freeIds ?? []), target.id] }),
   )
-  return { ok: true, ...next, ref, message: "Linked." }
+  return { ok: true, ...next, ref, message: { key: "search.msg.linked" } }
 }
 
 function rewire(ids: string[] | undefined, from: string, to: string) {
@@ -232,13 +238,13 @@ export function noteToTask(
   rings: GoalRing[] = BUILT_IN_RINGS,
 ): Change {
   const note = notes.find((item) => item.id === id)
-  if (!note) return { ok: false, message: "That card is gone." }
+  if (!note) return { ok: false, message: { key: "search.msg.gone" } }
   const title = noteText(note)
-  if (!title) return { ok: false, message: "Write on the card before making it a task." }
+  if (!title) return { ok: false, message: { key: "search.msg.needText" } }
   const hangs = notes.some((item) => item.id !== id && (item.parentIds ?? []).includes(id)) || cards.some((item) => item.goalIds.includes(id))
-  if (hangs) return { ok: false, message: "Other cards hang under this one on the goal map. Move them first." }
+  if (hangs) return { ok: false, message: { key: "search.msg.hangs" } }
   const column = columns.find((item) => item.kind === "todo") ?? columns[0]
-  if (!column) return { ok: false, message: "There is no column to put the task in." }
+  if (!column) return { ok: false, message: { key: "search.msg.noColumn" } }
 
   const noteIds = new Set(notes.map((item) => item.id))
   const parents = note.parentIds ?? []
@@ -275,7 +281,7 @@ export function noteToTask(
     notes: rewired.notes,
     cards: [...rewired.cards, task],
     ref: { kind: "task", id: taskId },
-    message: `Now a task in ${column.name}.`,
+    message: { key: "search.msg.nowTask", vars: { column: column.name, columnId: column.id } },
   }
 }
 
@@ -285,7 +291,7 @@ export function noteToTask(
  */
 export function taskToNote(notes: Note[], cards: KanbanCard[], id: string): Change {
   const card = cards.find((item) => item.id === id)
-  if (!card) return { ok: false, message: "That task is gone." }
+  if (!card) return { ok: false, message: { key: "search.msg.taskGone" } }
   const noteIds = new Set(notes.map((item) => item.id))
   const noteId = newId("card")
   const maxZ = notes.reduce((max, item) => Math.max(max, item.z), 0)
@@ -323,6 +329,6 @@ export function taskToNote(notes: Note[], cards: KanbanCard[], id: string): Chan
     notes: [...rewired.notes, note],
     cards: rewired.cards,
     ref: { kind: "note", id: noteId },
-    message: "Now a whiteboard card, placed below the other cards.",
+    message: { key: "search.msg.nowNote" },
   }
 }

@@ -3,6 +3,8 @@
 import { useRef, useState } from "react"
 import clsx from "clsx"
 import type { KanbanColumn } from "@/lib/kanban-data"
+import { useLanguage } from "@/components/language-provider"
+import { columnLabel } from "@/lib/kanban-names"
 
 type Props = {
   column: KanbanColumn
@@ -14,6 +16,8 @@ type Props = {
 }
 
 export function KanbanColumnView({ column, count, draggingId, onDropCard, children }: Props) {
+  const { t, tn } = useLanguage()
+  const name = columnLabel(t, column)
   const listRef = useRef<HTMLUListElement>(null)
   const [line, setLine] = useState<{ top: number; beforeId: string | null } | null>(null)
   const full = column.limit !== undefined && count >= column.limit
@@ -39,7 +43,7 @@ export function KanbanColumnView({ column, count, draggingId, onDropCard, childr
 
   return (
     <section
-      aria-label={column.name}
+      aria-label={name}
       onDragOver={(event) => {
         if (!draggingId) return
         event.preventDefault()
@@ -64,7 +68,7 @@ export function KanbanColumnView({ column, count, draggingId, onDropCard, childr
     >
       <header className="flex items-center justify-between gap-2 px-3 pb-2 pt-3">
         <h2 className={clsx("min-w-0 text-balance text-sm font-semibold leading-tight", isToday ? "text-accent" : "text-ink")}>
-          {column.name}
+          {name}
         </h2>
         <span
           className={clsx(
@@ -72,7 +76,9 @@ export function KanbanColumnView({ column, count, draggingId, onDropCard, childr
             full ? "bg-accent text-board" : "bg-line/60 text-ink-soft",
           )}
           aria-label={
-            column.limit !== undefined ? `${count} of ${column.limit} cards${full ? ", full" : ""}` : `${count} cards`
+            column.limit !== undefined
+              ? t(full ? "column.countLimitFull" : "column.countLimit", { count, limit: column.limit })
+              : tn("column.count", count)
           }
         >
           {column.limit !== undefined ? `${count} / ${column.limit}` : count}
@@ -83,7 +89,7 @@ export function KanbanColumnView({ column, count, draggingId, onDropCard, childr
         {children}
         {count === 0 && (
           <li className="list-none rounded-md border border-dashed border-line px-3 py-6 text-center text-xs text-ink-soft">
-            Drop a card here
+            {t("column.dropHere")}
           </li>
         )}
         {line && (

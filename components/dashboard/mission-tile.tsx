@@ -8,6 +8,8 @@ import {
   type IkigaiOverlapId,
   type IkigaiRegionId,
 } from "@/lib/board-data"
+import { useLanguage } from "@/components/language-provider"
+import type { MessageKey } from "@/lib/i18n"
 import { MISSION_REGIONS, type MissionCounts } from "@/lib/mission-counts"
 
 const HALF = IKIGAI_SIZE / 2
@@ -55,15 +57,14 @@ function circleCenter(id: IkigaiCircleId) {
   return { cx: HALF + offset.x, cy: HALF + offset.y }
 }
 
-function cards(count: number) {
-  return `${count} ${count === 1 ? "card" : "cards"}`
-}
-
 export function MissionTile({ counts }: { counts: MissionCounts }) {
+  const { t, tn } = useLanguage()
+  const cards = (count: number) => tn("dashboard.cards", count)
+  const regionName = (id: IkigaiRegionId) => t(`dashboard.region.${id}` as MessageKey)
   const marks = [
-    { id: "keep", name: "Keep", value: counts.keep },
-    { id: "release", name: "Release", value: counts.release },
-    { id: "none", name: "No mark", value: counts.none },
+    { id: "keep", name: t("dashboard.mission.keep"), value: counts.keep },
+    { id: "release", name: t("dashboard.mission.release"), value: counts.release },
+    { id: "none", name: t("dashboard.mission.none"), value: counts.none },
   ]
 
   return (
@@ -90,7 +91,7 @@ export function MissionTile({ counts }: { counts: MissionCounts }) {
           return (
             <g key={id} textAnchor="middle" className={count === 0 ? "opacity-60" : undefined}>
               <text x={x} y={y - 14} className="fill-ink-soft" fontSize={id === "ikigai" ? 22 : 26}>
-                {NAMES[id]}
+                {regionName(id)}
               </text>
               <text x={x} y={y + 38} className="fill-ink font-serif tabular-nums" fontSize={id === "ikigai" ? 56 : 66}>
                 {count}
@@ -110,14 +111,14 @@ export function MissionTile({ counts }: { counts: MissionCounts }) {
           ))}
         </ul>
         <p className="text-sm text-ink-soft text-pretty">
-          {cards(counts.total)} in all, on the Whiteboard and in the Kanban. A card with two hashtags counts in both places.
+          {t("dashboard.mission.total", { cards: cards(counts.total) })}
         </p>
       </div>
 
       <ul className="sr-only">
         {MISSION_REGIONS.map((id) => (
           <li key={id}>
-            {NAMES[id]}: {cards(counts.regions[id])}
+            {regionName(id)}: {cards(counts.regions[id])}
           </li>
         ))}
       </ul>

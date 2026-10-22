@@ -1,3 +1,4 @@
+import { useLanguage } from "@/components/language-provider"
 import type { WheelSlice } from "@/lib/wheels"
 
 const WIDTH = 1000
@@ -28,6 +29,7 @@ function shortName(name: string) {
 
 /** A ring of equal slices. Each slice fills outward from the center to its own figure, and one without a figure stays empty. */
 export function WheelChart({ title, centerLabel, slices }: { title: string; centerLabel: string; slices: WheelSlice[] }) {
+  const { t } = useLanguage()
   const step = (Math.PI * 2) / Math.max(slices.length, 1)
   const gap = slices.length > 1 ? GAP : 0
 
@@ -77,7 +79,7 @@ export function WheelChart({ title, centerLabel, slices }: { title: string; cent
         })}
         {slices.length === 0 ? (
           <text x={CX} y={CY} textAnchor="middle" fontSize={26} className="fill-ink-soft">
-            No sectors yet
+            {t("dashboard.wheels.empty")}
           </text>
         ) : (
           <>
