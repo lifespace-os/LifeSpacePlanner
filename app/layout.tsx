@@ -26,7 +26,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${geist.variable} ${newsreader.variable} bg-desk`} suppressHydrationWarning>
       <head>
-        <style id="theme-variables" dangerouslySetInnerHTML={{ __html: themeCss() }} />
+        <style href="theme-variables" precedence="default">
+          {themeCss()}
+        </style>
       </head>
       <body className="min-h-dvh font-sans antialiased" suppressHydrationWarning>
         <WorkspaceProvider>
