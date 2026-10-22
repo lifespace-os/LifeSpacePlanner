@@ -28,8 +28,9 @@ import {
 } from "@/lib/kanban-data"
 import { isReviews, type WeeklyReviews } from "@/lib/dashboard"
 import { isNudge, type WorkspaceNudge } from "@/lib/nudge"
+import { isCustomThemeList, type CustomTheme } from "@/lib/custom-themes"
 import { isThemeSchedule, type ThemeSchedule } from "@/lib/theme-schedule"
-import { isThemeId, type ThemeId } from "@/lib/themes"
+import { isThemeKey, type ThemeKey } from "@/lib/themes"
 import { isViewHref, type ViewHref } from "@/lib/views"
 
 /** One address for the workspace. A later server can answer the same path. */
@@ -78,7 +79,9 @@ export type WorkspaceDoc = {
   /** The weekly reviews, by the Monday of their week. Absent until one is saved. */
   reviews?: WeeklyReviews
   /** The interface theme. Absent means Morning paper. */
-  theme?: ThemeId
+  theme?: ThemeKey
+  /** Themes loaded from files, beside the seven. Absent until one is loaded. */
+  customThemes?: CustomTheme[]
   /** Switches the theme by the time of day. Absent means off, with the default times. */
   themeSchedule?: ThemeSchedule
 }
@@ -94,6 +97,7 @@ export type WorkspaceSliceKey =
   | "nudge"
   | "reviews"
   | "theme"
+  | "customThemes"
   | "themeSchedule"
 
 export const SAMPLE_MISSION = "I live strong and healthy, close to the people I love, with time left for what I enjoy."
@@ -144,7 +148,8 @@ export function parseWorkspace(value: unknown): { ok: true; doc: WorkspaceDoc } 
   if (value.lastView !== undefined && !isViewHref(value.lastView)) return fail("The remembered view in the file is not valid.")
   if (value.nudge !== undefined && !isNudge(value.nudge)) return fail("The daily nudge times in the file are not valid.")
   if (value.reviews !== undefined && !isReviews(value.reviews)) return fail("The weekly reviews in the file are not valid.")
-  if (value.theme !== undefined && !isThemeId(value.theme)) return fail("The theme in the file is not one of the seven themes.")
+  if (value.customThemes !== undefined && !isCustomThemeList(value.customThemes)) return fail("The loaded themes in the file are not valid.")
+  if (value.theme !== undefined && !isThemeKey(value.theme)) return fail("The theme in the file is not a theme this app knows.")
   if (value.themeSchedule !== undefined && !isThemeSchedule(value.themeSchedule)) return fail("The time of day theme settings in the file are not valid.")
   return { ok: true, doc: value as WorkspaceDoc }
 }

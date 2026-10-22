@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-@custom-variant dark-theme (&:where([data-theme="dusk"] *, [data-theme="evening"] *, [data-theme="night"] *, [data-theme="late-night"] *));
+@custom-variant dark-theme (&:where([data-theme="dusk"] *, [data-theme="evening"] *, [data-theme="night"] *, [data-theme="late-night"] *, [data-mode="dark"] *));
 
 @theme inline {
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;

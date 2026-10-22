@@ -7,6 +7,9 @@ export type ThemeId =
   | "night"
   | "late-night"
 
+/** One of the seven themes, or a theme the person loaded from a file. */
+export type ThemeKey = ThemeId | `custom-${string}`
+
 export type ThemeColors = {
   desk: string
   board: string
@@ -21,7 +24,7 @@ export type ThemeColors = {
 }
 
 export type Theme = {
-  id: ThemeId
+  id: ThemeKey
   name: string
   mode: "light" | "dark"
   colors: ThemeColors
@@ -32,10 +35,10 @@ export type Theme = {
 
 export const DEFAULT_THEME: ThemeId = "morning-paper"
 
-const LIGHT_DOT = "rgba(35, 39, 43, 0.07)"
-const LIGHT_RULE = "rgba(59, 110, 165, 0.12)"
-const DARK_DOT = "rgba(255, 255, 255, 0.07)"
-const DARK_RULE = "rgba(140, 180, 230, 0.14)"
+export const LIGHT_DOT = "rgba(35, 39, 43, 0.07)"
+export const LIGHT_RULE = "rgba(59, 110, 165, 0.12)"
+export const DARK_DOT = "rgba(255, 255, 255, 0.07)"
+export const DARK_RULE = "rgba(140, 180, 230, 0.14)"
 
 export const THEMES: Theme[] = [
   {
@@ -179,27 +182,56 @@ export function isThemeId(value: unknown): value is ThemeId {
   return typeof value === "string" && THEME_BY_ID.has(value as ThemeId)
 }
 
-export function themeOf(id: ThemeId | undefined): Theme {
+const CUSTOM_KEY = /^custom-[a-z0-9-]{1,64}$/
+
+export function isThemeKey(value: unknown): value is ThemeKey {
+  return isThemeId(value) || (typeof value === "string" && CUSTOM_KEY.test(value))
+}
+
+/** A built-in theme, or Morning paper for any other key. Loaded themes are found with `themeFor`. */
+export function themeOf(id: ThemeKey | undefined): Theme {
   return THEME_BY_ID.get(id ?? DEFAULT_THEME) ?? THEMES[0]
 }
 
-function declarations(theme: Theme) {
+export const THEME_VARIABLES = [
+  "--t-desk",
+  "--t-board",
+  "--t-card",
+  "--t-ink",
+  "--t-ink-soft",
+  "--t-line",
+  "--t-accent",
+  "--t-accent-soft",
+  "--t-release",
+  "--t-link",
+  "--t-board-dot",
+  "--t-task-rule",
+  "color-scheme",
+] as const
+
+export function themeVariables(theme: Theme): [(typeof THEME_VARIABLES)[number], string][] {
   const c = theme.colors
   return [
-    `--t-desk:${c.desk}`,
-    `--t-board:${c.board}`,
-    `--t-card:${c.card}`,
-    `--t-ink:${c.ink}`,
-    `--t-ink-soft:${c.inkSoft}`,
-    `--t-line:${c.line}`,
-    `--t-accent:${c.accent}`,
-    `--t-accent-soft:${c.accentSoft}`,
-    `--t-release:${c.release}`,
-    `--t-link:${c.link}`,
-    `--t-board-dot:${theme.boardDot}`,
-    `--t-task-rule:${theme.taskRule}`,
-    `color-scheme:${theme.mode}`,
-  ].join(";")
+    ["--t-desk", c.desk],
+    ["--t-board", c.board],
+    ["--t-card", c.card],
+    ["--t-ink", c.ink],
+    ["--t-ink-soft", c.inkSoft],
+    ["--t-line", c.line],
+    ["--t-accent", c.accent],
+    ["--t-accent-soft", c.accentSoft],
+    ["--t-release", c.release],
+    ["--t-link", c.link],
+    ["--t-board-dot", theme.boardDot],
+    ["--t-task-rule", theme.taskRule],
+    ["color-scheme", theme.mode],
+  ]
+}
+
+function declarations(theme: Theme) {
+  return themeVariables(theme)
+    .map(([name, value]) => `${name}:${value}`)
+    .join(";")
 }
 
 /** The theme variables as one stylesheet. Morning paper is also the root default. */

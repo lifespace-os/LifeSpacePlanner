@@ -1,12 +1,12 @@
-import { isThemeId, type ThemeId } from "@/lib/themes"
+import { isThemeKey, type ThemeKey } from "@/lib/themes"
 
 export type ThemeSchedule = {
   /** Off keeps the theme that is on. */
   enabled: boolean
   /** The theme from dayTime until eveningTime. */
-  day: ThemeId
+  day: ThemeKey
   /** The theme from eveningTime until dayTime. */
-  evening: ThemeId
+  evening: ThemeKey
   /** HH:MM, 24 hour, local time. */
   dayTime: string
   eveningTime: string
@@ -31,8 +31,8 @@ export function isThemeSchedule(value: unknown): value is ThemeSchedule {
   const record = value as Record<string, unknown>
   return (
     typeof record.enabled === "boolean" &&
-    isThemeId(record.day) &&
-    isThemeId(record.evening) &&
+    isThemeKey(record.day) &&
+    isThemeKey(record.evening) &&
     isScheduleTime(record.dayTime) &&
     isScheduleTime(record.eveningTime)
   )
@@ -44,7 +44,7 @@ function minutesOfTime(time: string) {
 }
 
 /** The theme the schedule wants at this moment. Equal times leave the day theme on. */
-export function scheduledThemeId(schedule: ThemeSchedule, now: Date): ThemeId {
+export function scheduledThemeId(schedule: ThemeSchedule, now: Date): ThemeKey {
   const at = now.getHours() * 60 + now.getMinutes()
   const day = minutesOfTime(schedule.dayTime)
   const evening = minutesOfTime(schedule.eveningTime)

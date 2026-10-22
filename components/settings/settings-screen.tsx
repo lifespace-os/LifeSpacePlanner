@@ -13,8 +13,18 @@ import {
   withTime,
   type NudgeKind,
 } from "@/lib/nudge"
+import {
+  MAX_CUSTOM_THEMES,
+  parseThemeText,
+  themeFileName,
+  themeFileText,
+  themeFor,
+  themeFromCustom,
+  withCustomTheme,
+  type CustomTheme,
+} from "@/lib/custom-themes"
 import { DEFAULT_THEME_SCHEDULE, isScheduleTime, type ThemeSchedule } from "@/lib/theme-schedule"
-import { DEFAULT_THEME, THEMES, themeOf, type Theme, type ThemeId } from "@/lib/themes"
+import { DEFAULT_THEME, THEMES, type Theme, type ThemeKey } from "@/lib/themes"
 import {
   DEFAULT_LIFE,
   LIFE_YEARS_MAX,
@@ -73,11 +83,15 @@ const THEME_GROUPS: { mode: Theme["mode"]; title: string }[] = [
 function ThemeSection() {
   const headingId = useId()
   const { doc, report } = useWorkspace()
-  const current: ThemeId = doc.theme ?? DEFAULT_THEME
+  const customs = doc.customThemes ?? []
+  const current: ThemeKey = doc.theme ?? DEFAULT_THEME
   const schedule = doc.themeSchedule ?? DEFAULT_THEME_SCHEDULE
-  const optionRefs = useRef(new Map<ThemeId, HTMLButtonElement>())
+  const optionRefs = useRef(new Map<ThemeKey, HTMLButtonElement>())
+  const allThemes: Theme[] = [...THEMES, ...customs.map(themeFromCustom)]
+  const ordered = THEME_GROUPS.flatMap((group) => allThemes.filter((theme) => theme.mode === group.mode))
+  const shown = themeFor(current, customs)
 
-  function choose(id: ThemeId) {
+  function choose(id: ThemeKey) {
     report("theme", id)
   }
 
@@ -86,7 +100,7 @@ function ThemeSection() {
   }
 
   function move(from: number, step: number) {
-    const next = THEMES[(from + step + THEMES.length) % THEMES.length]
+    const next = ordered[(from + step + ordered.length) % ordered.length]
     choose(next.id)
     optionRefs.current.get(next.id)?.focus()
   }
@@ -109,14 +123,14 @@ function ThemeSection() {
       </p>
       <ToggleSwitch checked={schedule.enabled} onChange={follow} label="Follow the time of day" />
       {schedule.enabled ? (
-        <ScheduleFields schedule={schedule} nowName={themeOf(current).name} />
+        <ScheduleFields schedule={schedule} nowName={shown.name} customs={customs} />
       ) : (
       <div role="radiogroup" aria-labelledby={headingId} className="flex flex-col gap-4">
         {THEME_GROUPS.map((group) => (
           <div key={group.mode} className="flex flex-col gap-2">
             <h3 className="text-sm font-medium text-ink-soft">{group.title}</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {THEMES.map((theme, index) =>
+              {ordered.map((theme, index) =>
                 theme.mode !== group.mode ? null : (
                   <ThemeOption
                     key={theme.id}
@@ -136,7 +150,129 @@ function ThemeSection() {
         ))}
       </div>
       )}
+      <ThemeFileTools shown={shown} customs={customs} current={current} schedule={schedule} />
     </SectionShell>
+  )
+}
+
+function ThemeFileTools({
+  shown,
+  customs,
+  current,
+  schedule,
+}: {
+  shown: Theme
+  customs: CustomTheme[]
+  current: ThemeKey
+  schedule: ThemeSchedule
+}) {
+  const { report } = useWorkspace()
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [message, setMessage] = useState<{ text: string; problem: boolean } | null>(null)
+
+  function download() {
+    const blob = new Blob([themeFileText(shown)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = themeFileName(shown.name)
+    link.click()
+    URL.revokeObjectURL(url)
+    setMessage({ text: `Saved ${shown.name} as ${link.download}.`, problem: false })
+  }
+
+  async function onFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ""
+    if (!file) return
+    if (file.size > 20_000) {
+      setMessage({ text: "That file is too large to be a theme, so nothing was loaded.", problem: true })
+      return
+    }
+    const parsed = parseThemeText(await file.text())
+    if (!parsed.ok) {
+      setMessage({ text: parsed.reason, problem: true })
+      return
+    }
+    const next = withCustomTheme(customs, parsed.theme)
+    if (!next.ok) {
+      setMessage({
+        text: `You can keep ${MAX_CUSTOM_THEMES} loaded themes. Remove one first, then load this file again.`,
+        problem: true,
+      })
+      return
+    }
+    report("customThemes", next.list)
+    setMessage({
+      text: `${next.replaced ? "Updated" : "Loaded"} ${parsed.theme.name}. Pick it from the list above.`,
+      problem: false,
+    })
+  }
+
+  function remove(theme: CustomTheme) {
+    const left = customs.filter((entry) => entry.id !== theme.id)
+    report("customThemes", left.length ? left : undefined)
+    if (current === theme.id) report("theme", DEFAULT_THEME)
+    if (schedule.day === theme.id || schedule.evening === theme.id) {
+      report("themeSchedule", {
+        ...schedule,
+        day: schedule.day === theme.id ? DEFAULT_THEME_SCHEDULE.day : schedule.day,
+        evening: schedule.evening === theme.id ? DEFAULT_THEME_SCHEDULE.evening : schedule.evening,
+      })
+    }
+    setMessage({ text: `Removed ${theme.name}.`, problem: false })
+  }
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-line pt-4">
+      <p className="text-sm text-ink-soft">
+        A theme file lists the ten interface colors by name, each as a hex color. Download theme saves{" "}
+        <span className="font-medium text-ink">{shown.name}</span>, the theme that is on.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={download} className={secondaryButton}>
+          Download theme
+        </button>
+        <button type="button" onClick={() => fileInput.current?.click()} className={secondaryButton}>
+          Load theme
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          className="sr-only"
+          tabIndex={-1}
+          aria-label="Choose a theme file"
+          onChange={onFile}
+        />
+      </div>
+      <p role="status" className={`min-h-5 text-sm ${message?.problem ? "text-release" : "text-ink-soft"}`}>
+        {message?.text}
+      </p>
+      {customs.length > 0 && (
+        <ul aria-label="Loaded themes" className="flex flex-col gap-2">
+          {customs.map((theme) => (
+            <li
+              key={theme.id}
+              className="flex items-center justify-between gap-3 rounded-md border border-line bg-card px-3 py-2"
+            >
+              <span className="min-w-0 truncate text-sm text-ink">
+                {theme.name}
+                <span className="text-ink-soft">{theme.mode === "dark" ? " (dark)" : " (light)"}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => remove(theme)}
+                aria-label={`Remove ${theme.name}`}
+                className="shrink-0 rounded-md px-2 py-1 text-sm text-release hover:bg-line/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 
@@ -149,7 +285,15 @@ const SCHEDULE_SLOTS: {
   { slot: "evening", timeKey: "eveningTime", label: "Evening" },
 ]
 
-function ScheduleFields({ schedule, nowName }: { schedule: ThemeSchedule; nowName: string }) {
+function ScheduleFields({
+  schedule,
+  nowName,
+  customs,
+}: {
+  schedule: ThemeSchedule
+  nowName: string
+  customs: CustomTheme[]
+}) {
   const fieldId = useId()
   const { report } = useWorkspace()
   const [times, setTimes] = useState({ dayTime: schedule.dayTime, eveningTime: schedule.eveningTime })
@@ -159,7 +303,7 @@ function ScheduleFields({ schedule, nowName }: { schedule: ThemeSchedule; nowNam
     if (isScheduleTime(value)) report("themeSchedule", { ...schedule, [timeKey]: value })
   }
 
-  function changeTheme(slot: "day" | "evening", id: ThemeId) {
+  function changeTheme(slot: "day" | "evening", id: ThemeKey) {
     report("themeSchedule", { ...schedule, [slot]: id })
   }
 
@@ -184,7 +328,7 @@ function ScheduleFields({ schedule, nowName }: { schedule: ThemeSchedule; nowNam
                 <select
                   id={`${fieldId}-${slot}-theme`}
                   value={schedule[slot]}
-                  onChange={(event) => changeTheme(slot, event.target.value as ThemeId)}
+                  onChange={(event) => changeTheme(slot, event.target.value as ThemeKey)}
                   className={inputClass}
                 >
                   {THEME_GROUPS.map((group) => (
@@ -196,6 +340,15 @@ function ScheduleFields({ schedule, nowName }: { schedule: ThemeSchedule; nowNam
                       ))}
                     </optgroup>
                   ))}
+                  {customs.length > 0 && (
+                    <optgroup label="Loaded">
+                      {customs.map((theme) => (
+                        <option key={theme.id} value={theme.id}>
+                          {theme.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
               <div className="flex flex-col gap-1.5">
@@ -390,6 +543,7 @@ function BackupSection() {
       lastView: incoming.lastView ?? doc.lastView,
       nudge: incoming.nudge ?? doc.nudge,
       theme: incoming.theme ?? doc.theme,
+      customThemes: incoming.customThemes ?? doc.customThemes,
       themeSchedule: incoming.themeSchedule ?? (incoming.theme ? undefined : doc.themeSchedule),
     })
     setBusy(false)
