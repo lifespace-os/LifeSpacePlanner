@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react"
 import { FlowDiagram } from "@/components/dashboard/flow-diagram"
 import { GoalList } from "@/components/dashboard/goal-list"
+import { MapTile } from "@/components/dashboard/map-tile"
 import { MissionTile } from "@/components/dashboard/mission-tile"
 import { WeeklyReview } from "@/components/dashboard/weekly-review"
 import { useGoals } from "@/components/goals-provider"
 import { useKanban } from "@/components/kanban/kanban-provider"
+import { useWorkspace } from "@/components/workspace-provider"
 import { finishedCounts, flowOf, goalTaskCounts, taskStates } from "@/lib/dashboard"
 import { ladderSections } from "@/lib/gantt"
 import { missionCounts } from "@/lib/mission-counts"
@@ -15,6 +17,7 @@ import { todayIso } from "@/lib/repeat"
 export function DashboardScreen() {
   const { cards, columnsByBoard } = useKanban()
   const { notes, rings } = useGoals()
+  const { doc } = useWorkspace()
   const [today, setToday] = useState<string | null>(null)
 
   useEffect(() => {
@@ -79,6 +82,16 @@ export function DashboardScreen() {
           How many cards carry the hashtag of each Ikigai circle, each overlap, and the center. Keep and Release count every card once.
         </p>
         <MissionTile counts={mission} />
+      </section>
+
+      <section aria-labelledby="map-heading" className="flex flex-col gap-3">
+        <h2 id="map-heading" className="font-serif text-xl font-medium">
+          Map
+        </h2>
+        <p className="text-sm text-ink-soft text-pretty">
+          The rings and the Graph as you arranged them on the Whiteboard, without card text. Ring names stay.
+        </p>
+        <MapTile notes={notes} rings={rings} spots={doc.board.graphSpots} boxes={doc.board.graphBoxes} />
       </section>
 
       <section aria-labelledby="goals-heading" className="flex flex-col gap-3">
