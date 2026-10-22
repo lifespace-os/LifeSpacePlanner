@@ -1,6 +1,7 @@
 export const VIEWS = [
   { href: "/views/calendar", label: "Calendar" },
   { href: "/views/gantt", label: "Gantt" },
+  { href: "/views/life-in-weeks", label: "Life in weeks" },
   { href: "/views/todo-list", label: "Todo list" },
 ] as const
 

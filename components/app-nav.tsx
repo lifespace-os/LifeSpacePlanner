@@ -47,7 +47,7 @@ function ViewSlot({ pathname }: { pathname: string }) {
   }, [openView, report])
 
   return (
-    <li className="w-24 shrink-0">
+    <li className="w-32 shrink-0">
       <Link
         href={shown.href}
         aria-current={openView ? "page" : undefined}
