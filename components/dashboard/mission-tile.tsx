@@ -12,14 +12,14 @@ import { MISSION_REGIONS, type MissionCounts } from "@/lib/mission-counts"
 
 const HALF = IKIGAI_SIZE / 2
 
-const TONES: Record<IkigaiCircleId, { fill: string; edge: string }> = {
+export const TONES: Record<IkigaiCircleId, { fill: string; edge: string }> = {
   love: { fill: "#f3cdd1", edge: "#d9a0a8" },
   "good-at": { fill: "#d1e2ec", edge: "#9fbfd2" },
   income: { fill: "#f7e8a4", edge: "#dcc56a" },
   needed: { fill: "#d6e5c9", edge: "#aac596" },
 }
 
-const NAMES: Record<IkigaiRegionId, string> = {
+export const NAMES: Record<IkigaiRegionId, string> = {
   love: "Love",
   "good-at": "Good at",
   income: "Income",
@@ -39,7 +39,7 @@ const OVERLAP_SIDES: Record<IkigaiOverlapId, [number, number]> = {
 }
 
 /** Where the label of a region sits, in diagram units. */
-function labelAt(id: IkigaiRegionId): { x: number; y: number } {
+export function labelAt(id: IkigaiRegionId): { x: number; y: number } {
   if (id === "ikigai") return { x: HALF, y: HALF }
   if (id in OVERLAP_SIDES) {
     const [sx, sy] = OVERLAP_SIDES[id as IkigaiOverlapId]

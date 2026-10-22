@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { ExportDialog } from "@/components/dashboard/export-dialog"
 import { FlowDiagram } from "@/components/dashboard/flow-diagram"
 import { GoalList } from "@/components/dashboard/goal-list"
 import { LabelsTile } from "@/components/dashboard/labels-tile"
@@ -15,9 +16,11 @@ import { labelSetLists } from "@/lib/board-data"
 import { finishedCounts, flowOf, goalTaskCounts, taskStates } from "@/lib/dashboard"
 import { ladderSections } from "@/lib/gantt"
 import { labelShares } from "@/lib/label-shares"
+import { lifeGrid } from "@/lib/life-weeks"
 import { missionCounts } from "@/lib/mission-counts"
 import { todayIso } from "@/lib/repeat"
 import { wheelsData } from "@/lib/wheels"
+import { DEFAULT_LIFE } from "@/lib/workspace"
 
 export function DashboardScreen() {
   const { cards, columnsByBoard } = useKanban()
@@ -49,6 +52,12 @@ export function DashboardScreen() {
     [doc.board.sectorLists, doc.board.sphereSetId, notes, cards],
   )
 
+  const life = useMemo(() => {
+    if (!today) return null
+    const saved = doc.life ?? DEFAULT_LIFE
+    return lifeGrid(saved.birthDate, saved.years, today)
+  }, [doc.life, today])
+
   const tiles: { id: string; name: string; value: number | undefined }[] = [
     { id: "today", name: "Today", value: counts?.today },
     { id: "week", name: "This week", value: counts?.week },
@@ -58,7 +67,21 @@ export function DashboardScreen() {
 
   return (
     <main className="mx-auto flex w-full max-w-[1100px] flex-col gap-8 px-4 py-5 sm:px-6">
-      <h1 className="font-serif text-3xl font-medium tracking-tight">Dashboard</h1>
+      <header className="flex items-center justify-between gap-4">
+        <h1 className="font-serif text-3xl font-medium tracking-tight">Dashboard</h1>
+        <ExportDialog
+          notes={notes}
+          rings={rings}
+          spots={doc.board.graphSpots}
+          boxes={doc.board.graphBoxes}
+          counts={counts}
+          flow={flow}
+          mission={mission}
+          wheels={wheels}
+          labels={labels}
+          life={life}
+        />
+      </header>
 
       <section aria-labelledby="finished-heading" className="flex flex-col gap-3">
         <h2 id="finished-heading" className="font-serif text-xl font-medium">
