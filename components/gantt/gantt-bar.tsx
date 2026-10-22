@@ -97,6 +97,7 @@ export function GanttBar({ task, start, onOpen, onSchedule }: Props) {
       className={clsx(
         "absolute top-1/2 flex h-6 -translate-y-1/2 items-center text-left text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
         movable && "touch-none",
+        !drag && "transition-[filter,box-shadow] hover:shadow-md hover:brightness-90",
         asPoint
           ? clsx("h-4 rounded-full border-2 bg-card", task.done ? "border-line" : "cursor-ew-resize border-accent")
           : clsx(
