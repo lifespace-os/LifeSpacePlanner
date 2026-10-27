@@ -26,6 +26,7 @@ export function SelectionBox({
   tagTarget,
   onMoveMany,
   onTagDrag,
+  onBinDrag,
 }: {
   notes: Note[]
   ids: string[]
@@ -36,6 +37,7 @@ export function SelectionBox({
   tagTarget: boolean
   onMoveMany: (moves: GroupMove[]) => void
   onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
+  onBinDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
 }) {
   const boxRef = useRef<HTMLDivElement>(null)
   const drag = useRef<DragState | null>(null)
@@ -98,6 +100,7 @@ export function SelectionBox({
     const zoom = viewRef.current.zoom
     state.group.apply(dx / zoom, dy / zoom)
     if (fixed || tagTarget) onTagDrag(ids[0], event.clientX, event.clientY, "move")
+    onBinDrag(ids[0], event.clientX, event.clientY, "move")
   }
 
   function handlePointerEnd(event: React.PointerEvent<HTMLDivElement>) {
@@ -107,6 +110,10 @@ export function SelectionBox({
     if (!state.moved) return
     setDragging(false)
     const dropped = event.type === "pointerup"
+    if (onBinDrag(ids[0], event.clientX, event.clientY, dropped ? "drop" : "cancel")) {
+      state.group.reset()
+      return
+    }
     if (fixed) {
       state.group.reset()
       onTagDrag(ids[0], event.clientX, event.clientY, dropped ? "drop" : "cancel")

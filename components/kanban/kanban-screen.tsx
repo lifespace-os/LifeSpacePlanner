@@ -20,8 +20,10 @@ import { goalTaskCounts, taskStates } from "@/lib/dashboard"
 import { newId } from "@/lib/workspace"
 import { finishedCard, nextCopy, todayIso } from "@/lib/repeat"
 import { useMission } from "@/components/mission-provider"
+import { useTrash } from "@/components/trash-provider"
 import { belowIds, ringCardsOf } from "@/lib/ring-focus"
 import { filterGoalIds, highlightColor, passesFilter, ringHashtags } from "@/lib/kanban-filter"
+import { ArchivedList } from "./archived-list"
 import { CardEditor } from "./card-editor"
 import { ColumnEditor } from "./column-editor"
 import { FilterBar } from "./filter-bar"
@@ -47,6 +49,8 @@ export function KanbanScreen() {
     setRingsOn,
     resultsOn,
     setResultsOn,
+    archivedOn,
+    setArchivedOn,
     ringFocusId,
     setRingFocusId,
     cardFilter,
@@ -103,7 +107,7 @@ export function KanbanScreen() {
   const filtering = missionOnly && missionText.length > 0
   const { notes, rings } = useGoals()
   const ringNotes = useMemo(() => ringCardsOf(notes, rings), [notes, rings])
-  const focusedId = ringsOn && !resultsOn && ringFocusId && ringNotes.some((note) => note.id === ringFocusId) ? ringFocusId : null
+  const focusedId = ringsOn && !resultsOn && !archivedOn && ringFocusId && ringNotes.some((note) => note.id === ringFocusId) ? ringFocusId : null
   const below = useMemo(() => (focusedId ? belowIds(focusedId, notes, rings) : null), [focusedId, notes, rings])
   const shownRingNotes = below ? ringNotes.filter((note) => below.has(note.id)) : ringNotes
   const taskCounts = useMemo(
@@ -125,8 +129,18 @@ export function KanbanScreen() {
     const byMission = filtering ? resultCards.filter(hasMissionPath) : resultCards
     return byMission.filter((card) => passesFilter(card, activeFilter, keptIds))
   }, [filtering, resultCards, activeFilter, keptIds])
-  const listCards = resultsOn ? resultCards : boardCards
-  const listShown = resultsOn ? visibleResults.length : visibleCards.length
+  const { archive } = useTrash()
+  const archivedCards = useMemo(() => archive.map((entry) => entry.card), [archive])
+  const visibleArchive = useMemo(
+    () =>
+      archive.filter(
+        (entry) => (!filtering || hasMissionPath(entry.card)) && passesFilter(entry.card, activeFilter, keptIds),
+      ),
+    [archive, filtering, activeFilter, keptIds],
+  )
+  const boardShown = !resultsOn && !archivedOn
+  const listCards = archivedOn ? archivedCards : resultsOn ? resultCards : boardCards
+  const listShown = archivedOn ? visibleArchive.length : resultsOn ? visibleResults.length : visibleCards.length
 
   const pickRing = (id: string) => {
     if (id === focusedId) {
@@ -297,7 +311,7 @@ export function KanbanScreen() {
 
         <div role="tablist" aria-label={t("kanban.boardsLabel")} className="flex items-center gap-1 rounded-lg border border-line bg-desk/70 p-1">
           {KANBAN_BOARDS.map((item) => {
-            const active = item.id === boardId && !resultsOn
+            const active = item.id === boardId && boardShown
             return (
               <button
                 key={item.id}
@@ -309,6 +323,7 @@ export function KanbanScreen() {
                 onClick={() => {
                   setBoardId(item.id)
                   setResultsOn(false)
+                  setArchivedOn(false)
                 }}
                 onDragOver={(event) => {
                   if (!draggingId) return
@@ -338,11 +353,12 @@ export function KanbanScreen() {
             )
           })}
           <ToggleSwitch checked={resultsOn} onChange={setResultsOn} label={t("kanban.resultsLabel")} count={resultCards.length} />
+          <ToggleSwitch checked={archivedOn} onChange={setArchivedOn} label={t("archive.title")} count={archive.length} />
         </div>
 
         <div className="flex items-center gap-3">
-          {!resultsOn && <ToggleSwitch checked={ringsOn} onChange={setRingsOn} label={t("kanban.ringsLabel")} />}
-          {!resultsOn && (
+          {boardShown && <ToggleSwitch checked={ringsOn} onChange={setRingsOn} label={t("kanban.ringsLabel")} />}
+          {boardShown && (
             <button
               type="button"
               disabled={doneTaskCount === 0}
@@ -356,7 +372,7 @@ export function KanbanScreen() {
           <p role="status" aria-live="polite" className="max-w-xs text-pretty text-right text-sm text-ink-soft">
             {status}
           </p>
-          {!resultsOn && (
+          {boardShown && (
             <ColumnEditor
               boardName={boardLabel(t, board.id)}
               columns={columns}
@@ -387,9 +403,11 @@ export function KanbanScreen() {
         shown={listShown}
       />
 
-      {ringsOn && !resultsOn && <RingRow cards={shownRingNotes} rings={rings} focusId={focusedId} taskCounts={taskCounts} onPick={pickRing} />}
+      {ringsOn && boardShown && <RingRow cards={shownRingNotes} rings={rings} focusId={focusedId} taskCounts={taskCounts} onPick={pickRing} />}
 
-      {resultsOn ? (
+      {archivedOn ? (
+        <ArchivedList entries={visibleArchive} total={archive.length} onStatus={setStatus} />
+      ) : resultsOn ? (
         <ResultsGrid
           cards={visibleResults}
           total={resultCards.length}

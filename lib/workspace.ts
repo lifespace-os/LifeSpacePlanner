@@ -33,7 +33,7 @@ import { isThemeSchedule, type ThemeSchedule } from "@/lib/theme-schedule"
 import { isThemeKey, type ThemeKey } from "@/lib/themes"
 import { isLanguage, type Language } from "@/lib/i18n"
 import { isMediaId } from "@/lib/media"
-import { isTrashList, type TrashItem } from "@/lib/trash"
+import { isArchiveList, isTrashList, type ArchivedTask, type StoredTrashItem } from "@/lib/trash"
 import { isViewHref, type ViewHref } from "@/lib/views"
 
 /** One address for the workspace. A later server can answer the same path. */
@@ -89,12 +89,15 @@ export type WorkspaceDoc = {
   themeSchedule?: ThemeSchedule
   /** The interface language. Absent means English. */
   language?: Language
-  /** Deleted cards and tasks, newest first. Absent means the trash is empty. */
-  trash?: TrashItem[]
+  /** Deleted whiteboard cards, newest first. Absent means the trash is empty. Older files may also hold tasks here. */
+  trash?: StoredTrashItem[]
+  /** Kanban tasks taken off their boards, newest first. Absent means nothing is archived. */
+  archive?: ArchivedTask[]
 }
 
 export type WorkspaceSliceKey =
   | "trash"
+  | "archive"
   | "missionText"
   | "notes"
   | "rings"
@@ -162,6 +165,7 @@ export function parseWorkspace(value: unknown): { ok: true; doc: WorkspaceDoc } 
   if (value.themeSchedule !== undefined && !isThemeSchedule(value.themeSchedule)) return fail("The time of day theme settings in the file are not valid.")
   if (value.language !== undefined && !isLanguage(value.language)) return fail("The language in the file is not one this app knows.")
   if (value.trash !== undefined && !isTrashList(value.trash, isNote, isCard)) return fail("The trash in the file is not valid.")
+  if (value.archive !== undefined && !isArchiveList(value.archive, isCard)) return fail("The archived tasks in the file are not valid.")
   return { ok: true, doc: value as WorkspaceDoc }
 }
 

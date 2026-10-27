@@ -60,7 +60,7 @@ export function KanbanCardView({
   onResult,
 }: Props) {
   const { t, locale } = useLanguage()
-  const { trashTask } = useTrash()
+  const { archiveTask } = useTrash()
   const inResults = mode === "results"
   const [menu, setMenu] = useState<{ top: number; left: number } | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -318,11 +318,11 @@ export function KanbanCardView({
               role="menuitem"
               onClick={() => {
                 setMenu(null)
-                trashTask(card.id)
-              }}
-              className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-release hover:bg-release/10 focus-visible:bg-release/10 focus-visible:outline-none"
-            >
-              {t("common.delete")}
+  archiveTask(card.id)
+  }}
+  className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-ink hover:bg-line/50 focus-visible:bg-line/50 focus-visible:outline-none"
+  >
+  {t("archive.archive")}
             </button>
           </div>
         </div>

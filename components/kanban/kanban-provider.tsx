@@ -28,6 +28,9 @@ type KanbanState = {
   /** True while the grid of finished cards shows in place of the board's columns. */
   resultsOn: boolean
   setResultsOn: (on: boolean) => void
+  /** True while the list of archived tasks shows in place of the board's columns. Results and Archived never show together. */
+  archivedOn: boolean
+  setArchivedOn: (on: boolean) => void
   /** The ring card the board is narrowed to, or null when the whole board shows. */
   ringFocusId: string | null
   setRingFocusId: (id: string | null) => void
@@ -57,7 +60,8 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
   useWorkspaceSlice("kanban", kanban)
   const [missionOnly, setMissionOnly] = useState(false)
   const [ringsOn, setRingsOnState] = useState(false)
-  const [resultsOn, setResultsOn] = useState(false)
+  const [resultsOn, setResultsOnState] = useState(false)
+  const [archivedOn, setArchivedOnState] = useState(false)
   const [ringFocusId, setRingFocusId] = useState<string | null>(null)
   const [cardFilter, setCardFilter] = useState<CardFilter>(NO_FILTER)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -66,6 +70,16 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
   const setRingsOn = useCallback((on: boolean) => {
     setRingsOnState(on)
     if (!on) setRingFocusId(null)
+  }, [])
+
+  const setResultsOn = useCallback((on: boolean) => {
+    setResultsOnState(on)
+    if (on) setArchivedOnState(false)
+  }, [])
+
+  const setArchivedOn = useCallback((on: boolean) => {
+    setArchivedOnState(on)
+    if (on) setResultsOnState(false)
   }, [])
 
   const openCard = useCallback((cardId: string) => setOpenId(cardId), [])
@@ -116,6 +130,8 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
       setRingsOn,
       resultsOn,
       setResultsOn,
+      archivedOn,
+      setArchivedOn,
       ringFocusId,
       setRingFocusId,
       cardFilter,
@@ -128,7 +144,7 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
       revertDraft,
       saveDraft,
     }),
-    [boardId, columnsByBoard, cards, missionOnly, ringsOn, setRingsOn, resultsOn, ringFocusId, cardFilter, openId, openCard, closeCard, drafts, editDraft, revertDraft, saveDraft],
+    [boardId, columnsByBoard, cards, missionOnly, ringsOn, setRingsOn, resultsOn, setResultsOn, archivedOn, setArchivedOn, ringFocusId, cardFilter, openId, openCard, closeCard, drafts, editDraft, revertDraft, saveDraft],
   )
 
   return <KanbanContext.Provider value={value}>{children}</KanbanContext.Provider>

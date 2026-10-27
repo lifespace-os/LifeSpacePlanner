@@ -40,6 +40,8 @@ type Props = {
   onSelect: (id: string, additive: boolean) => void
   /** Returns true when a drop was taken as a tagging gesture, so the cards should return. */
   onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
+  /** Returns true when a drop landed on the trash bin and the cards went to Trash. */
+  onBinDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
   onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
   onMoveMany: (moves: GroupMove[]) => void
   onFront: (id: string) => void
@@ -88,6 +90,7 @@ export const NoteCard = memo(function NoteCard({
   multiCount,
   onSelect,
   onTagDrag,
+  onBinDrag,
   onMove,
   onMoveMany,
   onFront,
@@ -147,6 +150,7 @@ export const NoteCard = memo(function NoteCard({
     const zoom = viewRef.current.zoom
     state.group?.apply(dx / zoom, dy / zoom)
     if (fixed || tagTarget) onTagDrag(note.id, event.clientX, event.clientY, "move")
+    onBinDrag(note.id, event.clientX, event.clientY, "move")
   }
 
   function handlePointerEnd(event: React.PointerEvent<HTMLElement>) {
@@ -159,6 +163,10 @@ export const NoteCard = memo(function NoteCard({
     }
     setDragging(false)
     const dropped = event.type === "pointerup"
+    if (onBinDrag(note.id, event.clientX, event.clientY, dropped ? "drop" : "cancel")) {
+      state.group?.reset()
+      return
+    }
     if (fixed) {
       state.group?.reset()
       onTagDrag(note.id, event.clientX, event.clientY, dropped ? "drop" : "cancel")

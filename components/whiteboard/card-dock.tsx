@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react"
 import clsx from "clsx"
+import { Trash2 } from "lucide-react"
+import { useLanguage } from "@/components/language-provider"
 import { CARD_COLORS, getCardColor, isCustomColor, type CardColorId } from "@/lib/board-data"
 
 const DEFAULT_CUSTOM_COLOR = "#8fb8c9"
@@ -13,12 +15,21 @@ export function CardDock({
   onColorChange,
   onDrop,
   onPlaceCenter,
+  trashCount,
+  binOver,
+  binRef,
+  onOpenTrash,
 }: {
   color: CardColorId
   onColorChange: (color: CardColorId) => void
   onDrop: (clientX: number, clientY: number) => void
   onPlaceCenter: () => void
+  trashCount: number
+  binOver: boolean
+  binRef: React.RefObject<HTMLButtonElement | null>
+  onOpenTrash: () => void
 }) {
+  const { t } = useLanguage()
   const dockRef = useRef<HTMLDivElement>(null)
   const drag = useRef<DragState | null>(null)
   const [ghost, setGhost] = useState<{ x: number; y: number } | null>(null)
@@ -155,6 +166,30 @@ export function CardDock({
             />
           </label>
         </div>
+
+        <span aria-hidden="true" className="h-9 w-px bg-line" />
+
+        <button
+          ref={binRef}
+          type="button"
+          onClick={onOpenTrash}
+          aria-label={t("trash.binAria", { count: trashCount })}
+          className={clsx(
+            "flex h-11 items-center gap-2 rounded-lg border px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            binOver
+              ? "border-ink bg-ink/10 text-ink ring-2 ring-ink ring-offset-2 ring-offset-board"
+              : "border-line text-ink-soft hover:bg-desk hover:text-ink",
+          )}
+        >
+          <Trash2 aria-hidden="true" className="size-4" />
+          <span aria-hidden="true">{binOver ? t("trash.binRelease") : t("trash.bin")}</span>
+          <span
+            aria-hidden="true"
+            className="min-w-5 rounded-full bg-ink/10 px-1.5 text-center text-xs tabular-nums text-ink"
+          >
+            {trashCount}
+          </span>
+        </button>
       </div>
 
       {ghost ? (

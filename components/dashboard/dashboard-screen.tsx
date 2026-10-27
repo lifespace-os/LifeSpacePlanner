@@ -12,6 +12,7 @@ import { WheelsTile } from "@/components/dashboard/wheels-tile"
 import { useGoals } from "@/components/goals-provider"
 import { useKanban } from "@/components/kanban/kanban-provider"
 import { useLanguage } from "@/components/language-provider"
+import { useTrash } from "@/components/trash-provider"
 import { useWorkspace } from "@/components/workspace-provider"
 import { labelSetLists } from "@/lib/board-data"
 import { finishedCounts, flowOf, goalTaskCounts, taskStates } from "@/lib/dashboard"
@@ -26,6 +27,7 @@ import { DEFAULT_LIFE } from "@/lib/workspace"
 export function DashboardScreen() {
   const { cards, columnsByBoard } = useKanban()
   const { notes, rings } = useGoals()
+  const { archive } = useTrash()
   const { doc } = useWorkspace()
   const { t, tn } = useLanguage()
   const [today, setToday] = useState<string | null>(null)
@@ -34,7 +36,15 @@ export function DashboardScreen() {
     setToday(todayIso())
   }, [])
 
-  const tasks = useMemo(() => taskStates(cards, columnsByBoard), [cards, columnsByBoard])
+  const tasks = useMemo(() => {
+    const finishedArchived = archive
+      .map((entry) => entry.card)
+      .filter(
+        (card) =>
+          card.inResults || columnsByBoard[card.boardId]?.find((column) => column.id === card.columnId)?.kind === "done",
+      )
+    return taskStates([...cards, ...finishedArchived], columnsByBoard)
+  }, [cards, archive, columnsByBoard])
   const counts = useMemo(() => (today ? finishedCounts(tasks, today) : null), [tasks, today])
   const flow = useMemo(() => flowOf(notes, rings, tasks), [notes, rings, tasks])
   const totals = useMemo(() => goalTaskCounts(tasks, notes, rings), [tasks, notes, rings])

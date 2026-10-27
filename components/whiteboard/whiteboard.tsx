@@ -105,6 +105,7 @@ import {
 import { GoalCardPanel, type GoalDraft } from "./goal-card-panel"
 import { IkigaiStepsWindow } from "./ikigai-guide"
 import { CardDock } from "./card-dock"
+import { TrashPanel } from "@/components/trash/trash-panel"
 import { ZoomControls } from "./zoom-controls"
 import { CanvasMenu, CardMenu, type MenuState } from "./context-menu"
 
@@ -122,7 +123,10 @@ function clampZoom(zoom: number) {
 export function Whiteboard() {
   const { doc } = useWorkspace()
   const { notes, setNotes, rings, setRings } = useGoals()
-  const { trashNote } = useTrash()
+  const { trash, trashNote } = useTrash()
+  const binRef = useRef<HTMLButtonElement>(null)
+  const [binOver, setBinOver] = useState(false)
+  const [trashOpen, setTrashOpen] = useState(false)
   const [zones, setZones] = useState<Zones>(doc.board.zones)
   const [budgetZones, setBudgetZones] = useState<BudgetZones>(doc.board.budgetZones)
   const [groups, setGroups] = useState<Group[]>(doc.board.groups)
@@ -1003,6 +1007,25 @@ export function Whiteboard() {
     [trashNote],
   )
 
+  const handleBinDrag = useCallback(
+    (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => {
+      const rect = binRef.current?.getBoundingClientRect()
+      const over =
+        phase !== "cancel" &&
+        !!rect &&
+        clientX >= rect.left &&
+        clientX <= rect.right &&
+        clientY >= rect.top &&
+        clientY <= rect.bottom
+      setBinOver(phase === "move" && over)
+      if (phase !== "drop" || !over) return false
+      const ids = selectionRef.current.includes(id) ? [...selectionRef.current] : [id]
+      for (const noteId of ids) deleteNote(noteId)
+      return true
+    },
+    [deleteNote],
+  )
+
   const startEdit = useCallback((id: string) => {
     setMenu(null)
     setEditingId(id)
@@ -1342,6 +1365,7 @@ export function Whiteboard() {
         onEditEnd={endEdit}
         onCardMenu={openCardMenu}
         onDelete={deleteNote}
+        onBinDrag={handleBinDrag}
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-4">
@@ -1758,7 +1782,16 @@ export function Whiteboard() {
         />
         {mapOn || graphOn ? null : (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-            <CardDock color={dockColor} onColorChange={setDockColor} onDrop={dropFromDock} onPlaceCenter={placeAtCenter} />
+            <CardDock
+              color={dockColor}
+              onColorChange={setDockColor}
+              onDrop={dropFromDock}
+              onPlaceCenter={placeAtCenter}
+              trashCount={trash.length}
+              binOver={binOver}
+              binRef={binRef}
+              onOpenTrash={() => setTrashOpen(true)}
+            />
           </div>
         )}
         {boardLinksOn ? (
@@ -1776,6 +1809,8 @@ export function Whiteboard() {
           <span aria-hidden="true" />
         )}
       </div>
+
+      {trashOpen ? <TrashPanel onClose={() => setTrashOpen(false)} /> : null}
 
       {missionOpen && mode === "mission" ? (
         <MissionWindow initialText={missionText} onSave={saveMission} onCancel={closeMission} />

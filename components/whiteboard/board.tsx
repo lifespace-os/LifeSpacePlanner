@@ -108,6 +108,7 @@ export function Board({
   onSelect,
   onMarquee,
   onTagDrag,
+  onBinDrag,
   onMove,
   onMoveMany,
   onFront,
@@ -156,6 +157,7 @@ export function Board({
   onSelect: (id: string, additive: boolean) => void
   onMarquee: (ids: string[]) => void
   onTagDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
+  onBinDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
   onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
   onMoveMany: (moves: GroupMove[]) => void
   onFront: (id: string) => void
@@ -376,6 +378,7 @@ export function Board({
               tagTarget={tagOnly}
               onMoveMany={onMoveMany}
               onTagDrag={onTagDrag}
+              onBinDrag={onBinDrag}
             />
 
             {notes.map((note) => {
@@ -396,6 +399,7 @@ export function Board({
                   multiCount={inSelection ? selectedIds.length : 0}
                   onSelect={onSelect}
                   onTagDrag={onTagDrag}
+                  onBinDrag={onBinDrag}
                   onMove={onMove}
                   onMoveMany={onMoveMany}
                   onFront={onFront}

@@ -59,7 +59,7 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const { setCards } = useKanban()
-  const { trashTask } = useTrash()
+  const { archiveTask } = useTrash()
   const issue = draftIssue(draft)
 
   const removeImage = () =>
@@ -275,10 +275,10 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => trashTask(card.id)}
-                className="rounded px-2 py-1.5 text-sm text-release hover:bg-release/10 focus-visible:outline-2 focus-visible:outline-accent"
-              >
-                {t("common.delete")}
+  onClick={() => archiveTask(card.id)}
+  className="rounded px-2 py-1.5 text-sm text-ink hover:bg-line/50 focus-visible:outline-2 focus-visible:outline-accent"
+  >
+  {t("archive.archive")}
               </button>
               <button
                 type="button"
