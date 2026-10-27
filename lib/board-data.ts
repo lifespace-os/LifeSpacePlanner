@@ -72,6 +72,8 @@ export type Note = {
   mapAngle?: number | null
   /** The answers saved in the side panel of a Life goals or Project goals card. */
   goalPlan?: GoalPlan | null
+  /** The id of the one picture on this card, kept in the media store. Absent means no picture. */
+  image?: string
 }
 
 /** Why a goal exists. "unlinked" is a valid answer. */

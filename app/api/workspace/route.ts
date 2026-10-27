@@ -1,14 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from "fs/promises"
-import os from "os"
 import path from "path"
+import { dataDir } from "@/lib/data-dir"
 import { parseWorkspace, type WorkspaceDoc } from "@/lib/workspace"
 
-const DATA_DIR_NAME = "LifeSpace Planner"
-
 function workspaceFile() {
-  const dir =
-    process.env.LIFESPACE_DATA_DIR || path.join(os.homedir(), "Library", "Application Support", DATA_DIR_NAME)
-  return path.join(dir, "workspace.json")
+  return path.join(dataDir(), "workspace.json")
 }
 
 function seedFile() {

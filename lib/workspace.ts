@@ -32,6 +32,7 @@ import { isCustomThemeList, type CustomTheme } from "@/lib/custom-themes"
 import { isThemeSchedule, type ThemeSchedule } from "@/lib/theme-schedule"
 import { isThemeKey, type ThemeKey } from "@/lib/themes"
 import { isLanguage, type Language } from "@/lib/i18n"
+import { isMediaId } from "@/lib/media"
 import { isViewHref, type ViewHref } from "@/lib/views"
 
 /** One address for the workspace. A later server can answer the same path. */
@@ -235,7 +236,8 @@ function isNote(value: unknown): boolean {
     typeof value.text === "string" &&
     typeof value.x === "number" &&
     typeof value.y === "number" &&
-    Array.isArray(value.hashtags)
+    Array.isArray(value.hashtags) &&
+    (value.image === undefined || isMediaId(value.image))
   )
 }
 

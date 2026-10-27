@@ -14,7 +14,9 @@ import {
   type Note,
   type View,
 } from "@/lib/board-data"
+import { useT } from "@/components/language-provider"
 import { beginGroupDrag, type GroupDrag, type GroupMove } from "@/lib/group-drag"
+import { mediaUrl } from "@/lib/media"
 import { CardLabelSets } from "./card-label-sets"
 
 type Props = {
@@ -221,7 +223,7 @@ export const NoteCard = memo(function NoteCard({
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
       onDoubleClick={(event) => {
-        if ((event.target as HTMLElement).closest("button")) return
+        if ((event.target as HTMLElement).closest("button, [data-card-image]")) return
         onEditStart(note.id)
       }}
       onContextMenu={(event) => {
@@ -244,6 +246,7 @@ export const NoteCard = memo(function NoteCard({
         "group absolute flex touch-none flex-col select-none outline-none",
         "transition-[transform,box-shadow,opacity] duration-150",
         "focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-board",
+        "data-[image-drop]:outline-2 data-[image-drop]:outline-dashed data-[image-drop]:outline-offset-2 data-[image-drop]:outline-ink",
         editing ? "cursor-text" : dragging ? "cursor-grabbing" : "cursor-grab",
         isTask ? "rounded-md border border-line border-t-4 border-t-accent bg-card" : "rounded-sm border-b-2",
         !isTask && (color.dark ? "text-paper-light" : "text-paper-ink"),
@@ -254,6 +257,8 @@ export const NoteCard = memo(function NoteCard({
         released && "opacity-50",
       )}
     >
+      {note.image ? <CardPicture id={note.image} /> : null}
+
       {isTask ? (
         <TaskFace note={note} released={released} />
       ) : editing ? (
@@ -301,6 +306,27 @@ export const NoteCard = memo(function NoteCard({
     </article>
   )
 })
+
+/** The saved picture, cropped to fill a fixed frame so the card never grows to the original. */
+function CardPicture({ id }: { id: string }) {
+  const t = useT()
+  return (
+    <div
+      data-card-image=""
+      className="mx-auto mt-2 h-[110px] w-[180px] shrink-0 overflow-hidden rounded-sm bg-ink/10"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- served from the app's own media store */}
+      <img
+        src={mediaUrl(id)}
+        alt={t("whiteboard.image.alt")}
+        loading="lazy"
+        decoding="async"
+        draggable={false}
+        className="size-full object-cover"
+      />
+    </div>
+  )
+}
 
 function CardEditor({ note, onDone }: { note: Note; onDone: (text: string) => void }) {
   const finished = useRef(false)

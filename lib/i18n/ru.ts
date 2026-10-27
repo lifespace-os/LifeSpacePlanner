@@ -166,7 +166,7 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "filter.label": "Фильтр",
   "filter.ring": "Кольцо",
   "filter.clear": "Сбросить фильтр",
-  "filter.tagHeading.project": "Проект",
+  "filter.tagHeading.project": "��роект",
   "filter.tagHeading.hashtag": "Хэштег",
   "filter.noHashtags": "Пока нет хэштегов у {scope}. Фильтровать можно и по одному кольцу.",
   "filter.scope.project": "целей проектов",
@@ -214,7 +214,7 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "card.resultAriaMove": "В итоги: «{title}»",
   "card.highlightedSr": " (подсвечена фильтром)",
   "card.columnHeading": "Колонка",
-  "card.boardHeading": "До��ка",
+  "card.boardHeading": "��о��ка",
   "card.full": "Полна",
 
   // column editor
@@ -436,7 +436,7 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "dashboard.review.save": "Сохранить обзор",
   "dashboard.review.lastSaved": "Сохранено {date}.",
   "dashboard.review.notSaved": "Пока не сохранено.",
-  "dashboard.review.unsaved": "Есть несохранённые изменения.",
+  "dashboard.review.unsaved": "Есть несохр��нённые изменения.",
   "dashboard.export.button": "Экспорт",
   "dashboard.export.title": "Экспорт сводки",
   "dashboard.export.pictures": "Какие картинки включить",
@@ -600,6 +600,13 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "resultsGrid.filtered.few": "Фильтр скрывает все {count} карточки в итогах. Сбросьте его, чтобы увидеть.",
   "resultsGrid.filtered.many": "Фильтр скрывает все {count} карточек в итогах. Сбросьте его, чтобы увидеть.",
   "whiteboard.showEveryLine": "Показать все линии",
+  "whiteboard.image.add": "Добавить картинку",
+  "whiteboard.image.replace": "Заменить картинку",
+  "whiteboard.image.remove": "Убрать картинку",
+  "whiteboard.image.alt": "Картинка на карточке",
+  "whiteboard.image.wrongType": "Можно добавить только картинки JPEG, PNG и WebP.",
+  "whiteboard.image.tooLarge": "Картинка больше 20 МБ. Выберите поменьше.",
+  "whiteboard.image.failed": "Не удалось добавить картинку. Попробуйте ещё раз.",
   "resultsGrid.filtered.other": "Фильтр скрывает все {count} карточки в итогах. Сбросьте его, чтобы увидеть.",
 
   // END

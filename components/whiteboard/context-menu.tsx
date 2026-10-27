@@ -2,7 +2,9 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import clsx from "clsx"
-import { Hash, PencilLine, Plus, Trash2, X } from "lucide-react"
+import { Hash, ImageOff, ImagePlus, PencilLine, Plus, Trash2, X } from "lucide-react"
+import { useT } from "@/components/language-provider"
+import { IMAGE_ACCEPT } from "@/lib/media"
 import { CARD_COLORS, getCardColor, normalizeHashtag, type CardColorId, type Note } from "@/lib/board-data"
 
 export type MenuState =
@@ -107,6 +109,7 @@ export function CardMenu({
   tagColors,
   fields,
   showEditWords,
+  image,
   onEdit,
   onDelete,
   onClose,
@@ -133,10 +136,14 @@ export function CardMenu({
   }
   /** Off on the Map, where the card is hidden and cannot be edited in place. */
   showEditWords: boolean
+  /** Absent on the Map and the Graph, where the card is not drawn and a picture would not show. */
+  image?: { onFile: (file: File) => void; onRemove: () => void }
   onEdit: () => void
   onDelete: () => void
   onClose: () => void
 }) {
+  const t = useT()
+  const fileInput = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState("")
 
   function submitTag(event: React.FormEvent<HTMLFormElement>) {
@@ -316,6 +323,42 @@ export function CardMenu({
       </div>
 
       <div className="mt-1.5 border-t border-line pt-1.5">
+        {image ? (
+          <>
+            <input
+              ref={fileInput}
+              type="file"
+              accept={IMAGE_ACCEPT}
+              tabIndex={-1}
+              className="sr-only"
+              aria-hidden="true"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.target.value = ""
+                if (!file) return
+                image.onFile(file)
+                onClose()
+              }}
+            />
+            <button type="button" onClick={() => fileInput.current?.click()} className={itemClass}>
+              <ImagePlus className="size-4 text-ink-soft" aria-hidden="true" />
+              {t(note.image ? "whiteboard.image.replace" : "whiteboard.image.add")}
+            </button>
+            {note.image ? (
+              <button
+                type="button"
+                onClick={() => {
+                  image.onRemove()
+                  onClose()
+                }}
+                className={itemClass}
+              >
+                <ImageOff className="size-4 text-ink-soft" aria-hidden="true" />
+                {t("whiteboard.image.remove")}
+              </button>
+            ) : null}
+          </>
+        ) : null}
         {showEditWords ? (
           <button type="button" onClick={onEdit} className={itemClass}>
             <PencilLine className="size-4 text-ink-soft" aria-hidden="true" />

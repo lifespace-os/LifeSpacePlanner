@@ -567,6 +567,13 @@ export const en = {
   "resultsGrid.filtered.one": "The filter leaves none of the {count} card on Results. Clear it to see them.",
   "resultsGrid.filtered.other": "The filter leaves none of the {count} cards on Results. Clear it to see them.",
   "whiteboard.showEveryLine": "Show every line",
+  "whiteboard.image.add": "Add image",
+  "whiteboard.image.replace": "Replace image",
+  "whiteboard.image.remove": "Remove image",
+  "whiteboard.image.alt": "Picture on the card",
+  "whiteboard.image.wrongType": "Only JPEG, PNG and WebP pictures can be added.",
+  "whiteboard.image.tooLarge": "That picture is over 20 MB. Choose a smaller one.",
+  "whiteboard.image.failed": "The picture could not be added. Try again.",
 
   // END
 } as const

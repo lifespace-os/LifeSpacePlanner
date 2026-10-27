@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useGoals } from "@/components/goals-provider"
+import { useT } from "@/components/language-provider"
+import { storeImage } from "@/lib/media"
 import { useMission } from "@/components/mission-provider"
 import { useWorkspace, useWorkspaceSlice } from "@/components/workspace-provider"
 import { newId, type WorkspaceBoard } from "@/lib/workspace"
@@ -190,6 +192,10 @@ export function Whiteboard() {
   const [graphMissionOpen, setGraphMissionOpen] = useState(false)
   const [allBoardLinks, setAllBoardLinks] = useState(false)
   const [linkNotice, setLinkNotice] = useState<string | null>(null)
+  const t = useT()
+  const [imageNotice, setImageNotice] = useState<string | null>(null)
+  const imageNoticeTimer = useRef<number | undefined>(undefined)
+  const imageDropCard = useRef<HTMLElement | null>(null)
   const [graphShowText, setGraphShowText] = useState(true)
   const [graphSmall, setGraphSmall] = useState(false)
   const [graphFilter, setGraphFilter] = useState<GraphFilter>(NO_GRAPH_FILTER)
@@ -1104,6 +1110,71 @@ export function Whiteboard() {
     [mapScale, mapPointSize, rings],
   )
 
+  const imagesOn = !mapOn && !graphOn
+
+  const showImageNotice = useCallback((message: string) => {
+    setImageNotice(message)
+    window.clearTimeout(imageNoticeTimer.current)
+    imageNoticeTimer.current = window.setTimeout(() => setImageNotice(null), 5000)
+  }, [])
+
+  useEffect(() => () => window.clearTimeout(imageNoticeTimer.current), [])
+
+  const attachImage = useCallback(
+    async (noteId: string, file: File) => {
+      const result = await storeImage(file)
+      if (!result.ok) {
+        showImageNotice(
+          t(
+            result.reason === "type"
+              ? "whiteboard.image.wrongType"
+              : result.reason === "size"
+                ? "whiteboard.image.tooLarge"
+                : "whiteboard.image.failed",
+          ),
+        )
+        return
+      }
+      setImageNotice(null)
+      updateNote(noteId, (note) => ({ ...note, image: result.id }))
+    },
+    [showImageNotice, t],
+  )
+
+  const removeImage = useCallback(
+    (noteId: string) =>
+      updateNote(noteId, (note) => {
+        if (!note.image) return note
+        const { image: _image, ...rest } = note
+        return rest
+      }),
+    [],
+  )
+
+  const markImageDrop = useCallback((target: HTMLElement | null) => {
+    const card = target?.closest<HTMLElement>("[data-note-card]") ?? null
+    if (imageDropCard.current === card) return
+    imageDropCard.current?.removeAttribute("data-image-drop")
+    card?.setAttribute("data-image-drop", "")
+    imageDropCard.current = card
+  }, [])
+
+  useEffect(() => {
+    if (!imagesOn) return
+    function handlePaste(event: ClipboardEvent) {
+      const target = event.target as HTMLElement | null
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return
+      const ids = selectionRef.current
+      if (ids.length !== 1) return
+      const file = Array.from(event.clipboardData?.files ?? []).find((f) => f.type.startsWith("image/"))
+      if (!file) return
+      event.preventDefault()
+      void attachImage(ids[0], file)
+    }
+    document.addEventListener("paste", handlePaste)
+    return () => document.removeEventListener("paste", handlePaste)
+  }, [imagesOn, attachImage])
+
   const closeMenu = useCallback(() => setMenu(null), [])
   const clearSelection = useCallback(() => {
     setSelectedIds((prev) => (prev.length > 0 ? NO_IDS : prev))
@@ -1140,11 +1211,37 @@ export function Whiteboard() {
   return (
     <main
       ref={rootRef}
+      onDragOver={(event) => {
+        if (!imagesOn || !event.dataTransfer.types.includes("Files")) return
+        event.preventDefault()
+        const card = (event.target as HTMLElement).closest<HTMLElement>("[data-note-card]")
+        event.dataTransfer.dropEffect = card ? "copy" : "none"
+        markImageDrop(card)
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) markImageDrop(null)
+      }}
+      onDrop={(event) => {
+        if (!imagesOn || !event.dataTransfer.types.includes("Files")) return
+        event.preventDefault()
+        markImageDrop(null)
+        const noteId = (event.target as HTMLElement).closest<HTMLElement>("[data-note-card]")?.dataset.noteId
+        const file = event.dataTransfer.files[0]
+        if (noteId && file) void attachImage(noteId, file)
+      }}
       className={clsx(
         "relative overflow-hidden bg-board",
         focusMode ? "fixed inset-0 z-50 h-dvh" : "h-[calc(100dvh-3.5rem)]",
       )}
     >
+      {imageNotice ? (
+        <p
+          role="status"
+          className="absolute top-20 left-1/2 z-40 max-w-80 -translate-x-1/2 rounded-lg border border-line bg-board/95 px-3 py-2 text-center text-xs leading-relaxed text-ink shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] backdrop-blur"
+        >
+          {imageNotice}
+        </p>
+      ) : null}
       <Board
         notes={displayNotes}
         zones={zones}
@@ -1741,6 +1838,11 @@ export function Whiteboard() {
             onLevel: (tag) => updateNote(menuNote.id, (note) => setGoalLevel(note, tag, rings)),
           }}
           showEditWords={!mapOn && !graphOn}
+          image={
+            imagesOn
+              ? { onFile: (file) => void attachImage(menuNote.id, file), onRemove: () => removeImage(menuNote.id) }
+              : undefined
+          }
           onEdit={() => startEdit(menuNote.id)}
           onDelete={() => deleteNote(menuNote.id)}
         />
