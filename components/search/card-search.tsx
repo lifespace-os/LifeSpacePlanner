@@ -38,7 +38,7 @@ export function CardSearch() {
   const { t, tn } = useLanguage()
   const { notes, setNotes, rings } = useGoals()
   const { cards, setCards, columnsByBoard, openId, closeCard, revertDraft } = useKanban()
-  const { items: visionItems, addCard: addToVision, followCard: followOnVision } = useVision()
+  const { followCard: followOnVision } = useVision()
   const [query, setQuery] = useState("")
   const [listOpen, setListOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -198,10 +198,6 @@ export function CardSearch() {
         onLinkMission={() => chosen && apply(linkMission(notes, cards, chosen.ref))}
         onLinkCircle={(circle: IkigaiCircleId) => chosen && apply(linkCircle(notes, cards, chosen.ref, circle))}
         onLinkCard={(target) => chosen && apply(linkCard(notes, cards, chosen.ref, target))}
-        onVision={chosen !== null && visionItems.some((item) => item.cardId === chosen.ref.id)}
-        onAddToVision={() => {
-          if (chosen && addToVision(chosen.ref.id)) setFeedback({ text: t("vision.added"), error: false })
-        }}
       />
 
       <ConfirmDialog

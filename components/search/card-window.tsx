@@ -31,9 +31,6 @@ type Props = {
   onLinkMission: () => void
   onLinkCircle: (circle: IkigaiCircleId) => void
   onLinkCard: (ref: CardRef) => void
-  onAddToVision: () => void
-  /** True when the chosen card already has a tile on the Vision board. */
-  onVision: boolean
 }
 
 function sameRef(a: CardRef | undefined, b: CardRef | undefined) {
@@ -70,12 +67,9 @@ function Actions({
   onLinkMission,
   onLinkCircle,
   onLinkCard,
-  onAddToVision,
-  onVision,
-}: Pick<
-  Props,
-  "linkHits" | "onConvert" | "onAddTag" | "onLinkMission" | "onLinkCircle" | "onLinkCard" | "onAddToVision" | "onVision"
-> & { chosen: Detail }) {
+}: Pick<Props, "linkHits" | "onConvert" | "onAddTag" | "onLinkMission" | "onLinkCircle" | "onLinkCard"> & {
+  chosen: Detail
+}) {
   const { t } = useLanguage()
   const [tagDraft, setTagDraft] = useState("")
   const [linkQuery, setLinkQuery] = useState("")
@@ -111,17 +105,6 @@ function Actions({
         <div>
           <button type="button" onClick={onConvert} className={BUTTON}>
             {isNote ? t("search.toTask") : t("search.toNote")}
-          </button>
-        </div>
-      </section>
-
-      <section aria-labelledby={`${tagId}-vision`} className="flex flex-col gap-2">
-        <h3 id={`${tagId}-vision`} className="text-sm font-medium text-ink">
-          {t("vision.cardSection")}
-        </h3>
-        <div>
-          <button type="button" onClick={onAddToVision} disabled={onVision} className={BUTTON}>
-            {onVision ? t("vision.cardOn") : t("vision.cardAdd")}
           </button>
         </div>
       </section>

@@ -1,26 +1,32 @@
-/** One card placed on the Vision board. It points at a whiteboard card or a kanban task; the card itself is never copied. */
+/**
+ * The saved place of one card on the Vision board. It points at a whiteboard card or a kanban task; the card itself is
+ * never copied. The place is kept even while the card does not qualify, so it returns there when it does again.
+ */
 export type VisionItem = {
   id: string
-  /** The id of the whiteboard card or kanban task this tile shows. A card sits on the board at most once. */
+  /** The id of the whiteboard card or kanban task. A card has at most one place. */
   cardId: string
   x: number
   y: number
-  width: number
-  height: number
-  /** Only the picture, or the paper colour when there is none. */
-  hideWords: boolean
 }
 
-export const VISION_MIN = { width: 120, height: 90 }
-export const VISION_MAX = { width: 720, height: 720 }
-export const VISION_DEFAULT = { width: 220, height: 180 }
+/** A card belongs on the board when it has an image and either of these hashtags. */
+export const VISION_TAGS = ["dream", "want"] as const
+
+/** The room one card takes when a new card is placed in open space. */
+export const VISION_SLOT = { width: 224, height: 300 }
 export const VISION_GAP = 24
-export const VISION_STEP = 10
+
+export function qualifiesForVision(hashtags: readonly string[] | undefined, image: string | undefined) {
+  if (!image) return false
+  return (hashtags ?? []).some((tag) => (VISION_TAGS as readonly string[]).includes(tag.toLowerCase()))
+}
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value)
 }
 
+/** Accepts files saved before the board became infinite: their size and words flag are simply ignored. */
 export function isVisionList(value: unknown): value is VisionItem[] {
   if (!Array.isArray(value)) return false
   const cards = new Set<string>()
@@ -28,47 +34,45 @@ export function isVisionList(value: unknown): value is VisionItem[] {
     if (typeof item !== "object" || item === null) return false
     const entry = item as Record<string, unknown>
     if (typeof entry.id !== "string" || typeof entry.cardId !== "string") return false
-    if (!["x", "y", "width", "height"].every((key) => isFiniteNumber(entry[key]))) return false
-    if (typeof entry.hideWords !== "boolean") return false
+    if (!isFiniteNumber(entry.x) || !isFiniteNumber(entry.y)) return false
     if (cards.has(entry.cardId)) return false
     cards.add(entry.cardId)
   }
   return true
 }
 
-/** Drops the tiles whose card is gone for good. A card in the trash or the archive is still alive. */
+/** Keeps only what a place needs, dropping the size and words flag older files carried. */
+export function trimVision(items: VisionItem[]): VisionItem[] {
+  return items.map(({ id, cardId, x, y }) => ({ id, cardId, x: Math.round(x), y: Math.round(y) }))
+}
+
+/** Drops the places whose card is gone for good. A card in the trash or the archive is still alive. */
 export function pruneVision(items: VisionItem[], liveCardIds: Set<string>) {
   return items.filter((item) => liveCardIds.has(item.cardId))
 }
 
-/** Moves a tile to the card that replaced the old one, when a card and a task are turned into each other. */
+/** Moves a place to the card that replaced the old one, when a card and a task are turned into each other. */
 export function followCard(items: VisionItem[], fromId: string, toId: string) {
   if (fromId === toId || items.some((item) => item.cardId === toId)) return items
   if (!items.some((item) => item.cardId === fromId)) return items
   return items.map((item) => (item.cardId === fromId ? { ...item, cardId: toId } : item))
 }
 
-export function clampBox(box: Pick<VisionItem, "x" | "y" | "width" | "height">) {
-  return {
-    x: Math.max(0, Math.round(box.x)),
-    y: Math.max(0, Math.round(box.y)),
-    width: Math.min(VISION_MAX.width, Math.max(VISION_MIN.width, Math.round(box.width))),
-    height: Math.min(VISION_MAX.height, Math.max(VISION_MIN.height, Math.round(box.height))),
-  }
-}
-
-/** The first free place in a grid of default-sized tiles, reading left to right. */
-export function nextSpot(items: VisionItem[], columns = 4) {
-  const stepX = VISION_DEFAULT.width + VISION_GAP
-  const stepY = VISION_DEFAULT.height + VISION_GAP
-  for (let index = 0; index < 400; index += 1) {
-    const x = VISION_GAP + (index % columns) * stepX
-    const y = VISION_GAP + Math.floor(index / columns) * stepY
+/** The first free slot, reading left to right, that touches no saved place, including those of cards not shown now. */
+export function nextSpot(items: VisionItem[], columns = 5) {
+  const stepX = VISION_SLOT.width + VISION_GAP
+  const stepY = VISION_SLOT.height + VISION_GAP
+  for (let index = 0; index < 600; index += 1) {
+    const x = (index % columns) * stepX
+    const y = Math.floor(index / columns) * stepY
     const taken = items.some(
       (item) =>
-        x < item.x + item.width && x + VISION_DEFAULT.width > item.x && y < item.y + item.height && y + VISION_DEFAULT.height > item.y,
+        x < item.x + VISION_SLOT.width &&
+        x + VISION_SLOT.width > item.x &&
+        y < item.y + VISION_SLOT.height &&
+        y + VISION_SLOT.height > item.y,
     )
     if (!taken) return { x, y }
   }
-  return { x: VISION_GAP, y: VISION_GAP }
+  return { x: 0, y: 0 }
 }
