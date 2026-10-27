@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
   const id = `${crypto.randomUUID()}.${IMAGE_EXTENSION[type]}`
   const dir = mediaDir()
-  const filePath = path.join(dir, id)
+  const filePath = path.join(/*turbopackIgnore: true*/ dir, id)
   await mkdir(dir, { recursive: true })
   await writeFile(`${filePath}.tmp`, bytes)
   await rename(`${filePath}.tmp`, filePath)
