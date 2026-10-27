@@ -1,6 +1,8 @@
 "use client"
 
-import { Maximize, Minus, Plus } from "lucide-react"
+import clsx from "clsx"
+import { Link2, Maximize, Minus, Plus } from "lucide-react"
+import { useT } from "@/components/language-provider"
 
 const buttonClass =
   "flex size-8 items-center justify-center rounded-lg text-ink-soft transition-colors hover:bg-desk hover:text-ink disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -13,6 +15,9 @@ export function ZoomControls({
   onZoomOut,
   onReset,
   onFit,
+  linksAvailable = false,
+  allLinks = false,
+  onToggleAllLinks,
 }: {
   zoom: number
   canZoomIn: boolean
@@ -21,7 +26,13 @@ export function ZoomControls({
   onZoomOut: () => void
   onReset: () => void
   onFit: () => void
+  linksAvailable?: boolean
+  allLinks?: boolean
+  onToggleAllLinks?: () => void
 }) {
+  const t = useT()
+  const linksLabel = t("whiteboard.showEveryLine")
+
   return (
     <div
       role="group"
@@ -47,6 +58,21 @@ export function ZoomControls({
       <button type="button" onClick={onFit} aria-label="Fit all cards" title="Fit all cards" className={buttonClass}>
         <Maximize className="size-4" aria-hidden="true" />
       </button>
+      {linksAvailable && onToggleAllLinks ? (
+        <button
+          type="button"
+          aria-pressed={allLinks}
+          aria-label={linksLabel}
+          title={linksLabel}
+          onClick={onToggleAllLinks}
+          className={clsx(
+            "flex size-8 items-center justify-center rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            allLinks ? "bg-accent text-board" : "text-ink-soft hover:bg-desk hover:text-ink",
+          )}
+        >
+          <Link2 className="size-4" aria-hidden="true" />
+        </button>
+      ) : null}
     </div>
   )
 }

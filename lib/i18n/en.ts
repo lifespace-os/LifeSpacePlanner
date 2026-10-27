@@ -566,6 +566,7 @@ export const en = {
   "resultsGrid.empty": "Nothing on Results yet. Open a board and use Move to Results on a card in Done, or move everything in Done at once.",
   "resultsGrid.filtered.one": "The filter leaves none of the {count} card on Results. Clear it to see them.",
   "resultsGrid.filtered.other": "The filter leaves none of the {count} cards on Results. Clear it to see them.",
+  "whiteboard.showEveryLine": "Show every line",
 
   // END
 } as const

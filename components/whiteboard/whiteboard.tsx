@@ -1650,6 +1650,9 @@ export function Whiteboard() {
           onZoomOut={() => zoomAtCenter(1 / ZOOM_STEP)}
           onReset={() => zoomAtCenter(1 / view.zoom)}
           onFit={() => (mapOn && goalMapCenter ? fitMap(mapFocus) : fitAll())}
+          linksAvailable={boardLinksOn}
+          allLinks={allBoardLinks}
+          onToggleAllLinks={() => setAllBoardLinks((on) => !on)}
         />
         {mapOn || graphOn ? null : (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
@@ -1666,17 +1669,6 @@ export function Whiteboard() {
                 {linkNotice}
               </p>
             ) : null}
-            <button
-              type="button"
-              aria-pressed={allBoardLinks}
-              onClick={() => setAllBoardLinks((on) => !on)}
-              className={clsx(
-                "pointer-events-auto rounded-xl border px-3 py-2 text-xs font-medium shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] backdrop-blur transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                allBoardLinks ? "border-accent bg-accent text-board" : "border-line bg-board/95 text-ink-soft hover:bg-desk hover:text-ink",
-              )}
-            >
-              Show every line
-            </button>
           </div>
         ) : (
           <span aria-hidden="true" />

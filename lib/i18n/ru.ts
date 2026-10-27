@@ -103,7 +103,7 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "settings.backup.title": "Резервная копия",
   "settings.backup.help": "Скачайте свои карточки как файл JSON или загрузите его обратно.",
   "settings.backup.download": "Скачать JSON",
-  "settings.backup.load": "Загрузить файл JSON",
+  "settings.backup.load": "��агрузить файл JSON",
   "settings.backup.chooseFile": "Выберите файл резервной копии JSON",
   "settings.backup.notJson": "Этот файл не является корректным JSON, поэтому ничего не загружено.",
   "settings.backup.nothingLoaded": "{reason} Ничего не загружено.",
@@ -214,13 +214,13 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "card.resultAriaMove": "В итоги: «{title}»",
   "card.highlightedSr": " (подсвечена фильтром)",
   "card.columnHeading": "Колонка",
-  "card.boardHeading": "Доска",
+  "card.boardHeading": "До��ка",
   "card.full": "Полна",
 
   // column editor
   "colEditor.button": "Изменить колонки",
   "colEditor.dialogTitle": "Колонки доски «{board}»",
-  "colEditor.help": "Переименуйте, переставьте или удалите. Карточки удалённой колонки переходят в соседнюю.",
+  "colEditor.help": "Переименуйте, переставьте или удалите. Карточки удалённой колонки переходят в со��еднюю.",
   "colEditor.nameLabel": "Название колонки {n}",
   "colEditor.untitled": "Колонка без названия",
   "colEditor.moveLeft": "Сдвинуть «{name}» влево",
@@ -351,7 +351,7 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "dashboard.freeLines.few": "{count} свободные линии",
   "dashboard.freeLines.many": "{count} свободных линий",
   "dashboard.freeLines.other": "{count} свободные линии",
-  "dashboard.flow.title": "Поток",
+  "dashboard.flow.title": "��оток",
   "dashboard.flow.note": "Выгрузка — это все карточки на Доске и все задачи, созданные из карточек. Карточка может пропустить шаг.",
   "dashboard.flow.step.unload": "Выгрузка",
   "dashboard.flow.step.zone": "Хочу или Надо",
@@ -599,6 +599,7 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "resultsGrid.filtered.one": "Фильтр скрывает все {count} карточку в итогах. Сбросьте его, чтобы увидеть.",
   "resultsGrid.filtered.few": "Фильтр скрывает все {count} карточки в итогах. Сбросьте его, чтобы увидеть.",
   "resultsGrid.filtered.many": "Фильтр скрывает все {count} карточек в итогах. Сбросьте его, чтобы увидеть.",
+  "whiteboard.showEveryLine": "Показать все линии",
   "resultsGrid.filtered.other": "Фильтр скрывает все {count} карточки в итогах. Сбросьте его, чтобы увидеть.",
 
   // END
