@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import clsx from "clsx"
+import { Settings } from "lucide-react"
 import { CardSearch } from "@/components/search/card-search"
 import { ViewsMenu } from "@/components/views-menu"
 import { useWorkspace } from "@/components/workspace-provider"
@@ -27,14 +28,18 @@ const NAV_ITEM =
 function NavLink({ href, labelKey, pathname }: { href: string; labelKey: MessageKey; pathname: string }) {
   const t = useT()
   const active = href === "/" ? pathname === "/" : pathname.startsWith(href)
+  const label = t(labelKey)
+  const isSettings = labelKey === "nav.settings"
   return (
     <li>
       <Link
         href={href}
         aria-current={active ? "page" : undefined}
+        aria-label={isSettings ? label : undefined}
+        title={isSettings ? label : undefined}
         className={clsx(NAV_ITEM, active ? "bg-ink text-board" : "text-ink-soft hover:bg-line/50 hover:text-ink")}
       >
-        {t(labelKey)}
+        {isSettings ? <Settings aria-hidden="true" className="size-4" /> : label}
       </Link>
     </li>
   )
