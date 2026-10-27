@@ -19,6 +19,7 @@ const BEFORE_VIEWS: { href: string; labelKey: MessageKey }[] = [
 const AFTER_VIEWS: { href: string; labelKey: MessageKey }[] = [
   { href: "/dashboard", labelKey: "nav.dashboard" },
   { href: "/settings", labelKey: "nav.settings" },
+  { href: "/trash", labelKey: "nav.trash" },
 ]
 
 const NAV_ITEM =

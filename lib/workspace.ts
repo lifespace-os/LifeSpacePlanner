@@ -33,6 +33,7 @@ import { isThemeSchedule, type ThemeSchedule } from "@/lib/theme-schedule"
 import { isThemeKey, type ThemeKey } from "@/lib/themes"
 import { isLanguage, type Language } from "@/lib/i18n"
 import { isMediaId } from "@/lib/media"
+import { isTrashList, type TrashItem } from "@/lib/trash"
 import { isViewHref, type ViewHref } from "@/lib/views"
 
 /** One address for the workspace. A later server can answer the same path. */
@@ -88,9 +89,12 @@ export type WorkspaceDoc = {
   themeSchedule?: ThemeSchedule
   /** The interface language. Absent means English. */
   language?: Language
+  /** Deleted cards and tasks, newest first. Absent means the trash is empty. */
+  trash?: TrashItem[]
 }
 
 export type WorkspaceSliceKey =
+  | "trash"
   | "missionText"
   | "notes"
   | "rings"
@@ -157,6 +161,7 @@ export function parseWorkspace(value: unknown): { ok: true; doc: WorkspaceDoc } 
   if (value.theme !== undefined && !isThemeKey(value.theme)) return fail("The theme in the file is not a theme this app knows.")
   if (value.themeSchedule !== undefined && !isThemeSchedule(value.themeSchedule)) return fail("The time of day theme settings in the file are not valid.")
   if (value.language !== undefined && !isLanguage(value.language)) return fail("The language in the file is not one this app knows.")
+  if (value.trash !== undefined && !isTrashList(value.trash, isNote, isCard)) return fail("The trash in the file is not valid.")
   return { ok: true, doc: value as WorkspaceDoc }
 }
 

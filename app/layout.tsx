@@ -7,6 +7,7 @@ import { LanguageProvider } from "@/components/language-provider"
 import { MissionProvider } from "@/components/mission-provider"
 import { NudgeRunner } from "@/components/nudge-runner"
 import { ThemeApplier } from "@/components/theme-applier"
+import { TrashProvider } from "@/components/trash-provider"
 import { WorkspaceProvider } from "@/components/workspace-provider"
 import { themeCss } from "@/lib/themes"
 import "./globals.css"
@@ -38,9 +39,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <MissionProvider>
               <GoalsProvider>
                 <KanbanProvider>
-                  <AppNav />
-                  <NudgeRunner />
-                  {children}
+                  <TrashProvider>
+                    <AppNav />
+                    <NudgeRunner />
+                    {children}
+                  </TrashProvider>
                 </KanbanProvider>
               </GoalsProvider>
             </MissionProvider>

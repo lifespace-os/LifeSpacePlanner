@@ -1,4 +1,4 @@
-import { readFile } from "fs/promises"
+import { readFile, unlink } from "fs/promises"
 import path from "path"
 import { mediaDir } from "@/lib/data-dir"
 import { isMediaId } from "@/lib/media"
@@ -21,4 +21,17 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   } catch {
     return new Response("Not found", { status: 404 })
   }
+}
+
+/** Removes one stored picture. The app asks only when nothing, the trash included, still points at it. */
+export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params
+  if (!isMediaId(id)) return new Response("Not found", { status: 404 })
+  try {
+    await unlink(path.join(mediaDir(), id))
+  } catch (error) {
+    const missing = typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT"
+    if (!missing) return new Response("Could not remove the picture", { status: 500 })
+  }
+  return new Response(null, { status: 204 })
 }

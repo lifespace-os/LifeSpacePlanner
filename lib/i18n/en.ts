@@ -582,5 +582,27 @@ export const en = {
   "viewer.fit": "Fit to window",
   "editor.image": "Picture",
 
+  "nav.trash": "Trash",
+  "trash.eyebrow": "Deleted cards and tasks",
+  "trash.help": "A deleted whiteboard card or kanban task waits here until you restore it or delete it forever. Nothing is removed on a timer.",
+  "trash.empty": "Empty trash",
+  "trash.emptyState": "The trash is empty.",
+  "trash.kind.note": "Whiteboard card",
+  "trash.kind.task": "Kanban task",
+  "trash.deletedOn": "Deleted {date}",
+  "trash.noWords": "No words",
+  "trash.restore": "Restore",
+  "trash.restoreAria": "Restore {words}",
+  "trash.deleteForever": "Delete forever",
+  "trash.deleteForeverAria": "Delete {words} forever",
+  "trash.restored": "Restored {words}.",
+  "trash.deletedForever": "Deleted {words} forever.",
+  "trash.emptied": "Emptied the trash.",
+  "trash.confirmOne.title": "Delete forever?",
+  "trash.confirmOne.body": "{words} will be removed for good, with its picture if nothing else uses it. This cannot be undone.",
+  "trash.confirmAll.title": "Empty the trash?",
+  "trash.confirmAll.body.one": "The 1 item in the trash will be removed for good, with its picture if nothing else uses it. This cannot be undone.",
+  "trash.confirmAll.body.other": "All {count} items in the trash will be removed for good, with their pictures if nothing else uses them. This cannot be undone.",
+
   // END
 } as const

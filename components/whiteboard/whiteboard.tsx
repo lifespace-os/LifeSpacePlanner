@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useGoals } from "@/components/goals-provider"
+import { useTrash } from "@/components/trash-provider"
 import { useT } from "@/components/language-provider"
 import { storeImage } from "@/lib/media"
 import { useMission } from "@/components/mission-provider"
@@ -121,6 +122,7 @@ function clampZoom(zoom: number) {
 export function Whiteboard() {
   const { doc } = useWorkspace()
   const { notes, setNotes, rings, setRings } = useGoals()
+  const { trashNote } = useTrash()
   const [zones, setZones] = useState<Zones>(doc.board.zones)
   const [budgetZones, setBudgetZones] = useState<BudgetZones>(doc.board.budgetZones)
   const [groups, setGroups] = useState<Group[]>(doc.board.groups)
@@ -991,12 +993,15 @@ export function Whiteboard() {
     [dropOnSector, goalsDropOn, ikigaiTargetAt, markerActive, markersOn, mode, sectorState.openSector, tagCards],
   )
 
-  const deleteNote = useCallback((id: string) => {
-    setNotes((prev) => prev.filter((note) => note.id !== id))
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : prev))
-    setEditingId((current) => (current === id ? null : current))
-    setMenu(null)
-  }, [])
+  const deleteNote = useCallback(
+    (id: string) => {
+      trashNote(id)
+      setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : prev))
+      setEditingId((current) => (current === id ? null : current))
+      setMenu(null)
+    },
+    [trashNote],
+  )
 
   const startEdit = useCallback((id: string) => {
     setMenu(null)

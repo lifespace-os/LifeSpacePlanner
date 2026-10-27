@@ -5,6 +5,7 @@ import { X } from "lucide-react"
 import { useLanguage } from "@/components/language-provider"
 import { ImageViewer } from "@/components/image-viewer"
 import { useKanban } from "@/components/kanban/kanban-provider"
+import { useTrash } from "@/components/trash-provider"
 import { mediaUrl } from "@/lib/media"
 import {
   REMIND_COLUMN_ID,
@@ -58,6 +59,7 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const { setCards } = useKanban()
+  const { trashTask } = useTrash()
   const issue = draftIssue(draft)
 
   const removeImage = () =>
@@ -270,14 +272,23 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
           </div>
 
           <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-3">
-            <button
-              type="button"
-              onClick={onRevert}
-              disabled={!dirty}
-              className="rounded px-2 py-1.5 text-sm text-ink-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:invisible"
-            >
-              {t("editor.revert")}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => trashTask(card.id)}
+                className="rounded px-2 py-1.5 text-sm text-release hover:bg-release/10 focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                {t("common.delete")}
+              </button>
+              <button
+                type="button"
+                onClick={onRevert}
+                disabled={!dirty}
+                className="rounded px-2 py-1.5 text-sm text-ink-soft hover:text-ink focus-visible:outline-2 focus-visible:outline-accent disabled:invisible"
+              >
+                {t("editor.revert")}
+              </button>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"

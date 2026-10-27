@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import clsx from "clsx"
 import { ArrowRight, BellRing, Check, Clock, Ellipsis, Undo2 } from "lucide-react"
 import { useLanguage } from "@/components/language-provider"
+import { useTrash } from "@/components/trash-provider"
 import { SetShape } from "@/components/whiteboard/label-chip"
 import { getLabel } from "@/lib/board-data"
 import { boardLabel, columnLabel } from "@/lib/kanban-names"
@@ -59,6 +60,7 @@ export function KanbanCardView({
   onResult,
 }: Props) {
   const { t, locale } = useLanguage()
+  const { trashTask } = useTrash()
   const inResults = mode === "results"
   const [menu, setMenu] = useState<{ top: number; left: number } | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -310,6 +312,19 @@ export function KanbanCardView({
               {boardLabel(t, board.id)}
             </button>
           ))}
+          <div className="mt-1 border-t border-line/70 pt-1">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setMenu(null)
+                trashTask(card.id)
+              }}
+              className="flex w-full items-center rounded px-2 py-1.5 text-left text-sm text-release hover:bg-release/10 focus-visible:bg-release/10 focus-visible:outline-none"
+            >
+              {t("common.delete")}
+            </button>
+          </div>
         </div>
       )}
     </li>
