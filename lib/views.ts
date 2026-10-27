@@ -3,6 +3,7 @@ export const VIEWS = [
   { href: "/views/gantt", labelKey: "view.gantt" },
   { href: "/views/life-in-weeks", labelKey: "view.life-in-weeks" },
   { href: "/views/todo-list", labelKey: "view.todo-list" },
+  { href: "/views/vision-board", labelKey: "view.vision-board" },
 ] as const
 
 export type ViewHref = (typeof VIEWS)[number]["href"]

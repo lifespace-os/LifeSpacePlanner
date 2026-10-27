@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react"
 import { useGoals } from "@/components/goals-provider"
 import { useKanban } from "@/components/kanban/kanban-provider"
+import { useVision } from "@/components/vision/vision-provider"
 import { useWorkspace, useWorkspaceSlice } from "@/components/workspace-provider"
 import type { KanbanCard } from "@/lib/kanban-data"
 import { mediaUrl } from "@/lib/media"
@@ -48,6 +49,7 @@ function removePictures(candidates: (string | undefined)[], stillUsed: Set<strin
  */
 export function TrashProvider({ children }: { children: React.ReactNode }) {
   const { doc } = useWorkspace()
+  const { removeCard: removeFromVision } = useVision()
   const { notes, setNotes } = useGoals()
   const { cards, setCards, columnsByBoard, openId, closeCard, revertDraft } = useKanban()
   const [trash, setTrash] = useState<TrashItem[]>(() => trashedNotes(doc.trash))
@@ -84,21 +86,26 @@ export function TrashProvider({ children }: { children: React.ReactNode }) {
     [setNotes],
   )
 
-  const deleteForever = useCallback((trashId: string) => {
-    const { trash: current, notes: liveNotes, cards: liveCards, archive: liveArchive } = live.current
-    const item = current.find((entry) => entry.id === trashId)
-    if (!item) return
-    const rest = current.filter((entry) => entry.id !== trashId)
-    setTrash(rest)
-    removePictures([trashImage(item)], imageRefs(liveNotes, liveCards, rest, liveArchive))
-  }, [])
+  const deleteForever = useCallback(
+    (trashId: string) => {
+      const { trash: current, notes: liveNotes, cards: liveCards, archive: liveArchive } = live.current
+      const item = current.find((entry) => entry.id === trashId)
+      if (!item) return
+      const rest = current.filter((entry) => entry.id !== trashId)
+      setTrash(rest)
+      removeFromVision(item.note.id)
+      removePictures([trashImage(item)], imageRefs(liveNotes, liveCards, rest, liveArchive))
+    },
+    [removeFromVision],
+  )
 
   const emptyTrash = useCallback(() => {
     const { trash: current, notes: liveNotes, cards: liveCards, archive: liveArchive } = live.current
     if (current.length === 0) return
     setTrash([])
+    for (const item of current) removeFromVision(item.note.id)
     removePictures(current.map(trashImage), imageRefs(liveNotes, liveCards, [], liveArchive))
-  }, [])
+  }, [removeFromVision])
 
   const archiveTask = useCallback(
     (cardId: string) => {
@@ -128,14 +135,18 @@ export function TrashProvider({ children }: { children: React.ReactNode }) {
     [setCards],
   )
 
-  const deleteArchived = useCallback((archiveId: string) => {
-    const { trash: liveTrash, notes: liveNotes, cards: liveCards, archive: current } = live.current
-    const entry = current.find((item) => item.id === archiveId)
-    if (!entry) return
-    const rest = current.filter((item) => item.id !== archiveId)
-    setArchive(rest)
-    removePictures([entry.card.image], imageRefs(liveNotes, liveCards, liveTrash, rest))
-  }, [])
+  const deleteArchived = useCallback(
+    (archiveId: string) => {
+      const { trash: liveTrash, notes: liveNotes, cards: liveCards, archive: current } = live.current
+      const entry = current.find((item) => item.id === archiveId)
+      if (!entry) return
+      const rest = current.filter((item) => item.id !== archiveId)
+      setArchive(rest)
+      removeFromVision(entry.card.id)
+      removePictures([entry.card.image], imageRefs(liveNotes, liveCards, liveTrash, rest))
+    },
+    [removeFromVision],
+  )
 
   const value = useMemo<TrashState>(
     () => ({ trash, archive, trashNote, restore, deleteForever, emptyTrash, archiveTask, restoreTask, deleteArchived }),

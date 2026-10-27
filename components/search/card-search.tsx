@@ -4,6 +4,7 @@ import { useId, useMemo, useState } from "react"
 import { useGoals } from "@/components/goals-provider"
 import { useKanban } from "@/components/kanban/kanban-provider"
 import { useLanguage } from "@/components/language-provider"
+import { useVision } from "@/components/vision/vision-provider"
 import { placeLabel, searchMessage } from "@/lib/kanban-names"
 import { ConfirmDialog } from "@/components/settings/confirm-dialog"
 import { CardWindow, type Feedback } from "@/components/search/card-window"
@@ -37,6 +38,7 @@ export function CardSearch() {
   const { t, tn } = useLanguage()
   const { notes, setNotes, rings } = useGoals()
   const { cards, setCards, columnsByBoard, openId, closeCard, revertDraft } = useKanban()
+  const { items: visionItems, addCard: addToVision, followCard: followOnVision } = useVision()
   const [query, setQuery] = useState("")
   const [listOpen, setListOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -61,13 +63,14 @@ export function CardSearch() {
     setWindowOpen(true)
   }
 
-  function apply(change: Change) {
+  function apply(change: Change, fromId?: string) {
     if (!change.ok) {
       setFeedback({ text: searchMessage(t, change.message), error: true })
       return false
     }
     setNotes(change.notes)
     setCards(change.cards)
+    if (fromId !== undefined) followOnVision(fromId, change.ref.id)
     setChosenRef(change.ref)
     setFeedback({ text: searchMessage(t, change.message), error: false })
     return true
@@ -84,13 +87,13 @@ export function CardSearch() {
       setConfirmBack(true)
       return
     }
-    apply(noteToTask(notes, cards, chosen.ref.id, columnsByBoard.all, rings))
+    apply(noteToTask(notes, cards, chosen.ref.id, columnsByBoard.all, rings), chosen.ref.id)
   }
 
   function convertBack() {
     if (!chosen || chosen.ref.kind !== "task") return
     const id = chosen.ref.id
-    if (apply(taskToNote(notes, cards, id))) forgetTask(id)
+    if (apply(taskToNote(notes, cards, id), id)) forgetTask(id)
     setConfirmBack(false)
   }
 
@@ -195,6 +198,10 @@ export function CardSearch() {
         onLinkMission={() => chosen && apply(linkMission(notes, cards, chosen.ref))}
         onLinkCircle={(circle: IkigaiCircleId) => chosen && apply(linkCircle(notes, cards, chosen.ref, circle))}
         onLinkCard={(target) => chosen && apply(linkCard(notes, cards, chosen.ref, target))}
+        onVision={chosen !== null && visionItems.some((item) => item.cardId === chosen.ref.id)}
+        onAddToVision={() => {
+          if (chosen && addToVision(chosen.ref.id)) setFeedback({ text: t("vision.added"), error: false })
+        }}
       />
 
       <ConfirmDialog

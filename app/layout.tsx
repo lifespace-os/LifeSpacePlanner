@@ -8,6 +8,7 @@ import { MissionProvider } from "@/components/mission-provider"
 import { NudgeRunner } from "@/components/nudge-runner"
 import { ThemeApplier } from "@/components/theme-applier"
 import { TrashProvider } from "@/components/trash-provider"
+import { VisionProvider } from "@/components/vision/vision-provider"
 import { WorkspaceProvider } from "@/components/workspace-provider"
 import { themeCss } from "@/lib/themes"
 import "./globals.css"
@@ -39,11 +40,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <MissionProvider>
               <GoalsProvider>
                 <KanbanProvider>
-                  <TrashProvider>
-                    <AppNav />
-                    <NudgeRunner />
-                    {children}
-                  </TrashProvider>
+                  <VisionProvider>
+                    <TrashProvider>
+                      <AppNav />
+                      <NudgeRunner />
+                      {children}
+                    </TrashProvider>
+                  </VisionProvider>
                 </KanbanProvider>
               </GoalsProvider>
             </MissionProvider>

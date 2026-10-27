@@ -33,8 +33,9 @@ import { isThemeSchedule, type ThemeSchedule } from "@/lib/theme-schedule"
 import { isThemeKey, type ThemeKey } from "@/lib/themes"
 import { isLanguage, type Language } from "@/lib/i18n"
 import { isMediaId } from "@/lib/media"
-import { isArchiveList, isTrashList, type ArchivedTask, type StoredTrashItem } from "@/lib/trash"
+import { archivedTasks, isArchiveList, isTrashList, trashedNotes, type ArchivedTask, type StoredTrashItem } from "@/lib/trash"
 import { isViewHref, type ViewHref } from "@/lib/views"
+import { isVisionList, pruneVision, type VisionItem } from "@/lib/vision"
 
 /** One address for the workspace. A later server can answer the same path. */
 export const WORKSPACE_URL = "/api/workspace"
@@ -93,9 +94,12 @@ export type WorkspaceDoc = {
   trash?: StoredTrashItem[]
   /** Kanban tasks taken off their boards, newest first. Absent means nothing is archived. */
   archive?: ArchivedTask[]
+  /** The cards placed on the Vision board. Absent means the board is empty. */
+  vision?: VisionItem[]
 }
 
 export type WorkspaceSliceKey =
+  | "vision"
   | "trash"
   | "archive"
   | "missionText"
@@ -166,7 +170,23 @@ export function parseWorkspace(value: unknown): { ok: true; doc: WorkspaceDoc } 
   if (value.language !== undefined && !isLanguage(value.language)) return fail("The language in the file is not one this app knows.")
   if (value.trash !== undefined && !isTrashList(value.trash, isNote, isCard)) return fail("The trash in the file is not valid.")
   if (value.archive !== undefined && !isArchiveList(value.archive, isCard)) return fail("The archived tasks in the file are not valid.")
+  if (value.vision !== undefined && !isVisionList(value.vision)) return fail("The Vision board in the file is not valid.")
   return { ok: true, doc: value as WorkspaceDoc }
+}
+
+/** Every whiteboard card and kanban task that still exists, including those in the trash and the archive. */
+export function liveCardIds(doc: WorkspaceDoc) {
+  const ids = new Set<string>()
+  for (const note of doc.notes) ids.add(note.id)
+  for (const card of doc.kanban.cards) ids.add(card.id)
+  for (const item of trashedNotes(doc.trash)) ids.add(item.note.id)
+  for (const entry of archivedTasks(doc.archive, doc.trash)) ids.add(entry.card.id)
+  return ids
+}
+
+function withLiveVision(doc: WorkspaceDoc): WorkspaceDoc {
+  const kept = pruneVision(doc.vision ?? [], liveCardIds(doc))
+  return { ...doc, vision: kept.length > 0 ? kept : undefined }
 }
 
 function isLife(value: unknown): value is WorkspaceLife {
@@ -197,24 +217,24 @@ export function withSampleStory(doc: WorkspaceDoc): WorkspaceDoc {
     if (columns.some((column) => column.id === card.columnId)) return card
     return { ...card, columnId: columns[0]?.id ?? card.columnId }
   })
-  return {
+  return withLiveVision({
     ...doc,
     missionText: doc.missionText.trim() ? doc.missionText : SAMPLE_MISSION,
     notes: structuredClone(SAMPLE_NOTES),
     kanban: { ...doc.kanban, cards },
     board: { ...doc.board, graphSpots: {}, graphBoxes: {} },
-  }
+  })
 }
 
 /** Clears the whiteboard cards and kanban tasks. A mission sentence the person wrote stays. */
 export function withEmptyBoard(doc: WorkspaceDoc): WorkspaceDoc {
-  return {
+  return withLiveVision({
     ...doc,
     missionText: doc.missionText === SAMPLE_MISSION ? "" : doc.missionText,
     notes: [],
     kanban: { ...doc.kanban, cards: [] },
     board: { ...doc.board, graphSpots: {}, graphBoxes: {} },
-  }
+  })
 }
 
 function fail(reason: string) {
