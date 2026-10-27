@@ -574,6 +574,13 @@ export const en = {
   "whiteboard.image.wrongType": "Only JPEG, PNG and WebP pictures can be added.",
   "whiteboard.image.tooLarge": "That picture is over 20 MB. Choose a smaller one.",
   "whiteboard.image.failed": "The picture could not be added. Try again.",
+  "viewer.title": "Picture",
+  "viewer.open": "Open the picture",
+  "viewer.zoomIn": "Zoom in",
+  "viewer.zoomOut": "Zoom out",
+  "viewer.actualSize": "Actual size",
+  "viewer.fit": "Fit to window",
+  "editor.image": "Picture",
 
   // END
 } as const

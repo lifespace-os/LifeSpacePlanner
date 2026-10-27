@@ -279,6 +279,7 @@ function isCard(value: unknown): boolean {
     (value.remind === undefined || typeof value.remind === "string") &&
     (value.fromCard === undefined || isCardOrigin(value.fromCard)) &&
     (value.doneAt === undefined || typeof value.doneAt === "string") &&
+    (value.image === undefined || isMediaId(value.image)) &&
     (value.repeat === undefined || isRepeat(value.repeat)) &&
     (value.occurrence === undefined || typeof value.occurrence === "number") &&
   (value.hashtags === undefined || (Array.isArray(value.hashtags) && value.hashtags.every((tag) => typeof tag === "string"))) &&

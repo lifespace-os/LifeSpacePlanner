@@ -86,6 +86,8 @@ export type KanbanCard = {
   remind?: string
   /** Set when the task was made from a whiteboard card. It keeps the marks the card had. */
   fromCard?: CardOrigin
+  /** The id of the one picture in the media store. It is the same reference the whiteboard card had; the file is never copied. */
+  image?: string
   /** The day the task moved into Done, yyyy-mm-dd. Missing for tasks finished before dates were kept. */
   doneAt?: string
 }

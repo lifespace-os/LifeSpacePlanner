@@ -269,6 +269,7 @@ export function noteToTask(
     hashtags: [...note.hashtags],
     freeIds: [...new Set(free.filter((item) => item !== "mission" && item !== id))],
     fromCard: originOf(note, rings),
+    ...(note.image ? { image: note.image } : {}),
   }
   const rewired = rewireAll(
     notes.filter((item) => item.id !== id),
@@ -317,6 +318,7 @@ export function taskToNote(notes: Note[], cards: KanbanCard[], id: string): Chan
     task: null,
     details: hasDetails ? { title: card.title, since: card.since, due: card.due, owner: card.owner } : null,
     freeIds: [...new Set(lines.filter((item) => item !== id))],
+    ...(card.image ? { image: card.image } : {}),
   }
   const rewired = rewireAll(
     notes,

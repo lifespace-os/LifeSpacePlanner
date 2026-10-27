@@ -15,6 +15,7 @@ import {
   type View,
 } from "@/lib/board-data"
 import { useT } from "@/components/language-provider"
+import { ImageViewer } from "@/components/image-viewer"
 import { beginGroupDrag, type GroupDrag, type GroupMove } from "@/lib/group-drag"
 import { mediaUrl } from "@/lib/media"
 import { CardLabelSets } from "./card-label-sets"
@@ -310,20 +311,30 @@ export const NoteCard = memo(function NoteCard({
 /** The saved picture, cropped to fill a fixed frame so the card never grows to the original. */
 function CardPicture({ id }: { id: string }) {
   const t = useT()
+  const [open, setOpen] = useState(false)
   return (
     <div
       data-card-image=""
       className="mx-auto mt-2 h-[110px] w-[180px] shrink-0 overflow-hidden rounded-sm bg-ink/10"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- served from the app's own media store */}
-      <img
-        src={mediaUrl(id)}
-        alt={t("whiteboard.image.alt")}
-        loading="lazy"
-        decoding="async"
-        draggable={false}
-        className="size-full object-cover"
-      />
+      <button
+        type="button"
+        aria-label={t("viewer.open")}
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        className="block size-full cursor-zoom-in focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- served from the app's own media store */}
+        <img
+          src={mediaUrl(id)}
+          alt={t("whiteboard.image.alt")}
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          className="size-full object-cover"
+        />
+      </button>
+      {open ? <ImageViewer id={id} onClose={() => setOpen(false)} /> : null}
     </div>
   )
 }

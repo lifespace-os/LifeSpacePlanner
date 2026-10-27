@@ -3,6 +3,9 @@
 import { useEffect, useId, useRef, useState } from "react"
 import { X } from "lucide-react"
 import { useLanguage } from "@/components/language-provider"
+import { ImageViewer } from "@/components/image-viewer"
+import { useKanban } from "@/components/kanban/kanban-provider"
+import { mediaUrl } from "@/lib/media"
 import {
   REMIND_COLUMN_ID,
   draftIssue,
@@ -54,7 +57,17 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
   const id = useId()
   const dialogRef = useRef<HTMLDivElement>(null)
   const titleRef = useRef<HTMLTextAreaElement>(null)
+  const { setCards } = useKanban()
   const issue = draftIssue(draft)
+
+  const removeImage = () =>
+    setCards((previous) =>
+      previous.map((item) => {
+        if (item.id !== card.id) return item
+        const { image: _image, ...rest } = item
+        return rest
+      }),
+    )
 
   useEffect(() => {
     titleRef.current?.focus()
@@ -140,6 +153,8 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
                 className={`${FIELD} resize-none leading-snug`}
               />
             </div>
+
+            {card.image ? <TaskPicture id={card.image} onRemove={removeImage} /> : null}
 
             <StepList steps={draft.steps} onChange={(steps) => onChange({ steps })} />
 
@@ -283,6 +298,41 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
         </form>
       </div>
     </div>
+  )
+}
+
+function TaskPicture({ id, onRemove }: { id: string; onRemove: () => void }) {
+  const { t } = useLanguage()
+  const [open, setOpen] = useState(false)
+  return (
+    <fieldset>
+      <legend className="mb-1.5 flex w-full items-baseline justify-between gap-3 text-sm font-medium text-ink">
+        <span>{t("editor.image")}</span>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded px-1.5 py-0.5 text-xs font-normal text-ink-soft hover:bg-line/50 hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          {t("whiteboard.image.remove")}
+        </button>
+      </legend>
+      <button
+        type="button"
+        aria-label={t("viewer.open")}
+        aria-haspopup="dialog"
+        onClick={() => setOpen(true)}
+        className="flex w-full cursor-zoom-in justify-center rounded-md border border-line bg-board p-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- served from the app's own media store */}
+        <img
+          src={mediaUrl(id)}
+          alt={t("whiteboard.image.alt")}
+          draggable={false}
+          className="block h-auto max-h-64 w-auto max-w-full object-contain"
+        />
+      </button>
+      {open ? <ImageViewer id={id} onClose={() => setOpen(false)} /> : null}
+    </fieldset>
   )
 }
 
