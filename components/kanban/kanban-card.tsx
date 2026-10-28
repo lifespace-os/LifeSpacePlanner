@@ -5,6 +5,7 @@ import clsx from "clsx"
 import { ArrowRight, BellRing, Check, Clock, Ellipsis, Undo2 } from "lucide-react"
 import { useLanguage } from "@/components/language-provider"
 import { useTrash } from "@/components/trash-provider"
+import { WebLinkRow } from "@/components/web-links/web-link-row"
 import { SetShape } from "@/components/whiteboard/label-chip"
 import { getLabel } from "@/lib/board-data"
 import { boardLabel, columnLabel } from "@/lib/kanban-names"
@@ -195,6 +196,15 @@ export function KanbanCardView({
             </span>
           )}
         </div>
+
+        <WebLinkRow
+          links={card.webLinks}
+          className="mt-1.5"
+          onMore={(event) => {
+            event.stopPropagation()
+            onOpen(card.id)
+          }}
+        />
 
         {timeRange && (
           <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-soft">

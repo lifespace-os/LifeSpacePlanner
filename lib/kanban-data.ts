@@ -1,4 +1,5 @@
 import type { MessageKey } from "@/lib/i18n"
+import { sameWebLinks, type WebLink } from "@/lib/web-links"
 
 export type KanbanBoardId = "all" | "year" | "month" | "week" | "day"
 
@@ -88,6 +89,8 @@ export type KanbanCard = {
   fromCard?: CardOrigin
   /** The id of the one picture in the media store. It is the same reference the whiteboard card had; the file is never copied. */
   image?: string
+  /** The Web links on this task, in the order added. They are not hashtags and change no filter or count. */
+  webLinks?: WebLink[]
   /** The day the task moved into Done, yyyy-mm-dd. Missing for tasks finished before dates were kept. */
   doneAt?: string
 }
@@ -163,6 +166,7 @@ export type CardDraft = {
   steps: CardStep[]
   repeat: CardRepeat
   remind: string
+  webLinks: WebLink[]
 }
 
 export function draftOf(card: KanbanCard): CardDraft {
@@ -177,6 +181,7 @@ export function draftOf(card: KanbanCard): CardDraft {
     steps: card.steps ?? [],
     repeat: card.repeat ?? ONCE,
     remind: card.remind ?? "",
+    webLinks: card.webLinks ?? [],
   }
 }
 
@@ -190,6 +195,7 @@ export function sameDraft(a: CardDraft, b: CardDraft) {
     a.missionLink === b.missionLink &&
     a.secondLine === b.secondLine &&
     a.remind === b.remind &&
+    sameWebLinks(a.webLinks, b.webLinks) &&
     sameRepeat(a.repeat, b.repeat) &&
     a.steps.length === b.steps.length &&
     a.steps.every((step, index) => {

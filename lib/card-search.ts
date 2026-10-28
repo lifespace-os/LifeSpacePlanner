@@ -9,6 +9,7 @@ import {
 import { originOf } from "@/lib/dashboard"
 import type { MessageKey, MessageVars } from "@/lib/i18n"
 import type { KanbanCard, KanbanColumn, KanbanBoardId } from "@/lib/kanban-data"
+import type { WebLink } from "@/lib/web-links"
 import { newId } from "@/lib/workspace"
 
 /** A whiteboard card is a "note". A kanban card is a "task". */
@@ -34,6 +35,7 @@ export type Detail = Hit & {
   /** The card is joined to the mission, by a free line or by its goal line. */
   mission: boolean
   linked: Hit[]
+  webLinks: WebLink[]
 }
 
 export type Change =
@@ -123,7 +125,30 @@ export function describeCard(ref: CardRef, notes: Note[], cards: KanbanCard[], c
     const found = hitOfId(id, notes, cards, columns)
     return found ? [found] : []
   })
-  return { ...hit, mission: isOnMission(ref, notes, cards), linked }
+  const webLinks =
+    ref.kind === "note"
+      ? (notes.find((item) => item.id === ref.id)?.webLinks ?? [])
+      : (cards.find((item) => item.id === ref.id)?.webLinks ?? [])
+  return { ...hit, mission: isOnMission(ref, notes, cards), linked, webLinks }
+}
+
+/** Replaces the Web links of one card. A Web link is not a hashtag, so tags, rings and counts stay as they were. */
+export function setWebLinks(notes: Note[], cards: KanbanCard[], ref: CardRef, links: WebLink[]): Change {
+  const exists =
+    ref.kind === "note" ? notes.some((item) => item.id === ref.id) : cards.some((item) => item.id === ref.id)
+  if (!exists) return { ok: false, message: { key: "search.msg.gone" } }
+  const strip = <T extends { webLinks?: WebLink[] }>(item: T): T => {
+    const { webLinks: _webLinks, ...rest } = item
+    return rest as T
+  }
+  const next = changeCard(
+    notes,
+    cards,
+    ref,
+    (note) => (links.length > 0 ? { ...note, webLinks: links } : strip(note)),
+    (card) => (links.length > 0 ? { ...card, webLinks: links } : strip(card)),
+  )
+  return { ok: true, ...next, ref, message: { key: "webLinks.saved" } }
 }
 
 function isOnMission(ref: CardRef, notes: Note[], cards: KanbanCard[]) {
@@ -270,6 +295,7 @@ export function noteToTask(
     freeIds: [...new Set(free.filter((item) => item !== "mission" && item !== id))],
     fromCard: originOf(note, rings),
     ...(note.image ? { image: note.image } : {}),
+    ...(note.webLinks?.length ? { webLinks: note.webLinks.map((link) => ({ ...link })) } : {}),
   }
   const rewired = rewireAll(
     notes.filter((item) => item.id !== id),
@@ -319,6 +345,7 @@ export function taskToNote(notes: Note[], cards: KanbanCard[], id: string): Chan
     details: hasDetails ? { title: card.title, since: card.since, due: card.due, owner: card.owner } : null,
     freeIds: [...new Set(lines.filter((item) => item !== id))],
     ...(card.image ? { image: card.image } : {}),
+    ...(card.webLinks?.length ? { webLinks: card.webLinks.map((link) => ({ ...link })) } : {}),
   }
   const rewired = rewireAll(
     notes,

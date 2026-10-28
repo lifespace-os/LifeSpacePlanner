@@ -33,6 +33,7 @@ import { isThemeSchedule, type ThemeSchedule } from "@/lib/theme-schedule"
 import { isThemeKey, type ThemeKey } from "@/lib/themes"
 import { isLanguage, type Language } from "@/lib/i18n"
 import { isMediaId } from "@/lib/media"
+import { isWebLinkList } from "@/lib/web-links"
 import { archivedTasks, isArchiveList, isTrashList, trashedNotes, type ArchivedTask, type StoredTrashItem } from "@/lib/trash"
 import { isViewHref, type ViewHref } from "@/lib/views"
 import { isVisionList, pruneVision, type VisionItem } from "@/lib/vision"
@@ -266,7 +267,8 @@ function isNote(value: unknown): boolean {
     typeof value.x === "number" &&
     typeof value.y === "number" &&
     Array.isArray(value.hashtags) &&
-    (value.image === undefined || isMediaId(value.image))
+    (value.image === undefined || isMediaId(value.image)) &&
+    (value.webLinks === undefined || isWebLinkList(value.webLinks))
   )
 }
 
@@ -309,6 +311,7 @@ function isCard(value: unknown): boolean {
     (value.fromCard === undefined || isCardOrigin(value.fromCard)) &&
     (value.doneAt === undefined || typeof value.doneAt === "string") &&
     (value.image === undefined || isMediaId(value.image)) &&
+    (value.webLinks === undefined || isWebLinkList(value.webLinks)) &&
     (value.repeat === undefined || isRepeat(value.repeat)) &&
     (value.occurrence === undefined || typeof value.occurrence === "number") &&
   (value.hashtags === undefined || (Array.isArray(value.hashtags) && value.hashtags.every((tag) => typeof tag === "string"))) &&

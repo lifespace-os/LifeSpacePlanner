@@ -1,3 +1,5 @@
+import type { WebLink } from "@/lib/web-links"
+
 export type Mode = "unload" | "clusters" | "mission" | "goals" | "labels" | "task"
 
 export type ClusterView = "wantmust" | "groups"
@@ -74,6 +76,8 @@ export type Note = {
   goalPlan?: GoalPlan | null
   /** The id of the one picture on this card, kept in the media store. Absent means no picture. */
   image?: string
+  /** The Web links on this card, in the order added. They are not hashtags and change no filter or count. */
+  webLinks?: WebLink[]
 }
 
 /** Why a goal exists. "unlinked" is a valid answer. */

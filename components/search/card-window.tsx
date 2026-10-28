@@ -5,6 +5,8 @@ import { useLanguage } from "@/components/language-provider"
 import type { IkigaiCircleId } from "@/lib/board-data"
 import { CIRCLE_KEYS, SEARCH_LIMIT, type CardRef, type Detail, type Hit } from "@/lib/card-search"
 import { placeLabel } from "@/lib/kanban-names"
+import { WebLinksEditor } from "@/components/web-links/web-links-editor"
+import type { WebLink } from "@/lib/web-links"
 
 const CIRCLES: IkigaiCircleId[] = ["love", "good-at", "income", "needed"]
 
@@ -31,6 +33,7 @@ type Props = {
   onLinkMission: () => void
   onLinkCircle: (circle: IkigaiCircleId) => void
   onLinkCard: (ref: CardRef) => void
+  onWebLinks: (links: WebLink[]) => void
 }
 
 function sameRef(a: CardRef | undefined, b: CardRef | undefined) {
@@ -67,7 +70,8 @@ function Actions({
   onLinkMission,
   onLinkCircle,
   onLinkCard,
-}: Pick<Props, "linkHits" | "onConvert" | "onAddTag" | "onLinkMission" | "onLinkCircle" | "onLinkCard"> & {
+  onWebLinks,
+}: Pick<Props, "linkHits" | "onConvert" | "onAddTag" | "onLinkMission" | "onLinkCircle" | "onLinkCard" | "onWebLinks"> & {
   chosen: Detail
 }) {
   const { t } = useLanguage()
@@ -133,6 +137,13 @@ function Actions({
             {t("search.add")}
           </button>
         </form>
+      </section>
+
+      <section aria-labelledby={`${tagId}-web`} className="flex flex-col gap-2">
+        <h3 id={`${tagId}-web`} className="text-sm font-medium text-ink">
+          {t("webLinks.title")}
+        </h3>
+        <WebLinksEditor links={chosen.webLinks} onChange={onWebLinks} />
       </section>
 
       <section aria-labelledby={`${linkId}-head`} className="flex flex-col gap-3">

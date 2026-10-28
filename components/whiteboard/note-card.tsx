@@ -16,6 +16,7 @@ import {
 } from "@/lib/board-data"
 import { useT } from "@/components/language-provider"
 import { ImageViewer } from "@/components/image-viewer"
+import { WebLinkRow } from "@/components/web-links/web-link-row"
 import { beginGroupDrag, type GroupDrag, type GroupMove } from "@/lib/group-drag"
 import { mediaUrl } from "@/lib/media"
 import { CardLabelSets } from "./card-label-sets"
@@ -232,7 +233,7 @@ export const NoteCard = memo(function NoteCard({
       onPointerUp={handlePointerEnd}
       onPointerCancel={handlePointerEnd}
       onDoubleClick={(event) => {
-        if ((event.target as HTMLElement).closest("button, [data-card-image]")) return
+        if ((event.target as HTMLElement).closest("button, a, [data-card-image]")) return
         onEditStart(note.id)
       }}
       onContextMenu={(event) => {
@@ -285,7 +286,14 @@ export const NoteCard = memo(function NoteCard({
 
       <CardLabelSets sets={labelSets} />
 
-      <div className="mt-auto flex px-3 pb-2.5">
+      <div className="mt-auto flex flex-col gap-1.5 px-3 pb-2.5">
+        <WebLinkRow
+          links={note.webLinks}
+          onMore={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            onMenu(note.id, rect.left, rect.bottom + 6)
+          }}
+        />
         <button
           type="button"
           aria-label={
@@ -298,7 +306,7 @@ export const NoteCard = memo(function NoteCard({
             const rect = event.currentTarget.getBoundingClientRect()
             onMenu(note.id, rect.left, rect.bottom + 6)
           }}
-          className="inline-flex h-6 items-center gap-1 rounded-full border border-current/25 px-2.5 text-xs font-medium text-current/80 transition-colors hover:bg-current/10 hover:text-current focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+          className="inline-flex h-6 w-fit items-center gap-1 rounded-full border border-current/25 px-2.5 text-xs font-medium text-current/80 transition-colors hover:bg-current/10 hover:text-current focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
         >
           Tags
           {note.hashtags.length > 0 ? <span className="tabular-nums">{note.hashtags.length}</span> : null}

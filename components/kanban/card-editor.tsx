@@ -6,6 +6,7 @@ import { useLanguage } from "@/components/language-provider"
 import { ImageViewer } from "@/components/image-viewer"
 import { useKanban } from "@/components/kanban/kanban-provider"
 import { useTrash } from "@/components/trash-provider"
+import { WebLinksEditor } from "@/components/web-links/web-links-editor"
 import { mediaUrl } from "@/lib/media"
 import {
   REMIND_COLUMN_ID,
@@ -157,6 +158,11 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
             </div>
 
             {card.image ? <TaskPicture id={card.image} onRemove={removeImage} /> : null}
+
+            <fieldset className="min-w-0">
+              <legend className="mb-1.5 text-sm font-medium text-ink">{t("webLinks.title")}</legend>
+              <WebLinksEditor links={draft.webLinks} onChange={(webLinks) => onChange({ webLinks })} />
+            </fieldset>
 
             <StepList steps={draft.steps} onChange={(steps) => onChange({ steps })} />
 

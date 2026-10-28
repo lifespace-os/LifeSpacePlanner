@@ -102,7 +102,7 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "settings.sample.putBackConfirm": "Заменить примером",
   "settings.sample.putBackBody":
     "Карточки, которые вы написали на доске и в канбане, будут заменены примером истории. Сначала скачайте резервную копию, если хотите их сохранить.",
-  "settings.sample.emptyTitle": "Очистить доску?",
+  "settings.sample.emptyTitle": "Очистить ��оску?",
   "settings.sample.emptyConfirm": "Очистить доску",
   "settings.sample.emptyBody":
     "Будут удалены все карточки доски и задачи канбана, включая те, что вы написали. Сначала скачайте резервную копию, если хотите их сохранить.",
@@ -435,7 +435,7 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "dashboard.review.field.stop": "Что прекратить",
   "dashboard.review.field.stopHint": "То, что стоит больше, чем даёт.",
   "dashboard.review.saved": "Обзор недели с {date} сохранён.",
-  "dashboard.review.addedFinished": "Выполненные за неделю задачи добавлены.",
+  "dashboard.review.addedFinished": "Выполненные за неделю зад��чи добавлены.",
   "dashboard.review.addFinished.one": "Добавить {count} выполненную задачу",
   "dashboard.review.addFinished.few": "Добавить {count} выполненные задачи",
   "dashboard.review.addFinished.many": "Добавить {count} выполненных задач",
@@ -621,6 +621,20 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "viewer.actualSize": "Реальный размер",
   "viewer.fit": "По размеру окна",
   "editor.image": "Картинка",
+
+  "webLinks.title": "Веб-ссылки",
+  "webLinks.address": "Веб-адрес",
+  "webLinks.addressPlaceholder": "example.com или https://…",
+  "webLinks.name": "Название (необязательно)",
+  "webLinks.add": "Добавить",
+  "webLinks.remove": "Удалить веб-ссылку {address}",
+  "webLinks.rename": "Название веб-ссылки {address}",
+  "webLinks.open": "Открыть {label} в новой вкладке",
+  "webLinks.more": "Ещё веб-ссылок: {count}. Откройте меню карточки, чтобы увидеть их.",
+  "webLinks.refusedScheme": "Принимаются только адреса http и https.",
+  "webLinks.refusedInvalid": "Это не похоже на веб-адрес.",
+  "webLinks.tooMany": "На карточке может быть не больше {max} веб-ссылок.",
+  "webLinks.saved": "Веб-ссылки сохранены.",
   "resultsGrid.filtered.other": "Фильтр скрывает все {count} карточки в итогах. Сбросьте его, чтобы увидеть.",
 
   "trash.title": "Корзина",

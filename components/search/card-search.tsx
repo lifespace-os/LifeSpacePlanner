@@ -17,6 +17,7 @@ import {
   linkMission,
   noteToTask,
   searchCards,
+  setWebLinks,
   taskToNote,
   type CardRef,
   type Change,
@@ -198,6 +199,7 @@ export function CardSearch() {
         onLinkMission={() => chosen && apply(linkMission(notes, cards, chosen.ref))}
         onLinkCircle={(circle: IkigaiCircleId) => chosen && apply(linkCircle(notes, cards, chosen.ref, circle))}
         onLinkCard={(target) => chosen && apply(linkCard(notes, cards, chosen.ref, target))}
+        onWebLinks={(links) => chosen && apply(setWebLinks(notes, cards, chosen.ref, links))}
       />
 
       <ConfirmDialog
