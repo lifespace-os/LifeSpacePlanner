@@ -15,7 +15,7 @@ export type BoardLinkState = {
   toWorld: (clientX: number, clientY: number) => { x: number; y: number }
   onLinks: (id: string, parentIds: string[]) => void
   onFree: (a: string, b: string, on: boolean) => void
-  onNotice: (message: string | null) => void
+  onNotice: (message: string | null, kind?: "success" | "issue") => void
 }
 
 type Box = { x: number; y: number; w: number; h: number }
@@ -160,12 +160,12 @@ export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: Board
       fromId,
       goalLinks(note, byId, rings).filter((id) => id !== toId),
     )
-    onNotice(`Removed the link from ${nameOf(fromId)} to ${nameOf(toId)}.`)
+    onNotice(`Removed the link from ${nameOf(fromId)} to ${nameOf(toId)}.`, "success")
   }
 
   function removeFree(a: string, b: string) {
     onFree(a, b, false)
-    onNotice(`Removed the free line between ${nameOf(a)} and ${nameOf(b)}.`)
+    onNotice(`Removed the free line between ${nameOf(a)} and ${nameOf(b)}.`, "success")
   }
 
   function handleDown(event: React.PointerEvent<HTMLDivElement>, kind: LinkKind) {
@@ -197,18 +197,18 @@ export function BoardLinks({ notes, links, zoom }: { notes: Note[]; links: Board
     if (!target) return
     const issue = linkIssueFor(kind, from, target, byId, rings)
     if (issue) {
-      onNotice(issue)
+      onNotice(issue, "issue")
       return
     }
     if (kind === "free") {
       onFree(from, target, true)
-      onNotice(`Joined ${nameOf(from)} and ${nameOf(target)} with a free line.`)
+      onNotice(`Joined ${nameOf(from)} and ${nameOf(target)} with a free line.`, "success")
       return
     }
     const note = byId.get(from)
     if (!note) return
     onLinks(from, [...goalLinks(note, byId, rings), target])
-    onNotice(`Linked ${nameOf(from)} to ${nameOf(target)}.`)
+    onNotice(`Linked ${nameOf(from)} to ${nameOf(target)}.`, "success")
   }
 
   const previewFrom = linking ? boxes.get(linking.from) : undefined

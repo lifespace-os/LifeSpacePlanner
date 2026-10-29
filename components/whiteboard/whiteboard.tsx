@@ -9,7 +9,7 @@ import { useMission } from "@/components/mission-provider"
 import { useWorkspace, useWorkspaceSlice } from "@/components/workspace-provider"
 import { newId, type WorkspaceBoard } from "@/lib/workspace"
 import clsx from "clsx"
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, X } from "lucide-react"
 import {
   BUDGET_TAGS,
   insertRing,
@@ -116,6 +116,8 @@ const IKIGAI_FIT_PADDING = { top: 270, right: 400, bottom: 130, left: 400 }
 const WHEEL_FIT_PADDING = { top: 200, right: 400, bottom: 130, left: 60 }
 const MAP_FIT_PADDING = { top: 200, right: 400, bottom: 110, left: 40 }
 
+type LinkNoticeKind = "success" | "issue"
+
 function clampZoom(zoom: number) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom))
 }
@@ -198,6 +200,31 @@ export function Whiteboard() {
   const [graphMissionOpen, setGraphMissionOpen] = useState(false)
   const [allBoardLinks, setAllBoardLinks] = useState(false)
   const [linkNotice, setLinkNotice] = useState<string | null>(null)
+  const linkNoticeTimer = useRef<number | undefined>(undefined)
+  const dismissLinkNotice = useCallback(() => {
+    if (linkNoticeTimer.current !== undefined) window.clearTimeout(linkNoticeTimer.current)
+    linkNoticeTimer.current = undefined
+    setLinkNotice(null)
+  }, [])
+  const showLinkNotice = useCallback((message: string | null, kind: LinkNoticeKind = "success") => {
+    if (linkNoticeTimer.current !== undefined) window.clearTimeout(linkNoticeTimer.current)
+    linkNoticeTimer.current = undefined
+    if (!message) {
+      setLinkNotice(null)
+      return
+    }
+    setLinkNotice(message)
+    linkNoticeTimer.current = window.setTimeout(() => {
+      linkNoticeTimer.current = undefined
+      setLinkNotice(null)
+    }, kind === "issue" ? 8000 : 5000)
+  }, [])
+  useEffect(
+    () => () => {
+      if (linkNoticeTimer.current !== undefined) window.clearTimeout(linkNoticeTimer.current)
+    },
+    [],
+  )
   const t = useT()
   const [imageNotice, setImageNotice] = useState<string | null>(null)
   const imageNoticeTimer = useRef<number | undefined>(undefined)
@@ -1341,7 +1368,7 @@ export function Whiteboard() {
   toWorld: screenToWorld,
   onLinks: (id, parentIds) => updateNote(id, (note) => ({ ...note, parentIds })),
   onFree: setFreeLine,
-  onNotice: setLinkNotice,
+            onNotice: showLinkNotice,
   }
   : null
   }
@@ -1797,12 +1824,21 @@ export function Whiteboard() {
         {boardLinksOn ? (
           <div className="pointer-events-none flex max-w-72 flex-col items-end gap-2">
             {linkNotice ? (
-              <p
+              <div
                 role="status"
-                className="pointer-events-auto rounded-lg border border-line bg-board/95 px-3 py-2 text-xs leading-relaxed text-ink shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] backdrop-blur"
+                className="pointer-events-auto flex max-w-72 items-start gap-2 rounded-lg border border-line bg-board/95 px-3 py-2 text-xs leading-relaxed text-ink shadow-[0_12px_32px_-14px_rgba(35,39,43,0.45)] backdrop-blur"
               >
-                {linkNotice}
-              </p>
+                <span className="min-w-0 flex-1">{linkNotice}</span>
+                <button
+                  type="button"
+                  aria-label="Close notice"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={dismissLinkNotice}
+                  className="-mr-1 -mt-1 inline-flex size-7 shrink-0 items-center justify-center rounded-md text-ink-soft hover:bg-line/40 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <X aria-hidden="true" className="size-4" />
+                </button>
+              </div>
             ) : null}
           </div>
         ) : (
