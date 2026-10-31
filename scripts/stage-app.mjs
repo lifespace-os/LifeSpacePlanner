@@ -6,12 +6,15 @@ const root = process.cwd()
 const buildDir = path.join(root, "build")
 const standaloneDest = path.join(buildDir, "standalone")
 const seedDir = path.join(buildDir, "seed")
-const nodeDest = path.join(buildDir, "node")
+const runtimeDir = path.join(buildDir, "runtime")
+const nodeDest = path.join(runtimeDir, process.platform === "win32" ? "node.exe" : "node")
 
 await rm(standaloneDest, { recursive: true, force: true })
-await rm(nodeDest, { force: true })
+await rm(path.join(buildDir, "node"), { force: true })
+await rm(runtimeDir, { recursive: true, force: true })
 await rm(seedDir, { recursive: true, force: true })
 await mkdir(seedDir, { recursive: true })
+await mkdir(runtimeDir, { recursive: true })
 
 await cp(path.join(root, ".next", "standalone"), standaloneDest, { recursive: true, dereference: true })
 

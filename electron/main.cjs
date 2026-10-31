@@ -27,6 +27,7 @@ const START_PAGE = `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype
 let mainWindow = null
 let server = null
 let spawnedServer = false
+let serverFailed = false
 let quitting = false
 let pageReady = false
 let statusTitle = "Starting LifeSpace Planner…"
@@ -142,6 +143,12 @@ function startServer(nodePath, serverPath, dataDir, seedPath) {
   const onData = (chunk) => appendLog(chunk.toString())
   server.stdout.on("data", onData)
   server.stderr.on("data", onData)
+  server.on("error", (error) => {
+    serverFailed = true
+    spawnedServer = false
+    showStatus("Could not find Node.")
+    appendLog(error.message)
+  })
   server.on("exit", (code) => {
     if (spawnedServer && code) appendLog(`Server exited with code ${code}.`)
   })
@@ -193,7 +200,7 @@ function openWindow() {
 function serverPaths() {
   if (app.isPackaged) {
     return {
-      nodePath: path.join(process.resourcesPath, "node"),
+      nodePath: path.join(process.resourcesPath, "runtime", process.platform === "win32" ? "node.exe" : "node"),
       serverPath: path.join(process.resourcesPath, "standalone", "server.js"),
       seedPath: path.join(process.resourcesPath, "seed", "workspace.json"),
     }
@@ -229,7 +236,7 @@ async function launch() {
   appendLog(`Using ${paths.nodePath}`)
   if (!(await serverIsUp())) startServer(paths.nodePath, paths.serverPath, dataDir, paths.seedPath)
   if (!(await waitForServer())) {
-    showStatus("The app did not start in time.")
+    if (!serverFailed) showStatus("The app did not start in time.")
     return
   }
   pageReady = false
