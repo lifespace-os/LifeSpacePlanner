@@ -721,6 +721,13 @@ export function Whiteboard() {
     [layer],
   )
 
+  const resizeNote = useCallback(
+    (id: string, width: number, height: number) => {
+      updateNote(id, (note) => (note.width === width && note.height === height ? note : { ...note, width, height }))
+    },
+    [updateNote],
+  )
+
   const cardCenters = useCallback(() => {
     const centers = new Map<string, { x: number; y: number }>()
     viewportRef.current?.querySelectorAll<HTMLElement>("[data-note-id]").forEach((el) => {
@@ -1386,6 +1393,7 @@ export function Whiteboard() {
         onTagDrag={handleTagDrag}
         onMove={moveNote}
         onMoveMany={moveNotes}
+  onResize={resizeNote}
         onFront={bringToFront}
         onMission={setMission}
         onEditStart={startEdit}

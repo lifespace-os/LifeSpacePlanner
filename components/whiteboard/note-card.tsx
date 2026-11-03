@@ -5,7 +5,8 @@ import clsx from "clsx"
 import { Check, X } from "lucide-react"
 import {
   CARD_MIN_HEIGHT,
-  CARD_WIDTH,
+  cardWidthOf,
+  clampCardWidth,
   getCardColor,
   labelSetsOf,
   type LabelSetLists,
@@ -45,6 +46,8 @@ type Props = {
   onBinDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
   onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
   onMoveMany: (moves: GroupMove[]) => void
+  /** Saves the size set with the resize handle. */
+  onResize: (id: string, width: number, height: number) => void
   onFront: (id: string) => void
   onMission: (id: string, choice: Exclude<MissionChoice, null>) => void
   onEditStart: (id: string) => void
@@ -59,6 +62,14 @@ type DragState = {
   startY: number
   group: GroupDrag | null
   moved: boolean
+}
+
+type ResizeState = {
+  pointerId: number
+  startX: number
+  startY: number
+  startWidth: number
+  startHeight: number
 }
 
 const KEY_STEP = 24
@@ -94,6 +105,7 @@ export const NoteCard = memo(function NoteCard({
   onBinDrag,
   onMove,
   onMoveMany,
+  onResize,
   onFront,
   onMission,
   onEditStart,
@@ -103,7 +115,81 @@ export const NoteCard = memo(function NoteCard({
 }: Props) {
   const cardRef = useRef<HTMLElement>(null)
   const drag = useRef<DragState | null>(null)
+  const resize = useRef<ResizeState | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [resizing, setResizing] = useState(false)
+  const savedWidth = cardWidthOf(note)
+  const savedHeight = Math.max(CARD_MIN_HEIGHT, note.height ?? 0)
+
+  /** Draws a size on the card at once. The height is only a floor, so the text always keeps its room. */
+  function paintSize(card: HTMLElement, width: number, height: number) {
+    card.style.width = `${width}px`
+    card.style.minHeight = `${Math.max(CARD_MIN_HEIGHT, height)}px`
+  }
+
+  function saveSize(card: HTMLElement, width: number, height: number) {
+    const finalWidth = clampCardWidth(width)
+    paintSize(card, finalWidth, height)
+    onResize(note.id, finalWidth, Math.max(CARD_MIN_HEIGHT, Math.round(card.offsetHeight)))
+  }
+
+  function handleResizeDown(event: React.PointerEvent<HTMLButtonElement>) {
+    if (event.button !== 0 || editing) return
+    event.stopPropagation()
+    event.preventDefault()
+    const card = cardRef.current
+    if (!card) return
+    resize.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startWidth: card.offsetWidth,
+      startHeight: card.offsetHeight,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setResizing(true)
+    onFront(note.id)
+  }
+
+  function handleResizeMove(event: React.PointerEvent<HTMLButtonElement>) {
+    const state = resize.current
+    const card = cardRef.current
+    if (!state || !card || state.pointerId !== event.pointerId) return
+    const zoom = viewRef.current.zoom
+    paintSize(
+      card,
+      clampCardWidth(state.startWidth + (event.clientX - state.startX) / zoom),
+      state.startHeight + (event.clientY - state.startY) / zoom,
+    )
+  }
+
+  function handleResizeEnd(event: React.PointerEvent<HTMLButtonElement>) {
+    const state = resize.current
+    const card = cardRef.current
+    if (!state || !card || state.pointerId !== event.pointerId) return
+    resize.current = null
+    setResizing(false)
+    if (event.type === "pointercancel") {
+      paintSize(card, savedWidth, savedHeight)
+      return
+    }
+    const zoom = viewRef.current.zoom
+    saveSize(
+      card,
+      state.startWidth + (event.clientX - state.startX) / zoom,
+      state.startHeight + (event.clientY - state.startY) / zoom,
+    )
+  }
+
+  function handleResizeKey(event: React.KeyboardEvent<HTMLButtonElement>) {
+    const arrow = ARROWS[event.key]
+    const card = cardRef.current
+    if (!arrow || !card) return
+    event.preventDefault()
+    event.stopPropagation()
+    const step = event.shiftKey ? KEY_STEP * 4 : KEY_STEP
+    saveSize(card, card.offsetWidth + arrow[0] * step, card.offsetHeight + arrow[1] * step)
+  }
 
   function commit(left: number, top: number) {
     const card = cardRef.current
@@ -245,8 +331,8 @@ export const NoteCard = memo(function NoteCard({
       style={{
         left: note.x,
         top: note.y,
-        width: isTask ? CARD_WIDTH + 28 : CARD_WIDTH,
-        minHeight: CARD_MIN_HEIGHT,
+        width: savedWidth,
+        minHeight: savedHeight,
         zIndex: dragging || editing ? 9999 : note.z,
         transform: dragging ? "rotate(0deg) scale(1.04)" : editing ? "rotate(0deg)" : `rotate(${note.rotation}deg)`,
         backgroundColor: isTask ? undefined : color.fill,
@@ -314,6 +400,27 @@ export const NoteCard = memo(function NoteCard({
       </div>
 
       {mode === "mission" && missionSaved && !fixed && !tagTarget ? <MissionControls note={note} onMission={onMission} /> : null}
+
+      {editing ? null : (
+        <button
+          type="button"
+          data-resize-handle=""
+          aria-label="Resize card"
+          onPointerDown={handleResizeDown}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeEnd}
+          onPointerCancel={handleResizeEnd}
+          onKeyDown={handleResizeKey}
+          className={clsx(
+            "absolute right-0 flex size-6 cursor-nwse-resize touch-none items-end justify-end p-1 text-current transition-opacity",
+            "focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-accent group-hover:opacity-80",
+            mode === "mission" && missionSaved && !fixed && !tagTarget ? "bottom-8" : "bottom-0",
+            resizing ? "opacity-100" : "opacity-40",
+          )}
+        >
+          <span aria-hidden="true" className="size-2.5 border-r-2 border-b-2 border-current" />
+        </button>
+      )}
 
       {dragging && multiCount > 1 ? (
         <span className="absolute -top-3 -right-3 flex h-7 min-w-7 items-center justify-center rounded-full bg-accent px-2 text-sm font-medium text-board tabular-nums shadow-md">

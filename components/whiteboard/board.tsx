@@ -111,6 +111,7 @@ export function Board({
   onBinDrag,
   onMove,
   onMoveMany,
+  onResize,
   onFront,
   onMission,
   onEditStart,
@@ -160,6 +161,7 @@ export function Board({
   onBinDrag: (id: string, clientX: number, clientY: number, phase: "move" | "drop" | "cancel") => boolean
   onMove: (id: string, x: number, y: number, centerX: number, centerY: number) => void
   onMoveMany: (moves: GroupMove[]) => void
+  onResize: (id: string, width: number, height: number) => void
   onFront: (id: string) => void
   onMission: (id: string, choice: Exclude<MissionChoice, null>) => void
   onEditStart: (id: string) => void
@@ -402,6 +404,7 @@ export function Board({
                   onBinDrag={onBinDrag}
                   onMove={onMove}
                   onMoveMany={onMoveMany}
+                  onResize={onResize}
                   onFront={onFront}
                   onMission={onMission}
                   onEditStart={onEditStart}

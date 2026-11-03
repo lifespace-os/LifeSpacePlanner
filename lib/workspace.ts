@@ -268,7 +268,9 @@ function isNote(value: unknown): boolean {
     typeof value.y === "number" &&
     Array.isArray(value.hashtags) &&
     (value.image === undefined || isMediaId(value.image)) &&
-    (value.webLinks === undefined || isWebLinkList(value.webLinks))
+    (value.webLinks === undefined || isWebLinkList(value.webLinks)) &&
+    (value.width === undefined || (typeof value.width === "number" && Number.isFinite(value.width))) &&
+    (value.height === undefined || (typeof value.height === "number" && Number.isFinite(value.height)))
   )
 }
 

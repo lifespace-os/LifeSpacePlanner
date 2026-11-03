@@ -78,6 +78,10 @@ export type Note = {
   image?: string
   /** The Web links on this card, in the order added. They are not hashtags and change no filter or count. */
   webLinks?: WebLink[]
+  /** The width set with the resize handle. Absent means the default width. */
+  width?: number
+  /** The height set with the resize handle. It is a floor: the card is never shorter than its text. */
+  height?: number
 }
 
 /** Why a goal exists. "unlinked" is a valid answer. */
@@ -110,6 +114,19 @@ export type View = { x: number; y: number; zoom: number }
 
 export const CARD_WIDTH = 196
 export const CARD_MIN_HEIGHT = 132
+export const CARD_MAX_WIDTH = 480
+/** A card that has become a task is this much wider than a plain card until it is resized. */
+export const TASK_EXTRA_WIDTH = 28
+
+export function clampCardWidth(value: number) {
+  return Math.min(CARD_MAX_WIDTH, Math.max(CARD_WIDTH, Math.round(value)))
+}
+
+/** The width a whiteboard card is drawn at: the saved width, or the default for its kind. */
+export function cardWidthOf(note: Pick<Note, "width" | "task">) {
+  if (typeof note.width === "number" && Number.isFinite(note.width)) return clampCardWidth(note.width)
+  return note.task !== null ? CARD_WIDTH + TASK_EXTRA_WIDTH : CARD_WIDTH
+}
 export const MIN_ZOOM = 0.15
 export const MAX_ZOOM = 2.5
 
