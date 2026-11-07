@@ -5,6 +5,7 @@ import { useLanguage } from "@/components/language-provider"
 import type { IkigaiCircleId } from "@/lib/board-data"
 import { CIRCLE_KEYS, SEARCH_LIMIT, type CardRef, type Detail, type Hit } from "@/lib/card-search"
 import { placeLabel } from "@/lib/kanban-names"
+import { TagInput } from "@/components/tag-input"
 import { WebLinksEditor } from "@/components/web-links/web-links-editor"
 import type { WebLink } from "@/lib/web-links"
 
@@ -118,16 +119,20 @@ function Actions({
           {t("search.addTag")}
         </h3>
         <form
-          className="flex gap-2"
+          className="flex items-start gap-2"
           onSubmit={(event) => {
             event.preventDefault()
             if (onAddTag(tagDraft)) setTagDraft("")
           }}
         >
-          <input
+          <TagInput
             id={tagId}
             value={tagDraft}
-            onChange={(event) => setTagDraft(event.target.value)}
+            onValue={setTagDraft}
+            own={chosen.tags}
+            onPick={(tag) => {
+              if (onAddTag(tag)) setTagDraft("")
+            }}
             aria-labelledby={`${tagId}-tag`}
             placeholder={t("search.tagPlaceholder")}
             maxLength={25}

@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import clsx from "clsx"
 import { Hash, ImageOff, ImagePlus, PencilLine, Plus, Trash2, X } from "lucide-react"
 import { useT } from "@/components/language-provider"
+import { TagInput } from "@/components/tag-input"
 import { IMAGE_ACCEPT } from "@/lib/media"
 import { CARD_COLORS, getCardColor, normalizeHashtag, type CardColorId, type Note } from "@/lib/board-data"
 
@@ -47,7 +48,7 @@ function MenuShell({
       if (!ref.current?.contains(event.target as Node)) onClose()
     }
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose()
+      if (event.key === "Escape" && !event.defaultPrevented) onClose()
     }
     document.addEventListener("pointerdown", handlePointerDown, true)
     document.addEventListener("keydown", handleKeyDown)
@@ -270,25 +271,26 @@ export function CardMenu({
           >
             Hashtag
           </label>
-          <div className="mt-2 flex items-center gap-1.5">
-            <div className="relative flex-1">
-              <Hash
-                className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-soft"
-                aria-hidden="true"
-              />
-              <input
-                id="card-menu-hashtag"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.nativeEvent.isComposing || e.keyCode === 229)) e.preventDefault()
-                }}
-                placeholder="health"
-                autoComplete="off"
-                maxLength={30}
-                className="h-8 w-full rounded-md border border-line bg-board pr-2 pl-7 text-sm text-ink placeholder:text-ink-soft/60 focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
-              />
-            </div>
+          <div className="mt-2 flex items-start gap-1.5">
+            <TagInput
+              id="card-menu-hashtag"
+              value={draft}
+              onValue={setDraft}
+              own={note.hashtags}
+              onPick={(tag) => {
+                onAddHashtag(tag)
+                setDraft("")
+              }}
+              leading={
+                <Hash
+                  className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-soft"
+                  aria-hidden="true"
+                />
+              }
+              placeholder="health"
+              maxLength={30}
+              className="h-8 w-full rounded-md border border-line bg-board pr-2 pl-7 text-sm text-ink placeholder:text-ink-soft/60 focus-visible:border-accent focus-visible:outline-2 focus-visible:outline-accent/30"
+            />
             <button
               type="submit"
               disabled={!normalizeHashtag(draft)}

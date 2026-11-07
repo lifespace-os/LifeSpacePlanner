@@ -522,6 +522,7 @@ export const en = {
   "search.toNote": "Turn back into a whiteboard card",
   "search.addTag": "Add a hashtag",
   "search.tagPlaceholder": "#hashtag",
+  "tags.suggestions": "Matching tags",
   "search.add": "Add",
   "search.link": "Link",
   "search.findOther": "Find another card to link",

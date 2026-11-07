@@ -3,6 +3,7 @@
 import clsx from "clsx"
 import { Plus, X } from "lucide-react"
 import { useId, useState } from "react"
+import { TagInput } from "@/components/tag-input"
 import {
   CARD_COLORS,
   getCardColor,
@@ -197,11 +198,13 @@ export function GraphVertexWindow({
               event.preventDefault()
               addTag(draftTag)
             }}
-            className="flex gap-2"
+            className="flex items-start gap-2"
           >
-            <input
+            <TagInput
               value={draftTag}
-              onChange={(event) => setDraftTag(event.target.value)}
+              onValue={setDraftTag}
+              own={note.hashtags}
+              onPick={addTag}
               maxLength={25}
               aria-label="New tag"
               placeholder="Add a tag"
