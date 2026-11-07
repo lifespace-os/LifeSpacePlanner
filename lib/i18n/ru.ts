@@ -102,7 +102,7 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "settings.sample.putBackConfirm": "Заменить примером",
   "settings.sample.putBackBody":
     "Карточки, которые вы написали на доске и в канбане, будут заменены примером истории. Сначала скачайте резервную копию, если хотите их сохранить.",
-  "settings.sample.emptyTitle": "Очистить ����оску?",
+  "settings.sample.emptyTitle": "Очистить ������оску?",
   "settings.sample.emptyConfirm": "Очистить доску",
   "settings.sample.emptyBody":
     "Будут удалены все карточки доски и задачи канбана, включая те, что вы написали. Сначала скачайте резервную копию, если хотите их сохранить.",
@@ -516,6 +516,9 @@ export const ru: Record<keyof typeof en, string> & ExtraPluralForms = {
   "editor.newStep": "Новый шаг",
   "editor.addStepPlaceholder": "Добавить шаг",
   "editor.add": "Добавить",
+  "editor.tags": "Хештеги",
+  "editor.removeTag": "Убрать #{tag}",
+  "card.tagsSr": "Хештеги ",
   "editor.repeat": "Повтор",
   "editor.repeatHow": "Как часто повторяется задача",
   "editor.mode.once": "Один раз",

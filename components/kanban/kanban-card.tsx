@@ -197,6 +197,20 @@ export function KanbanCardView({
           )}
         </div>
 
+        {card.hashtags && card.hashtags.length > 0 && (
+          <ul className="mt-1.5 flex flex-wrap gap-1">
+            <li className="sr-only">{t("card.tagsSr")}</li>
+            {card.hashtags.map((tag) => (
+              <li
+                key={tag}
+                className="max-w-full truncate rounded-full border border-line px-2 text-[11px] leading-4 text-ink-soft"
+              >
+                #{tag}
+              </li>
+            ))}
+          </ul>
+        )}
+
         <WebLinkRow
           links={card.webLinks}
           className="mt-1.5"

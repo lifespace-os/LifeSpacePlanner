@@ -167,6 +167,7 @@ export type CardDraft = {
   repeat: CardRepeat
   remind: string
   webLinks: WebLink[]
+  hashtags: string[]
 }
 
 export function draftOf(card: KanbanCard): CardDraft {
@@ -182,6 +183,7 @@ export function draftOf(card: KanbanCard): CardDraft {
     repeat: card.repeat ?? ONCE,
     remind: card.remind ?? "",
     webLinks: card.webLinks ?? [],
+    hashtags: card.hashtags ?? [],
   }
 }
 
@@ -195,6 +197,8 @@ export function sameDraft(a: CardDraft, b: CardDraft) {
     a.missionLink === b.missionLink &&
     a.secondLine === b.secondLine &&
     a.remind === b.remind &&
+    a.hashtags.length === b.hashtags.length &&
+    a.hashtags.every((tag, index) => tag === b.hashtags[index]) &&
     sameWebLinks(a.webLinks, b.webLinks) &&
     sameRepeat(a.repeat, b.repeat) &&
     a.steps.length === b.steps.length &&

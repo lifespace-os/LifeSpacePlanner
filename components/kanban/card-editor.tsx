@@ -2,8 +2,11 @@
 
 import { useEffect, useId, useRef, useState } from "react"
 import { X } from "lucide-react"
+import { useGoals } from "@/components/goals-provider"
 import { useLanguage } from "@/components/language-provider"
 import { ImageViewer } from "@/components/image-viewer"
+import { TagInput } from "@/components/tag-input"
+import { normalizeHashtag } from "@/lib/board-data"
 import { useKanban } from "@/components/kanban/kanban-provider"
 import { useTrash } from "@/components/trash-provider"
 import { WebLinksEditor } from "@/components/web-links/web-links-editor"
@@ -158,6 +161,8 @@ export function CardEditor({ card, draft, dirty, onChange, onClose, onSave, onRe
             </div>
 
             {card.image ? <TaskPicture id={card.image} onRemove={removeImage} /> : null}
+
+            <TagSection tags={draft.hashtags} onChange={(hashtags) => onChange({ hashtags })} />
 
             <fieldset className="min-w-0">
               <legend className="mb-1.5 text-sm font-medium text-ink">{t("webLinks.title")}</legend>
@@ -349,6 +354,98 @@ function TaskPicture({ id, onRemove }: { id: string; onRemove: () => void }) {
         />
       </button>
       {open ? <ImageViewer id={id} onClose={() => setOpen(false)} /> : null}
+    </fieldset>
+  )
+}
+
+function TagSection({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+  const { t } = useLanguage()
+  const { rings } = useGoals()
+  const [text, setText] = useState("")
+  const [refused, setRefused] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const inputId = useId()
+
+  const addTag = (raw: string) => {
+    const tag = normalizeHashtag(raw)
+    if (!tag) return
+    const lower = tag.toLowerCase()
+    if (rings.some((ring) => ring.tags.some((item) => item.toLowerCase() === lower))) {
+      setRefused(tag)
+      return
+    }
+    setRefused(null)
+    if (!tags.some((item) => item.toLowerCase() === lower)) onChange([...tags, tag])
+    setText("")
+  }
+
+  const removeTag = (tag: string) => {
+    onChange(tags.filter((item) => item !== tag))
+    inputRef.current?.focus()
+  }
+
+  return (
+    <fieldset className="min-w-0">
+      <legend className="mb-1.5 text-sm font-medium text-ink">{t("editor.tags")}</legend>
+      {tags.length > 0 && (
+        <ul className="mb-2 flex flex-wrap gap-1.5">
+          {tags.map((tag) => (
+            <li
+              key={tag}
+              className="flex items-center gap-1 rounded-full border border-line bg-board py-0.5 pl-2.5 pr-1 text-xs text-ink"
+            >
+              <span className="max-w-40 truncate">#{tag}</span>
+              <button
+                type="button"
+                aria-label={t("editor.removeTag", { tag })}
+                onClick={() => removeTag(tag)}
+                className="flex size-5 items-center justify-center rounded-full text-ink-soft hover:bg-line/50 hover:text-ink focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                <X aria-hidden="true" className="size-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex items-start gap-2">
+        <label htmlFor={inputId} className="sr-only">
+          {t("search.addTag")}
+        </label>
+        <TagInput
+          id={inputId}
+          ref={inputRef}
+          value={text}
+          onValue={(value) => {
+            setText(value)
+            setRefused(null)
+          }}
+          own={tags}
+          onPick={addTag}
+          placeholder={t("search.tagPlaceholder")}
+          maxLength={25}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || event.nativeEvent.isComposing || event.keyCode === 229) return
+            // A highlighted suggestion is chosen by the field itself; any other Enter adds the typed tag, never saves the task.
+            if (event.currentTarget.getAttribute("aria-activedescendant")) return
+            event.preventDefault()
+            addTag(text)
+          }}
+          className={FIELD}
+        />
+        <button
+          type="button"
+          onClick={() => addTag(text)}
+          disabled={!normalizeHashtag(text)}
+          className="shrink-0 rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:bg-line/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {t("editor.add")}
+        </button>
+      </div>
+      {refused && (
+        <p role="status" className="mt-1.5 text-xs text-ink-soft">
+          {t("search.msg.ring", { tag: refused })}
+        </p>
+      )}
     </fieldset>
   )
 }

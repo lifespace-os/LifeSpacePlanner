@@ -8,7 +8,7 @@ import { useT } from "@/components/language-provider"
 import { collectTags, suggestTags } from "@/lib/tag-suggestions"
 
 type Props = Omit<
-  React.InputHTMLAttributes<HTMLInputElement>,
+  React.ComponentProps<"input">,
   "value" | "onChange" | "role" | "autoComplete" | "type"
 > & {
   value: string
