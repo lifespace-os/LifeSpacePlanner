@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import clsx from "clsx"
 import { ArrowRight, BellRing, Check, Clock, Ellipsis, Undo2 } from "lucide-react"
 import { useLanguage } from "@/components/language-provider"
@@ -42,7 +42,8 @@ type Props = {
 }
 
 const MENU_WIDTH = 240
-const MENU_MAX_HEIGHT = 352
+const MENU_GAP = 4
+const WINDOW_MARGIN = 8
 
 export function KanbanCardView({
   card,
@@ -63,7 +64,8 @@ export function KanbanCardView({
   const { t, locale } = useLanguage()
   const { archiveTask } = useTrash()
   const inResults = mode === "results"
-  const [menu, setMenu] = useState<{ top: number; left: number } | null>(null)
+  const [menu, setMenu] = useState<{ left: number; anchorTop: number; anchorBottom: number } | null>(null)
+  const [placement, setPlacement] = useState<{ side: "below" | "above"; maxHeight: number } | null>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const label = getLabel(card.labelId)
@@ -89,25 +91,45 @@ export function KanbanCardView({
     document.addEventListener("pointerdown", onPointerDown)
     document.addEventListener("keydown", onKeyDown)
     window.addEventListener("resize", close)
-    window.addEventListener("scroll", close, true)
+    const onScroll = (event: Event) => {
+      if (menuRef.current?.contains(event.target as Node)) return
+      close()
+    }
+    window.addEventListener("scroll", onScroll, true)
     return () => {
       document.removeEventListener("pointerdown", onPointerDown)
       document.removeEventListener("keydown", onKeyDown)
       window.removeEventListener("resize", close)
-      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("scroll", onScroll, true)
     }
   }, [menu])
 
-  useEffect(() => {
-    if (menu) menuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus()
+  // Measure the open menu at its natural height, then pick the side of the button with room for it.
+  useLayoutEffect(() => {
+    if (!menu) {
+      setPlacement(null)
+      return
+    }
+    const natural = menuRef.current?.scrollHeight ?? 0
+    const below = window.innerHeight - menu.anchorBottom - MENU_GAP - WINDOW_MARGIN
+    const above = menu.anchorTop - MENU_GAP - WINDOW_MARGIN
+    if (natural <= below) setPlacement({ side: "below", maxHeight: below })
+    else if (natural <= above || above > below) setPlacement({ side: "above", maxHeight: Math.max(above, 0) })
+    else setPlacement({ side: "below", maxHeight: Math.max(below, 0) })
   }, [menu])
+
+  useEffect(() => {
+    if (menu && placement) menuRef.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus()
+  }, [menu, placement])
 
   const openMenu = () => {
     const rect = buttonRef.current?.getBoundingClientRect()
     if (!rect) return
-    const left = Math.min(Math.max(8, rect.right - MENU_WIDTH), window.innerWidth - MENU_WIDTH - 8)
-    const top = Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - MENU_MAX_HEIGHT - 8))
-    setMenu({ top, left })
+    const left = Math.min(
+      Math.max(WINDOW_MARGIN, rect.right - MENU_WIDTH),
+      window.innerWidth - MENU_WIDTH - WINDOW_MARGIN,
+    )
+    setMenu({ left, anchorTop: rect.top, anchorBottom: rect.bottom })
   }
 
   return (
@@ -291,8 +313,16 @@ export function KanbanCardView({
           ref={menuRef}
           role="menu"
           aria-label={t("card.moveAria", { title: card.title })}
-          style={{ position: "fixed", top: menu.top, left: menu.left, width: MENU_WIDTH, maxHeight: MENU_MAX_HEIGHT }}
-          className="z-50 overflow-y-auto rounded-lg border border-line bg-card p-1.5 shadow-lg"
+          style={{
+            position: "fixed",
+            left: menu.left,
+            width: MENU_WIDTH,
+            ...(placement?.side === "above"
+              ? { bottom: window.innerHeight - menu.anchorTop + MENU_GAP }
+              : { top: menu.anchorBottom + MENU_GAP }),
+            ...(placement ? { maxHeight: placement.maxHeight } : { visibility: "hidden" as const }),
+          }}
+          className="z-50 overflow-y-auto overscroll-contain rounded-lg border border-line bg-card p-1.5 shadow-lg"
         >
           <p className="px-2 pb-1 pt-1 text-xs uppercase tracking-[0.14em] text-ink-soft">{t("card.columnHeading")}</p>
           {columns.map((column) => {
